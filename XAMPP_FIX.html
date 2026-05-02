@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>IExplore Laguna — XAMPP Fix Guide</title>
+<style>
+  body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; background: #f8f9fa; color: #1c1c1e; }
+  h1 { color: #2d6a4f; }
+  h2 { color: #1a3a2a; margin-top: 2rem; border-bottom: 2px solid #d8f3dc; padding-bottom: .4rem; }
+  code { background: #1c1c1e; color: #52b788; padding: 2px 7px; border-radius: 4px; font-size: .92em; }
+  pre { background: #1c1c1e; color: #e2e8f0; padding: 1.2rem 1.5rem; border-radius: 8px; overflow-x: auto; line-height: 1.7; }
+  pre .hi { color: #e9c46a; font-weight: bold; }
+  .step { background: #fff; border: 1px solid #e5e0d8; border-left: 4px solid #2d6a4f; border-radius: 8px; padding: 1.2rem 1.5rem; margin-bottom: 1.2rem; }
+  .step-num { display: inline-block; background: #2d6a4f; color: #fff; border-radius: 50%; width: 26px; height: 26px; text-align: center; line-height: 26px; font-weight: 700; font-size: .85rem; margin-right: .6rem; }
+  .warn { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 1rem 1.2rem; margin: 1rem 0; }
+  .ok { background: #d8f3dc; border: 1px solid #52b788; border-radius: 8px; padding: 1rem 1.2rem; margin: 1rem 0; }
+  a { color: #2d6a4f; }
+</style>
+</head>
+<body>
+
+<h1>🗺️ IExplore Laguna — XAMPP 403 Fix Guide</h1>
+<p>You're seeing <strong>Error 403 Access Forbidden</strong> because XAMPP's Apache is not allowing <code>.htaccess</code> overrides for your project folder. Follow the steps below to fix it permanently.</p>
+
+<div class="warn">
+  ⚠️ <strong>Root cause:</strong> XAMPP ships with <code>AllowOverride None</code> in its default Apache config. This blocks all <code>.htaccess</code> files from working, which Apache reports as a 403.
+</div>
+
+<h2>Fix 1 — Edit httpd.conf (Required)</h2>
+
+<div class="step">
+  <span class="step-num">1</span>
+  Open <strong>XAMPP Control Panel</strong> → click <strong>Config</strong> next to Apache → choose <strong>httpd.conf</strong>
+  <br><small style="color:#6b7280">File path: <code>C:\xampp\apache\conf\httpd.conf</code></small>
+</div>
+
+<div class="step">
+  <span class="step-num">2</span>
+  Press <strong>Ctrl+F</strong> and search for: <code>htdocs</code><br><br>
+  Find this block (around line 250):
+<pre>&lt;Directory "C:/xampp/htdocs"&gt;
+    Options Indexes FollowSymLinks Includes ExecCGI
+    AllowOverride <span class="hi">None</span>
+    Require all granted
+&lt;/Directory&gt;</pre>
+  Change <code>AllowOverride None</code> → <code>AllowOverride All</code>:
+<pre>&lt;Directory "C:/xampp/htdocs"&gt;
+    Options Indexes FollowSymLinks Includes ExecCGI
+    AllowOverride <span class="hi">All</span>
+    Require all granted
+&lt;/Directory&gt;</pre>
+</div>
+
+<div class="step">
+  <span class="step-num">3</span>
+  Save the file, then in XAMPP Control Panel click <strong>Stop</strong> → <strong>Start</strong> on Apache to restart it.
+</div>
+
+<h2>Fix 2 — Verify mod_rewrite is enabled (if still 403)</h2>
+
+<div class="step">
+  <span class="step-num">4</span>
+  In the same <code>httpd.conf</code>, search for:
+<pre>#LoadModule rewrite_module modules/mod_rewrite.so</pre>
+  Remove the <code>#</code> at the start so it reads:
+<pre>LoadModule rewrite_module modules/mod_rewrite.so</pre>
+  Restart Apache again.
+</div>
+
+<h2>Fix 3 — Check project folder permissions (Mac/Linux XAMPP)</h2>
+
+<div class="step">
+  <span class="step-num">5</span>
+  On <strong>macOS/Linux</strong> only — open Terminal and run:
+<pre>chmod -R 755 /Applications/XAMPP/xamppfiles/htdocs/iexplore-laguna</pre>
+  On <strong>Windows</strong> this is not needed.
+</div>
+
+<h2>Test your fix</h2>
+<p>After restarting Apache, visit these URLs in order:</p>
+<ol>
+  <li><a href="http://localhost/iexplore-laguna/test_db.php">http://localhost/iexplore-laguna/test_db.php</a> — should show green ✅ for all tables</li>
+  <li><a href="http://localhost/iexplore-laguna/">http://localhost/iexplore-laguna/</a> — should show the homepage</li>
+</ol>
+
+<div class="ok">
+  ✅ <strong>If test_db.php works but index.php still shows 403</strong> — the issue is specifically with <code>.htaccess</code>. Repeat Fix 1 and make sure you saved the file.
+</div>
+
+<div class="warn">
+  ⚠️ <strong>If you get a blank white page</strong> — there's a PHP error. Enable error display temporarily: open <code>includes/config.php</code> and make sure <code>DEBUG_MODE</code> is set to <code>true</code>.
+</div>
+
+<hr style="margin:2rem 0;border-color:#e5e0d8">
+<p style="color:#6b7280;font-size:.88rem">IExplore Laguna Capstone Project — XAMPP Apache 2.4 Fix Guide</p>
+
+</body>
+</html>
