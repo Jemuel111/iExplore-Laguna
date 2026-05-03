@@ -160,7 +160,7 @@ $transport_labels = [
 
     <!-- Map -->
     <div class="position-relative mb-3">
-      <div id="trip-map" style="height:520px;border-radius:var(--radius);border:1px solid var(--border)"></div>
+      <div id="trip-map" style="height:520px;min-height:520px;width:100%;display:block;border-radius:var(--radius);border:1px solid var(--border)"></div>
 
       <!-- Map legend -->
       <div class="position-absolute bottom-0 start-0 m-2 p-2 bg-white rounded shadow-sm"
@@ -268,9 +268,13 @@ $transport_labels = [
 
 <!-- ── JS ──────────────────────────────────────────────────── -->
 <script>
+document.addEventListener('DOMContentLoaded', function() {
 /* ============================================================
    TRIP PLANNER — Main JS
    ============================================================ */
+
+// Fix API base — pages/ is one level deep, api/ is at root
+const API_BASE = '<?= APP_URL ?>/api/';
 
 // ── Map init ────────────────────────────────────────────────
 const map = L.map('trip-map', { zoomControl: true }).setView([14.17, 121.24], 10);
@@ -279,6 +283,11 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   maxZoom: 18,
 }).addTo(map);
+
+// Critical: force Leaflet to recalculate container size
+setTimeout(() => { map.invalidateSize(); }, 200);
+setTimeout(() => { map.invalidateSize(); }, 600);
+window.addEventListener('resize', () => map.invalidateSize());
 
 // State
 let routeLayer    = null;
@@ -353,8 +362,8 @@ async function planRoute() {
   try {
     // Fetch route + spots in parallel
     const [routeRes, spotsRes] = await Promise.all([
-      IExploreApp.apiFetch(`routes.php?action=route&origin=${origin}&dest=${dest}`),
-      IExploreApp.apiFetch(`routes.php?action=spots&origin=${origin}&dest=${dest}`),
+      fetch(API_BASE + `routes.php?action=route&origin=${origin}&dest=${dest}`).then(r=>r.json()),
+      fetch(API_BASE + `routes.php?action=spots&origin=${origin}&dest=${dest}`).then(r=>r.json()),
     ]);
 
     if (!routeRes.success) {
@@ -608,9 +617,9 @@ async function renderBudget(routeData, spots, days, persons, budgetLevel) {
   const origin_id = routeData.origin.id;
   const dest_id   = routeData.destination.id;
 
-  const res = await IExploreApp.apiFetch(
-    `budget.php?action=estimate&origin=${origin_id}&dest=${dest_id}&days=${days}&persons=${persons}&level=${budgetLevel}`
-  );
+  const res = await fetch(
+    API_BASE + `budget.php?action=estimate&origin=${origin_id}&dest=${dest_id}&days=${days}&persons=${persons}&level=${budgetLevel}`
+  ).then(r => r.json());
 
   if (!res.success) return;
   const b = res.data;
@@ -735,12 +744,32 @@ function showSpotDetail(spotId) {
 }
 
 // ── Save itinerary ──────────────────────────────────────────
-document.getElementById('save-itinerary-btn').addEventListener('click', () => {
+document.getElementById('save-itinerary-btn').addEventListener('click', async () => {
   <?php if (!is_logged_in()): ?>
     IExploreApp.toast('Please log in to save your itinerary.', 'warning');
     setTimeout(() => window.location.href = '<?= APP_URL ?>/pages/login.php', 1500);
   <?php else: ?>
-    IExploreApp.toast('Itinerary saved! (Coming in full version)', 'success');
+    if (!routeData) { IExploreApp.toast('Plan a route first.', 'warning'); return; }
+    const btn = document.getElementById('save-itinerary-btn');
+    IExploreApp.setLoading(btn, true);
+    const res = await fetch(API_BASE + 'itineraries.php?action=save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        origin_id:    routeData.origin.id,
+        dest_id:      routeData.destination.id,
+        days:         parseInt(document.getElementById('days-select').value),
+        persons:      parseInt(document.getElementById('persons-select').value),
+        budget_level: document.getElementById('budget-select').value,
+        transport_pref: selectedTransport?.transport_type || 'any',
+      })
+    }).then(r => r.json());
+    IExploreApp.setLoading(btn, false);
+    if (res.success) {
+      IExploreApp.toast('Itinerary saved! View it in My Itineraries.', 'success');
+    } else {
+      IExploreApp.toast(res.message || 'Could not save itinerary.', 'error');
+    }
   <?php endif; ?>
 });
 
@@ -773,6 +802,8 @@ function catEmoji(cat) {
              museum:'🏺',religious:'⛪',beach_lake:'🏞️',adventure:'🧗',food:'🍜'};
   return m[cat] || '📍';
 }
+
+}); // end DOMContentLoaded
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
