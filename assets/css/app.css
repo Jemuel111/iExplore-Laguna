@@ -328,6 +328,8 @@ img { max-width: 100%; height: auto; }
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: .5rem;
+  flex-wrap: nowrap;
   padding: .5rem 0;
   border-bottom: 1px solid rgba(255,255,255,.1);
   font-size: .9rem;
@@ -374,6 +376,7 @@ img { max-width: 100%; height: auto; }
   font-size: 1.1rem;
   color: var(--green-dark);
   margin-bottom: .75rem;
+  white-space: nowrap;
 }
 .itinerary-item {
   background: var(--white);

@@ -635,8 +635,10 @@ async function renderBudget(routeData, spots, days, persons, budgetLevel) {
 
 function budgetRow(icon, label, amount) {
   return `<div class="budget-row">
-    <span class="label"><i class="bi ${icon} me-2"></i>${label}</span>
-    <span class="amount">${formatPeso(amount)}</span>
+    <span class="label" style="display:flex;align-items:center;gap:.5rem">
+      <i class="bi ${icon}"></i>${label}
+    </span>
+    <span class="amount" style="white-space:nowrap">${formatPeso(amount)}</span>
   </div>`;
 }
 
@@ -692,12 +694,14 @@ function renderItinerary(routeData, spots, days) {
 
 function itineraryItem(time, icon, name, desc, isSpot = false) {
   return `
-    <div class="itinerary-item">
-      <div class="item-time">${time}</div>
-      <div>
-        <i class="bi ${icon} me-1" style="color:${isSpot?'var(--terracotta)':'var(--green-light)'}"></i>
-        <span class="item-name">${name}</span>
-        <div class="item-desc">${desc}</div>
+    <div class="itinerary-item" style="display:flex;align-items:flex-start;gap:.75rem;padding:.9rem 1.1rem">
+      <div class="item-time" style="min-width:64px;flex-shrink:0;white-space:nowrap">${time}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:.35rem;flex-wrap:nowrap;margin-bottom:.2rem">
+          <i class="bi ${icon}" style="color:${isSpot?'var(--terracotta)':'var(--green-light)'};flex-shrink:0"></i>
+          <span class="item-name" style="font-weight:600;font-size:.95rem">${name}</span>
+        </div>
+        <div class="item-desc" style="font-size:.82rem;color:var(--text-muted)">${desc}</div>
       </div>
     </div>
   `;
