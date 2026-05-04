@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// LAKBAY LAGUNA — Homepage
+// IEXPLORE LAGUNA — Homepage
 // index.php
 // ============================================================
 $page_title  = 'Home';
@@ -19,6 +19,24 @@ $featured_spots = db_fetch_all(
 
 // Load all cities for the quick-select
 $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
+
+// Category badge helper (PHP-side only, replaces JS IExploreApp::badge() call)
+function spot_badge(string $category): string {
+    $labels = [
+        'nature'    => 'Nature',
+        'heritage'  => 'Heritage',
+        'waterfall' => 'Waterfall',
+        'hotspring' => 'Hot Spring',
+        'museum'    => 'Museum',
+        'religious' => 'Religious',
+        'beach_lake'=> 'Lake/Beach',
+        'adventure' => 'Adventure',
+        'food'      => 'Food',
+    ];
+    $label = htmlspecialchars($labels[$category] ?? $category, ENT_QUOTES, 'UTF-8');
+    $cat   = htmlspecialchars($category, ENT_QUOTES, 'UTF-8');
+    return "<span class=\"badge-category badge-{$cat}\">{$label}</span>";
+}
 ?>
 
 <!-- ── HERO ────────────────────────────────────────────────── -->
@@ -150,15 +168,8 @@ $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
             ?>
           </div>
           <div class="card-body-app">
-            <div class="d-flex justify-content-between align-items-start mb-2">
-              <?= IExploreApp::badge($spot['category']) ?? '' ?>
-              <?php // PHP-side badge render ?>
-              <?php
-              $catLabels = ['nature'=>'Nature','heritage'=>'Heritage','waterfall'=>'Waterfall',
-                            'hotspring'=>'Hot Spring','museum'=>'Museum','religious'=>'Religious',
-                            'beach_lake'=>'Lake/Beach','adventure'=>'Adventure','food'=>'Food'];
-              $catLabel = $catLabels[$spot['category']] ?? $spot['category'];
-              ?>
+            <div class="mb-2">
+              <?= spot_badge($spot['category']) ?>
             </div>
             <h5 class="card-title-app"><?= e($spot['name']) ?></h5>
             <div class="card-meta mb-2">

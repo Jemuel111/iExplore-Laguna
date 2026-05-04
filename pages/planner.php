@@ -160,7 +160,7 @@ $transport_labels = [
 
     <!-- Map -->
     <div class="position-relative mb-3">
-      <div id="trip-map" style="height:520px;min-height:520px;width:100%;display:block;border-radius:var(--radius);border:1px solid var(--border)"></div>
+    <div id="trip-map"></div>
 
       <!-- Map legend -->
       <div class="position-absolute bottom-0 start-0 m-2 p-2 bg-white rounded shadow-sm"
@@ -180,13 +180,8 @@ $transport_labels = [
       </div>
 
       <!-- Loading overlay -->
-      <div id="map-loading" class="d-none position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
-           style="background:rgba(255,255,255,.7);border-radius:var(--radius);z-index:1000">
-        <div class="text-center">
-          <div class="spinner-app mb-2"></div>
-          <div class="small text-muted">Loading route...</div>
-        </div>
-      </div>
+      <div id="map-loading" class="position-absolute top-0 start-0 w-100 h-100"
+     style="display:none;background:rgba(255,255,255,.7);border-radius:var(--radius);z-index:1000;align-items:center;justify-content:center">
     </div>
 
     <!-- Spots along route -->
@@ -284,9 +279,10 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 18,
 }).addTo(map);
 
-// Critical: force Leaflet to recalculate container size
-setTimeout(() => { map.invalidateSize(); }, 200);
-setTimeout(() => { map.invalidateSize(); }, 600);
+// Critical: force Leaflet to recalculate container size after layout settles
+setTimeout(() => { map.invalidateSize(); }, 100);
+setTimeout(() => { map.invalidateSize(); }, 400);
+setTimeout(() => { map.invalidateSize(); }, 800);
 window.addEventListener('resize', () => map.invalidateSize());
 
 // State
@@ -329,9 +325,9 @@ document.getElementById('swap-btn').addEventListener('click', () => {
   d.value = tmp;
 });
 
-// Auto-plan if pre-filled from homepage
+// ── FIX: Auto-plan INSIDE DOMContentLoaded so planRoute is in scope ──
 <?php if ($pre_origin && $pre_dest): ?>
-window.addEventListener('load', () => setTimeout(planRoute, 400));
+setTimeout(planRoute, 500);
 <?php endif; ?>
 
 // ── Main plan function ──────────────────────────────────────
@@ -613,7 +609,6 @@ function renderSpotsGrid(spots, filterCat = 'all') {
 
 // ── Render budget breakdown ─────────────────────────────────
 async function renderBudget(routeData, spots, days, persons, budgetLevel) {
-  // Fetch budget estimates for both origin and destination cities
   const origin_id = routeData.origin.id;
   const dest_id   = routeData.destination.id;
 
@@ -663,7 +658,6 @@ function renderItinerary(routeData, spots, days) {
         <div class="day-label">Day ${day} — ${cityName}</div>
     `;
 
-    // Morning departure on day 1
     if (day === 1) {
       html += itineraryItem('7:00 AM', 'bi-sun', 'Depart from ' + routeData.origin.name,
         'Prepare your bags and head to the terminal early.');
@@ -673,7 +667,6 @@ function renderItinerary(routeData, spots, days) {
           : 'Check transport options above.');
     }
 
-    // Spots
     let time = day === 1 ? 10 : 8;
     daySpots.forEach(spot => {
       const timeStr = `${time > 12 ? time-12 : time}:00 ${time >= 12 ? 'PM' : 'AM'}`;
@@ -683,11 +676,9 @@ function renderItinerary(routeData, spots, days) {
       time += 2;
     });
 
-    // Lunch
     html += itineraryItem('12:00 PM', 'bi-cup-hot', 'Lunch Break',
       'Try local Laguna specialties: buko pie, kesong puti, or fresh bangus.');
 
-    // Evening on last day
     if (day === days) {
       html += itineraryItem('5:00 PM', 'bi-house-check', 'Check-in / Rest',
         'Settle in at your accommodation and rest for the next day.');
@@ -713,7 +704,7 @@ function itineraryItem(time, icon, name, desc, isSpot = false) {
 }
 
 // ── Spot detail modal ───────────────────────────────────────
-function showSpotDetail(spotId) {
+window.showSpotDetail = function(spotId) {
   const spot = allSpots.find(s => s.id == spotId);
   if (!spot) return;
 
@@ -741,7 +732,7 @@ function showSpotDetail(spotId) {
     </button>
   `;
   new bootstrap.Modal(document.getElementById('spotModal')).show();
-}
+};
 
 // ── Save itinerary ──────────────────────────────────────────
 document.getElementById('save-itinerary-btn').addEventListener('click', async () => {
@@ -776,8 +767,7 @@ document.getElementById('save-itinerary-btn').addEventListener('click', async ()
 // ── Helpers ─────────────────────────────────────────────────
 function showMapLoading(show) {
   const el = document.getElementById('map-loading');
-  el.classList.toggle('d-none', !show);
-  el.classList.toggle('d-flex', show);
+  el.style.display = show ? 'flex' : 'none';
 }
 
 function formatDuration(min) {
