@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// LAKBAY LAGUNA — HTML Footer Partial
+// IEXPLORE LAGUNA — HTML Footer Partial
 // includes/footer.php
 // ============================================================
 ?>
@@ -78,8 +78,12 @@
 
 <!-- Bootstrap JS bundle -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<!-- Leaflet JS — must load before planner.php inline script -->
+<!-- Leaflet JS — must load before any map scripts -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet Routing Machine — MUST load after Leaflet -->
+<script src="https://cdn.jsdelivr.net/npm/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css">
+<!-- App JS -->
 <script src="<?= APP_URL ?>/assets/js/app.js"></script>
 
 </body>

@@ -160,7 +160,7 @@ $transport_labels = [
 
     <!-- Map -->
     <div class="position-relative mb-3">
-    <div id="trip-map"></div>
+      <div id="trip-map"></div>
 
       <!-- Map legend -->
       <div class="position-absolute bottom-0 start-0 m-2 p-2 bg-white rounded shadow-sm"
@@ -181,7 +181,8 @@ $transport_labels = [
 
       <!-- Loading overlay -->
       <div id="map-loading" class="position-absolute top-0 start-0 w-100 h-100"
-     style="display:none;background:rgba(255,255,255,.7);border-radius:var(--radius);z-index:1000;align-items:center;justify-content:center">
+           style="display:none;background:rgba(255,255,255,.7);border-radius:var(--radius);z-index:1000;align-items:center;justify-content:center">
+      </div>
     </div>
 
     <!-- Spots along route -->
@@ -261,6 +262,11 @@ $transport_labels = [
   </div>
 </div>
 
+<!-- ── Hide LRM default turn-by-turn panel ─────────────────── -->
+<style>
+  .leaflet-routing-container { display: none !important; }
+</style>
+
 <!-- ── JS ──────────────────────────────────────────────────── -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -268,7 +274,6 @@ document.addEventListener('DOMContentLoaded', function() {
    TRIP PLANNER — Main JS
    ============================================================ */
 
-// Fix API base — pages/ is one level deep, api/ is at root
 const API_BASE = '<?= APP_URL ?>/api/';
 
 // ── Map init ────────────────────────────────────────────────
@@ -279,14 +284,13 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 18,
 }).addTo(map);
 
-// Critical: force Leaflet to recalculate container size after layout settles
 setTimeout(() => { map.invalidateSize(); }, 100);
 setTimeout(() => { map.invalidateSize(); }, 400);
 setTimeout(() => { map.invalidateSize(); }, 800);
 window.addEventListener('resize', () => map.invalidateSize());
 
 // State
-let routeLayer    = null;
+let routeControl  = null;   // LRM routing control (replaces routeLayer)
 let markerLayer   = L.layerGroup().addTo(map);
 let allSpots      = [];
 let routeData     = null;
@@ -325,18 +329,18 @@ document.getElementById('swap-btn').addEventListener('click', () => {
   d.value = tmp;
 });
 
-// ── FIX: Auto-plan INSIDE DOMContentLoaded so planRoute is in scope ──
+// Auto-plan if pre-filled from query string
 <?php if ($pre_origin && $pre_dest): ?>
 setTimeout(planRoute, 500);
 <?php endif; ?>
 
 // ── Main plan function ──────────────────────────────────────
 async function planRoute() {
-  const origin = document.getElementById('origin-select').value;
-  const dest   = document.getElementById('dest-select').value;
-  const days   = parseInt(document.getElementById('days-select').value);
-  const persons= parseInt(document.getElementById('persons-select').value);
-  const budget = document.getElementById('budget-select').value;
+  const origin  = document.getElementById('origin-select').value;
+  const dest    = document.getElementById('dest-select').value;
+  const days    = parseInt(document.getElementById('days-select').value);
+  const persons = parseInt(document.getElementById('persons-select').value);
+  const budget  = document.getElementById('budget-select').value;
 
   if (!origin || !dest) {
     IExploreApp.toast('Please select both origin and destination.', 'warning');
@@ -347,51 +351,44 @@ async function planRoute() {
     return;
   }
 
-  // Show loading
   showMapLoading(true);
   IExploreApp.setLoading(document.getElementById('plan-btn'), true);
 
-  // Clear previous
+  // Clear previous markers (routing control cleared inside drawRoute)
   markerLayer.clearLayers();
-  if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
 
   try {
-    // Fetch route + spots in parallel
     const [routeRes, spotsRes] = await Promise.all([
-      fetch(API_BASE + `routes.php?action=route&origin=${origin}&dest=${dest}`).then(r=>r.json()),
-      fetch(API_BASE + `routes.php?action=spots&origin=${origin}&dest=${dest}`).then(r=>r.json()),
+      fetch(API_BASE + `routes.php?action=route&origin=${origin}&dest=${dest}`).then(r => r.json()),
+      fetch(API_BASE + `routes.php?action=spots&origin=${origin}&dest=${dest}`).then(r => r.json()),
     ]);
 
     if (!routeRes.success) {
       IExploreApp.toast(routeRes.message || 'Route not found.', 'error');
+      showMapLoading(false);
+      IExploreApp.setLoading(document.getElementById('plan-btn'), false);
       return;
     }
 
     routeData = routeRes.data;
     allSpots  = spotsRes.success ? spotsRes.data : [];
 
-    // Draw map
     drawRoute(routeData);
     drawSpotMarkers(allSpots);
 
-    // Render UI panels
     renderTransportOptions(routeData.transport_options);
     renderRouteStats(routeData);
     renderSpotsGrid(allSpots);
     renderBudget(routeData, allSpots, days, persons, budget);
     renderItinerary(routeData, allSpots, days);
 
-    // Show panels
     document.getElementById('route-summary').classList.remove('d-none');
     document.getElementById('spots-section').classList.remove('d-none');
     document.getElementById('budget-panel-wrap').classList.remove('d-none');
     document.getElementById('itinerary-panel').classList.remove('d-none');
     document.getElementById('right-panel-placeholder').classList.add('d-none');
-    document.getElementById('no-route-msg').classList.toggle(
-      'd-none', routeData.has_route
-    );
+    document.getElementById('no-route-msg').classList.toggle('d-none', routeData.has_route);
 
-    // Update budget meta
     document.getElementById('budget-persons').textContent = persons;
     document.getElementById('budget-days').textContent    = days;
 
@@ -404,46 +401,81 @@ async function planRoute() {
   }
 }
 
-// ── Draw route line on map ──────────────────────────────────
+// ── Draw road-following route via OSRM ──────────────────────
 function drawRoute(data) {
-  const { origin, destination, waypoints } = data;
+  const { origin, destination } = data;
 
-  const latlngs = waypoints.map(w => [w.lat, w.lng]);
+  // Remove previous routing control
+  if (routeControl) {
+    routeControl.remove();
+    routeControl = null;
+  }
 
-  routeLayer = L.polyline(latlngs, {
-    color: '#2d6a4f',
-    weight: 5,
-    opacity: .85,
-    dashArray: null,
-    lineJoin: 'round',
+  const startLatLng = L.latLng(parseFloat(origin.latitude),      parseFloat(origin.longitude));
+  const endLatLng   = L.latLng(parseFloat(destination.latitude), parseFloat(destination.longitude));
+
+  routeControl = L.Routing.control({
+    waypoints: [startLatLng, endLatLng],
+    router: L.Routing.osrmv1({
+      serviceUrl: 'https://router.project-osrm.org/route/v1',
+      profile: 'driving',
+      useHints: false,
+    }),
+    lineOptions: {
+      styles: [{ color: '#2d6a4f', weight: 5, opacity: 0.85 }],
+      extendToWaypoints: true,
+      missingRouteTolerance: 0,
+    },
+    // Override default markers with our custom icons
+    createMarker: function(i, waypoint) {
+      const icon  = i === 0 ? iconStart : iconEnd;
+      const name  = i === 0 ? origin.name : destination.name;
+      const label = i === 0 ? 'Starting Point' : 'Destination';
+      return L.marker(waypoint.latLng, { icon })
+        .bindPopup(`<div class="popup-title">${name}</div>
+                    <div class="popup-meta"><i class="bi bi-geo-alt"></i> ${label}</div>`);
+    },
+    show: false,              // hide turn-by-turn instructions panel
+    addWaypoints: false,      // disable drag-to-add waypoints
+    routeWhileDragging: false,
+    fitSelectedRoutes: true,
+    collapsible: false,
   }).addTo(map);
 
-  // Animate route draw
-  routeLayer.setStyle({ dashArray: '12 8', dashOffset: '0' });
-  let offset = 0;
-  const anim = setInterval(() => {
-    offset -= 2;
-    routeLayer.setStyle({ dashOffset: String(offset) });
-  }, 40);
-  setTimeout(() => {
-    clearInterval(anim);
-    routeLayer.setStyle({ dashArray: null });
-  }, 1600);
+  // Fit map bounds once route is calculated
+  routeControl.on('routesfound', function(e) {
+    const coords = e.routes[0].coordinates;
+    const bounds = L.latLngBounds(coords.map(c => [c.lat, c.lng]));
+    map.fitBounds(bounds, { padding: [40, 40] });
+  });
 
-  // Origin marker
-  L.marker([origin.latitude, origin.longitude], { icon: iconStart })
-    .addTo(markerLayer)
-    .bindPopup(`<div class="popup-title">${origin.name}</div>
-                <div class="popup-meta"><i class="bi bi-geo-alt"></i> Starting Point</div>`);
+  // Fallback: draw straight dashed line if OSRM fails
+  routeControl.on('routingerror', function(e) {
+    console.warn('OSRM routing error, falling back to straight line:', e);
+    const fallback = L.polyline([startLatLng, endLatLng], {
+      color: '#2d6a4f',
+      weight: 4,
+      opacity: 0.6,
+      dashArray: '10 6',
+    }).addTo(map);
 
-  // Destination marker
-  L.marker([destination.latitude, destination.longitude], { icon: iconEnd })
-    .addTo(markerLayer)
-    .bindPopup(`<div class="popup-title">${destination.name}</div>
-                <div class="popup-meta"><i class="bi bi-geo-alt"></i> Destination</div>`);
+    // Add fallback markers manually since LRM failed
+    L.marker(startLatLng, { icon: iconStart })
+      .addTo(markerLayer)
+      .bindPopup(`<div class="popup-title">${origin.name}</div>
+                  <div class="popup-meta">Starting Point</div>`);
+    L.marker(endLatLng, { icon: iconEnd })
+      .addTo(markerLayer)
+      .bindPopup(`<div class="popup-title">${destination.name}</div>
+                  <div class="popup-meta">Destination</div>`);
 
-  // Fit map to route
-  map.fitBounds(routeLayer.getBounds(), { padding: [40, 40] });
+    map.fitBounds([startLatLng, endLatLng], { padding: [40, 40] });
+
+    // Replace routeControl with a removable stub
+    routeControl = { remove: () => map.removeLayer(fallback) };
+
+    IExploreApp.toast('Using approximate route (road data unavailable).', 'info');
+  });
 }
 
 // ── Draw tourist spot markers ───────────────────────────────
@@ -515,7 +547,6 @@ function renderTransportOptions(options) {
 
   selectedTransport = options[0];
 
-  // Click to select transport
   container.querySelectorAll('.transport-option').forEach(el => {
     el.addEventListener('click', () => {
       container.querySelectorAll('.transport-option').forEach(e => {
@@ -552,7 +583,6 @@ function renderRouteStats(data) {
 
 // ── Render spots grid with category filter ──────────────────
 function renderSpotsGrid(spots, filterCat = 'all') {
-  // Build category filter buttons
   const cats = ['all', ...new Set(spots.map(s => s.category))];
   const filterBar = document.getElementById('category-filters');
   filterBar.innerHTML = cats.map(cat => `
@@ -619,13 +649,12 @@ async function renderBudget(routeData, spots, days, persons, budgetLevel) {
   if (!res.success) return;
   const b = res.data;
 
-  // Entrance fees from spots
   const totalFees = spots.reduce((sum, s) => sum + parseFloat(s.entrance_fee), 0);
 
   document.getElementById('total-budget').textContent = formatPeso(b.grand_total + totalFees * persons);
 
   document.getElementById('budget-breakdown').innerHTML = `
-    ${budgetRow('bi-bus-front',   'Transport',    b.transport * persons)}
+    ${budgetRow('bi-bus-front',   'Transport',     b.transport * persons)}
     ${budgetRow('bi-house-door',  'Accommodation', b.accommodation * persons * days)}
     ${budgetRow('bi-cup-hot',     'Food',          b.food * persons * days)}
     ${budgetRow('bi-ticket',      'Entrance Fees', totalFees * persons)}
@@ -751,11 +780,11 @@ document.getElementById('save-itinerary-btn').addEventListener('click', async ()
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        origin_id:    routeData.origin.id,
-        dest_id:      routeData.destination.id,
-        days:         parseInt(document.getElementById('days-select').value),
-        persons:      parseInt(document.getElementById('persons-select').value),
-        budget_level: document.getElementById('budget-select').value,
+        origin_id:      routeData.origin.id,
+        dest_id:        routeData.destination.id,
+        days:           parseInt(document.getElementById('days-select').value),
+        persons:        parseInt(document.getElementById('persons-select').value),
+        budget_level:   document.getElementById('budget-select').value,
         transport_pref: selectedTransport?.transport_type || 'any',
       })
     }).then(r => r.json());
@@ -770,8 +799,7 @@ document.getElementById('save-itinerary-btn').addEventListener('click', async ()
 
 // ── Helpers ─────────────────────────────────────────────────
 function showMapLoading(show) {
-  const el = document.getElementById('map-loading');
-  el.style.display = show ? 'flex' : 'none';
+  document.getElementById('map-loading').style.display = show ? 'flex' : 'none';
 }
 
 function formatDuration(min) {
@@ -782,18 +810,24 @@ function formatDuration(min) {
 }
 
 function formatPeso(amount) {
-  return '₱ ' + parseFloat(amount||0).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
+  return '₱ ' + parseFloat(amount||0).toLocaleString('en-PH',
+    { minimumFractionDigits:2, maximumFractionDigits:2 });
 }
 
 function catLabel(cat) {
-  const m = {nature:'Nature',heritage:'Heritage',waterfall:'Waterfall',hotspring:'Hot Spring',
-             museum:'Museum',religious:'Religious',beach_lake:'Lake/Beach',adventure:'Adventure',food:'Food'};
+  const m = {
+    nature:'Nature', heritage:'Heritage', waterfall:'Waterfall',
+    hotspring:'Hot Spring', museum:'Museum', religious:'Religious',
+    beach_lake:'Lake/Beach', adventure:'Adventure', food:'Food'
+  };
   return m[cat] || cat;
 }
 
 function catEmoji(cat) {
-  const m = {nature:'🌿',heritage:'🏛️',waterfall:'💧',hotspring:'♨️',
-             museum:'🏺',religious:'⛪',beach_lake:'🏞️',adventure:'🧗',food:'🍜'};
+  const m = {
+    nature:'🌿', heritage:'🏛️', waterfall:'💧', hotspring:'♨️',
+    museum:'🏺', religious:'⛪', beach_lake:'🏞️', adventure:'🧗', food:'🍜'
+  };
   return m[cat] || '📍';
 }
 
