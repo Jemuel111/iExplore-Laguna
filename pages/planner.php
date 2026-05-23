@@ -159,7 +159,7 @@ $transport_labels = [
   <div class="col-lg-5 col-xl-6">
 
     <!-- Map -->
-    <div class="position-relative mb-3">
+    <div class="position-relative mb-3" id="map-wrapper">
       <div id="trip-map"></div>
 
       <!-- Map legend -->
@@ -175,13 +175,63 @@ $transport_labels = [
         </div>
         <div class="d-flex align-items-center gap-2">
           <span style="width:18px;height:3px;background:#2d6a4f;display:inline-block;border-radius:2px"></span>
-          <span>Route</span>
+          <span>Road Route (OSRM)</span>
+        </div>
+      </div>
+
+      <!-- Map spot count badge (top-right) -->
+      <div id="map-spots-badge" class="position-absolute top-0 end-0 m-2 d-none"
+           style="z-index:999">
+        <span class="badge rounded-pill px-3 py-2"
+              style="background:var(--green-dark);color:#fff;font-size:.78rem;box-shadow:0 2px 8px rgba(0,0,0,.2)">
+          <i class="bi bi-geo-alt-fill me-1"></i>
+          <span id="map-spots-badge-count">0</span> spots on map
+        </span>
+      </div>
+
+      <!-- ── Slide-in Spot Detail Panel ────────────────────── -->
+      <div id="map-spot-panel" class="map-spot-panel">
+        <button id="map-spot-panel-close" class="map-spot-panel-close" title="Close">
+          <i class="bi bi-x-lg"></i>
+        </button>
+
+        <!-- Emoji / category header -->
+        <div id="msp-emoji-header" class="msp-emoji-header"></div>
+
+        <div class="p-3">
+          <!-- Category badge + name -->
+          <div id="msp-badge" class="mb-1"></div>
+          <h5 id="msp-name" class="msp-name mb-1"></h5>
+          <div id="msp-city" class="msp-meta mb-2"></div>
+
+          <!-- Rating bar -->
+          <div id="msp-rating" class="msp-rating mb-3"></div>
+
+          <!-- Quick info chips -->
+          <div id="msp-chips" class="msp-chips mb-3"></div>
+
+          <!-- Description -->
+          <p id="msp-desc" class="msp-desc mb-3"></p>
+
+          <!-- Actions -->
+          <div class="d-flex gap-2">
+            <button id="msp-fly-btn" class="btn btn-sm btn-primary-app flex-grow-1">
+              <i class="bi bi-crosshair me-1"></i>Center on Map
+            </button>
+            <button id="msp-add-btn" class="btn btn-sm btn-outline-app">
+              <i class="bi bi-images me-1"></i>Full Details
+            </button>
+          </div>
         </div>
       </div>
 
       <!-- Loading overlay -->
       <div id="map-loading" class="position-absolute top-0 start-0 w-100 h-100"
            style="display:none;background:rgba(255,255,255,.7);border-radius:var(--radius);z-index:1000;align-items:center;justify-content:center">
+        <div class="text-center">
+          <div class="spinner-app mb-2" style="width:2rem;height:2rem;border-width:3px"></div>
+          <div class="small text-muted">Calculating road route…</div>
+        </div>
       </div>
     </div>
 
@@ -249,18 +299,7 @@ $transport_labels = [
 </div><!-- /container -->
 </section>
 
-<!-- ── Spot Detail Modal ────────────────────────────────────── -->
-<div class="modal fade" id="spotModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content" style="border-radius:var(--radius);border:none">
-      <div class="modal-header border-0 pb-0">
-        <h5 class="modal-title" id="modalSpotName" style="font-family:'Playfair Display',serif"></h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body" id="modalSpotBody"></div>
-    </div>
-  </div>
-</div>
+<!-- spotModal removed: replaced by slide-in .map-spot-panel -->
 
 <!-- ── Hide LRM default turn-by-turn panel ─────────────────── -->
 <style>
@@ -478,27 +517,80 @@ function drawRoute(data) {
   });
 }
 
+// ── Spot marker registry (id → marker) ─────────────────────
+const spotMarkers = {};
+
 // ── Draw tourist spot markers ───────────────────────────────
 function drawSpotMarkers(spots) {
+  // Update map badge
+  const badge = document.getElementById('map-spots-badge');
+  const badgeCount = document.getElementById('map-spots-badge-count');
+  if (spots.length > 0) {
+    badge.classList.remove('d-none');
+    badgeCount.textContent = spots.length;
+  }
+
   spots.forEach(spot => {
     const fee = spot.entrance_fee > 0
       ? `₱ ${parseFloat(spot.entrance_fee).toFixed(2)}`
       : 'Free Entry';
 
-    L.marker([spot.latitude, spot.longitude], { icon: iconSpot })
+    const stars = '★'.repeat(Math.round(spot.rating)) + '☆'.repeat(5 - Math.round(spot.rating));
+
+    // Rich Leaflet popup (quick preview on hover/click)
+    const popup = L.popup({
+      maxWidth: 240,
+      className: 'spot-popup-rich',
+      closeButton: true,
+    }).setContent(`
+      <div class="popup-rich-header" style="background:var(--green-pale);padding:.75rem 1rem .5rem;margin:-.4rem -.4rem .5rem;border-radius:8px 8px 0 0;text-align:center;font-size:2rem;line-height:1">
+        ${catEmoji(spot.category)}
+      </div>
+      <div style="padding:0 .25rem">
+        <div class="popup-title" style="font-size:.95rem">${spot.name}</div>
+        <div class="popup-meta mb-1">
+          <i class="bi bi-geo-alt" style="color:var(--green-mid)"></i>
+          ${spot.city_name}
+        </div>
+        <div style="color:var(--sand-dark);font-size:.8rem;letter-spacing:.05em;margin-bottom:.35rem">${stars}
+          <span style="color:var(--text-muted);margin-left:.25rem">${parseFloat(spot.rating).toFixed(1)}</span>
+        </div>
+        <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem">
+          <span style="background:var(--terracotta);color:#fff;font-size:.72rem;font-weight:700;padding:.15rem .5rem;border-radius:20px">
+            ${fee}
+          </span>
+          <span style="font-size:.72rem;color:var(--text-muted)">
+            <i class="bi bi-clock"></i> ${spot.operating_hours || 'Hours vary'}
+          </span>
+        </div>
+        <a
+          href="<?= APP_URL ?>/pages/spot-detail.php?id=${spot.id}"
+          style="display:block;width:100%;padding:.35rem;background:var(--green-dark);color:#fff;border:none;border-radius:6px;font-size:.8rem;cursor:pointer;font-family:'DM Sans',sans-serif;text-align:center;text-decoration:none">
+          <i class="bi bi-images me-1"></i>See Full Details & Photos
+        </a>
+      </div>
+    `);
+
+    const marker = L.marker([spot.latitude, spot.longitude], { icon: iconSpot })
       .addTo(markerLayer)
-      .bindPopup(`
-        <div class="popup-title">${spot.name}</div>
-        <div class="popup-meta">
-          <i class="bi bi-building"></i> ${spot.city_name}
-          &nbsp;·&nbsp;
-          <span style="color:var(--sand-dark)">★</span> ${parseFloat(spot.rating).toFixed(1)}
-        </div>
-        <div class="popup-fee">${fee}</div>
-        <div class="popup-meta mt-1">
-          <i class="bi bi-clock"></i> ${spot.operating_hours || 'Hours vary'}
-        </div>
-      `);
+      .bindPopup(popup);
+
+    // When marker popup opens directly, close slide-in panel to avoid overlap
+    marker.on('popupopen', () => {
+      document.getElementById('map-spot-panel').classList.remove('open');
+      highlightSpotCard(spot.id);
+    });
+    marker.on('popupclose', () => {
+      // Deactivate card highlight when popup is closed
+      const card = document.getElementById(`spot-card-${spot.id}`);
+      if (card) {
+        card.classList.remove('spot-card-active');
+        card.style.borderColor = 'var(--border)';
+        card.style.background  = '#fff';
+      }
+    });
+
+    spotMarkers[spot.id] = marker;
   });
 }
 
@@ -591,7 +683,7 @@ function renderSpotsGrid(spots, filterCat = 'all') {
                    background:${cat===filterCat?'var(--green-mid)':'#fff'};
                    color:${cat===filterCat?'#fff':'var(--charcoal)'};
                    border:1.5px solid ${cat===filterCat?'var(--green-mid)':'var(--border)'}">
-      ${cat === 'all' ? 'All' : catLabel(cat)}
+      ${catEmoji(cat !== 'all' ? cat : '')} ${cat === 'all' ? 'All' : catLabel(cat)}
     </button>
   `).join('');
 
@@ -610,11 +702,13 @@ function renderSpotsGrid(spots, filterCat = 'all') {
 
   grid.innerHTML = filtered.map(spot => `
     <div class="col-12">
-      <div class="d-flex gap-3 p-3 bg-white rounded-3 align-items-start"
-           style="border:1px solid var(--border);cursor:pointer;transition:all .2s"
-           onmouseenter="this.style.borderColor='var(--green-light)'"
-           onmouseleave="this.style.borderColor='var(--border)'"
-           onclick="showSpotDetail(${spot.id})">
+      <div class="spot-card-row d-flex gap-3 p-3 bg-white rounded-3 align-items-start"
+           id="spot-card-${spot.id}"
+           data-spot-id="${spot.id}"
+           style="border:1.5px solid var(--border);cursor:pointer;transition:all .22s"
+           onmouseenter="this.style.borderColor='var(--green-light)';this.style.background='var(--green-pale)'"
+           onmouseleave="this.style.borderColor=this.classList.contains('spot-card-active')?'var(--green-mid)':'var(--border)';this.style.background=this.classList.contains('spot-card-active')?'#eaf4ef':'#fff'"
+           onclick="flyToSpot(${spot.id})">
         <div style="width:52px;height:52px;border-radius:10px;background:var(--green-pale);
                     display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0">
           ${catEmoji(spot.category)}
@@ -631,7 +725,10 @@ function renderSpotsGrid(spots, filterCat = 'all') {
             </span>
           </div>
         </div>
-        <i class="bi bi-chevron-right text-muted small mt-1"></i>
+        <div class="d-flex flex-column align-items-end gap-1">
+          <i class="bi bi-map text-green small" title="Fly to on map"></i>
+          <i class="bi bi-chevron-right text-muted small"></i>
+        </div>
       </div>
     </div>
   `).join('');
@@ -736,36 +833,114 @@ function itineraryItem(time, icon, name, desc, isSpot = false) {
   `;
 }
 
-// ── Spot detail modal ───────────────────────────────────────
-window.showSpotDetail = function(spotId) {
+// ── Fly to spot on map + open panel ────────────────────────
+window.flyToSpot = function(spotId) {
   const spot = allSpots.find(s => s.id == spotId);
   if (!spot) return;
 
-  document.getElementById('modalSpotName').textContent = spot.name;
-  document.getElementById('modalSpotBody').innerHTML = `
-    <div class="mb-3" style="background:var(--green-pale);border-radius:10px;padding:1.5rem;text-align:center;font-size:3rem">
-      ${catEmoji(spot.category)}
-    </div>
-    <table class="table table-sm small">
-      <tr><td class="text-muted">City</td><td class="fw-bold">${spot.city_name}</td></tr>
-      <tr><td class="text-muted">Category</td><td>${catLabel(spot.category)}</td></tr>
-      <tr><td class="text-muted">Entrance Fee</td>
-          <td class="fw-bold" style="color:var(--terracotta)">
-            ${spot.entrance_fee > 0 ? '₱ '+parseFloat(spot.entrance_fee).toFixed(2) : '🎉 Free Entry'}
-          </td></tr>
-      <tr><td class="text-muted">Operating Hours</td><td>${spot.operating_hours || 'Hours vary'}</td></tr>
-      <tr><td class="text-muted">Rating</td>
-          <td><span style="color:var(--sand-dark)">★</span> ${parseFloat(spot.rating).toFixed(1)} / 5.0</td></tr>
-    </table>
-    <p class="text-muted small mb-2">${spot.description || ''}</p>
-    <button class="btn btn-sm btn-primary-app w-100"
-            onclick="map.flyTo([${spot.latitude},${spot.longitude}],15);
-                     bootstrap.Modal.getInstance(document.getElementById('spotModal')).hide()">
-      <i class="bi bi-geo me-2"></i>View on Map
-    </button>
-  `;
-  new bootstrap.Modal(document.getElementById('spotModal')).show();
+  // Close any open popups first to avoid overlap
+  map.closePopup();
+
+  // Fly map to spot
+  map.flyTo([spot.latitude, spot.longitude], 15, { animate: true, duration: 0.8 });
+
+  // Open the slide-in detail panel only (no popup — keeps it clean)
+  openSpotPanel(spotId);
+  highlightSpotCard(spotId);
 };
+
+// ── Open slide-in panel with spot details ──────────────────
+window.openSpotPanel = function(spotId) {
+  const spot = allSpots.find(s => s.id == spotId);
+  if (!spot) return;
+
+  const panel     = document.getElementById('map-spot-panel');
+  const fee       = spot.entrance_fee > 0
+    ? `₱ ${parseFloat(spot.entrance_fee).toFixed(2)}`
+    : '🎉 Free Entry';
+  const fullStars = Math.round(spot.rating);
+  const starsHtml = Array.from({length:5}, (_,i) =>
+    `<i class="bi ${i < fullStars ? 'bi-star-fill' : 'bi-star'}"
+        style="color:${i < fullStars ? 'var(--sand-dark)' : '#ccc'};font-size:.85rem"></i>`
+  ).join('') + `<span style="font-size:.8rem;color:var(--text-muted);margin-left:.3rem">${parseFloat(spot.rating).toFixed(1)}</span>`;
+
+  document.getElementById('msp-emoji-header').textContent = catEmoji(spot.category);
+  document.getElementById('msp-emoji-header').style.background = catBg(spot.category);
+  document.getElementById('msp-badge').innerHTML =
+    `<span class="badge-category badge-${spot.category}">${catLabel(spot.category)}</span>`;
+  document.getElementById('msp-name').textContent  = spot.name;
+  document.getElementById('msp-city').innerHTML    =
+    `<i class="bi bi-geo-alt-fill me-1" style="color:var(--green-mid)"></i>${spot.city_name}`;
+  document.getElementById('msp-rating').innerHTML  = starsHtml;
+  document.getElementById('msp-chips').innerHTML   = `
+    <span class="msp-chip"><i class="bi bi-ticket me-1"></i>${fee}</span>
+    <span class="msp-chip"><i class="bi bi-clock me-1"></i>${spot.operating_hours || 'Hours vary'}</span>
+  `;
+  document.getElementById('msp-desc').textContent =
+    spot.description || 'No description available.';
+
+  // Button actions
+  document.getElementById('msp-fly-btn').onclick = () => {
+    map.flyTo([spot.latitude, spot.longitude], 16, { animate: true, duration: 0.6 });
+    const marker = spotMarkers[spot.id];
+    if (marker) setTimeout(() => marker.openPopup(), 700);
+  };
+  document.getElementById('msp-add-btn').onclick = () => {
+    window.location.href = `<?= APP_URL ?>/pages/spot-detail.php?id=${spot.id}`;
+  };
+
+  panel.classList.add('open');
+  highlightSpotCard(spotId);
+};
+
+// ── Close panel when clicking empty map area ────────────────
+map.on('click', () => {
+  document.getElementById('map-spot-panel').classList.remove('open');
+  document.querySelectorAll('.spot-card-active').forEach(el => {
+    el.classList.remove('spot-card-active');
+    el.style.borderColor = 'var(--border)';
+    el.style.background  = '#fff';
+  });
+});
+
+// ── Close panel button ──────────────────────────────────────
+document.getElementById('map-spot-panel-close').addEventListener('click', () => {
+  document.getElementById('map-spot-panel').classList.remove('open');
+  document.querySelectorAll('.spot-card-active').forEach(el => {
+    el.classList.remove('spot-card-active');
+    el.style.borderColor = 'var(--border)';
+    el.style.background  = '#fff';
+  });
+});
+
+// ── Highlight matching spot card in the list ────────────────
+function highlightSpotCard(spotId) {
+  document.querySelectorAll('.spot-card-row').forEach(el => {
+    el.classList.remove('spot-card-active');
+    el.style.borderColor = 'var(--border)';
+    el.style.background  = '#fff';
+  });
+  const card = document.getElementById(`spot-card-${spotId}`);
+  if (card) {
+    card.classList.add('spot-card-active');
+    card.style.borderColor = 'var(--green-mid)';
+    card.style.background  = '#eaf4ef';
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+// ── Legacy showSpotDetail kept for backward compat ──────────
+window.showSpotDetail = window.flyToSpot;
+
+// ── Category background color helper ───────────────────────
+function catBg(cat) {
+  const m = {
+    nature:'#d8f3dc', heritage:'#fef3c7', waterfall:'#dbeafe',
+    hotspring:'#ffe4e6', museum:'#f3e8ff', religious:'#fff7ed',
+    beach_lake:'#e0f2fe', adventure:'#fef9c3', food:'#fce7f3'
+  };
+  return m[cat] || 'var(--green-pale)';
+}
 
 // ── Save itinerary ──────────────────────────────────────────
 document.getElementById('save-itinerary-btn').addEventListener('click', async () => {
