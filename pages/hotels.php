@@ -152,7 +152,7 @@ $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
 
             <p class="text-muted small mb-3 flex-grow-1"
                style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">
-              <?= e($hotel['description']) ?>
+               <?= e($hotel['description'] ?? '') ?>
             </p>
 
             <!-- Amenity icons -->
