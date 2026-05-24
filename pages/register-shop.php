@@ -1,5 +1,7 @@
 <?php
 ob_start();
+require_once __DIR__ . '/../includes/helpers.php';
+session_start_safe();
 // ============================================================
 // iEXPLORE LAGUNA — Shop Owner Registration
 // pages/register-shop.php
@@ -15,9 +17,15 @@ if (is_logged_in()) {
     $u = current_user();
     $role = $u['role'] ?? 'tourist';
     if ($role === 'shop_owner') {
-        header('Location: ' . APP_URL . '/pages/shop-dashboard.php'); exit;
+        // Only redirect if they already have a shop — otherwise let them complete step 2
+        $existing_shop = db_fetch_one("SELECT id FROM shops WHERE owner_id = ?", [$u['id']]);
+        if ($existing_shop) {
+            header('Location: ' . APP_URL . '/pages/shop-dashboard.php'); exit;
+        }
+        // No shop yet — fall through to show step 2 form
+    } else {
+        header('Location: ' . APP_URL); exit;
     }
-    header('Location: ' . APP_URL); exit;
 }
 
 require_once __DIR__ . '/../includes/header.php';

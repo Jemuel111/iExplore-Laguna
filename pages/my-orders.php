@@ -1,5 +1,6 @@
 <?php
 ob_start();
+require_once __DIR__ . '/../includes/helpers.php';
 // ============================================================
 // iEXPLORE LAGUNA — Tourist: My Orders Page
 // pages/my-orders.php

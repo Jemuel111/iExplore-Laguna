@@ -148,7 +148,7 @@ switch ($action) {
         $title   = trim(    ($data['title']      ?? ''));
         $body    = trim(    ($data['body']        ?? ''));
         $visited = trim(    ($data['visited_on']  ?? ''));
-        $user_id = (int) ($_SESSION['user_id'] ?? 0);
+        $user_id = (int) (current_user()['id'] ?? 0);
 
         if (!$sid || $rating < 1 || $rating > 5) {
             json_error('Invalid spot ID or rating (1–5 required).', 400);

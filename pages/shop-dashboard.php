@@ -1,5 +1,6 @@
 <?php
 ob_start();
+require_once __DIR__ . '/../includes/helpers.php';
 // ============================================================
 // iEXPLORE LAGUNA — Shop Owner Dashboard
 // pages/shop-dashboard.php

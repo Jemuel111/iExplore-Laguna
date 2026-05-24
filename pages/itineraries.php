@@ -1,5 +1,7 @@
 <?php
 ob_start();
+require_once __DIR__ . '/../includes/helpers.php';
+
 // ============================================================
 // IEXPLORE LAGUNA — My Itineraries Page
 // pages/itineraries.php
