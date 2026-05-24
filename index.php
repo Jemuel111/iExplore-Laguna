@@ -165,9 +165,9 @@ function spot_badge(string $category): string {
 </section>
 
 <!-- ── FEATURED SPOTS ───────────────────────────────────────── -->
-<section class="py-5">
+<section class="py-4">
   <div class="container">
-    <div class="text-center mb-5 reveal">
+    <div class="text-center mb-4 reveal">
       <span class="section-label">Must-Visit</span>
       <h2 class="section-title">Top Tourist Spots in Laguna</h2>
       <p class="section-subtitle mx-auto text-muted">
@@ -226,9 +226,9 @@ function spot_badge(string $category): string {
 </section>
 
 <!-- ── HOW IT WORKS ─────────────────────────────────────────── -->
-<section class="py-5" style="background:var(--green-pale)">
+<section class="py-4" style="background:var(--green-pale)">
   <div class="container">
-    <div class="text-center mb-5 reveal">
+    <div class="text-center mb-4 reveal">
       <span class="section-label">How it Works</span>
       <h2 class="section-title">Plan Your Laguna Trip in 4 Easy Steps</h2>
       <div class="divider-fancy mx-auto mt-3"></div>
@@ -256,7 +256,7 @@ function spot_badge(string $category): string {
 </section>
 
 <!-- ── CTA ──────────────────────────────────────────────────── -->
-<section class="py-5 cta-section">
+<section class="py-4 cta-section">
   <div class="container text-center position-relative" style="z-index:1">
     <div class="reveal">
       <span class="section-label" style="color:var(--sand-dark)">Start Now</span>

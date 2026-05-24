@@ -57,8 +57,16 @@
       <div class="col-6 col-sm-4 col-lg-2">
         <h6 class="footer-heading mb-3">Account</h6>
         <ul class="list-unstyled footer-links">
-          <?php if (is_logged_in()): ?>
+          <?php if (is_logged_in()):
+            $__u = current_user(); ?>
             <li><a href="<?= APP_URL ?>/pages/itineraries.php"><i class="bi bi-journal-bookmark me-2 opacity-50"></i>My Itineraries</a></li>
+            <li><a href="<?= APP_URL ?>/pages/my-orders.php"><i class="bi bi-bag-check me-2 opacity-50"></i>My Orders</a></li>
+            <?php if ($__u['role'] === 'shop_owner'): ?>
+            <li><a href="<?= APP_URL ?>/pages/shop-dashboard.php"><i class="bi bi-shop me-2 opacity-50"></i>My Shop</a></li>
+            <?php endif; ?>
+            <?php if ($__u['role'] === 'hotel_owner'): ?>
+            <li><a href="<?= APP_URL ?>/pages/hotel-dashboard.php"><i class="bi bi-building me-2 opacity-50"></i>My Hotel</a></li>
+            <?php endif; ?>
             <li><a href="<?= APP_URL ?>/pages/logout.php"><i class="bi bi-box-arrow-right me-2 opacity-50"></i>Logout</a></li>
           <?php else: ?>
             <li><a href="<?= APP_URL ?>/pages/login.php"><i class="bi bi-box-arrow-in-right me-2 opacity-50"></i>Login</a></li>

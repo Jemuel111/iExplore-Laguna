@@ -75,6 +75,12 @@ $user        = current_user();
           </a>
         </li>
         <li class="nav-item">
+          <a class="nav-link <?= $active_page === 'explore'   ? 'active' : '' ?>"
+             href="<?= APP_URL ?>/pages/explore.php">
+            <i class="bi bi-basket3 me-1"></i>Explore
+          </a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link <?= $active_page === 'budget'    ? 'active' : '' ?>"
              href="<?= APP_URL ?>/pages/budget.php">
             <i class="bi bi-calculator me-1"></i>Budget
@@ -82,18 +88,52 @@ $user        = current_user();
         </li>
 
         <!-- Auth links -->
-        <?php if ($user): ?>
+        <?php if ($user):
+          $__role = $user['role'] ?? 'tourist'; ?>
           <li class="nav-item dropdown ms-lg-2">
             <a class="nav-link dropdown-toggle btn btn-sm btn-outline-light px-3" href="#"
                data-bs-toggle="dropdown">
               <i class="bi bi-person-circle me-1"></i><?= e($user['name']) ?>
+              <?php if ($__role === 'shop_owner'): ?>
+                <span class="badge ms-1" style="background:var(--terracotta);font-size:.65rem">Shop</span>
+              <?php elseif ($__role === 'hotel_owner'): ?>
+                <span class="badge ms-1" style="background:#534AB7;font-size:.65rem">Hotel</span>
+              <?php endif; ?>
             </a>
             <ul class="dropdown-menu dropdown-menu-end shadow">
-              <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/itineraries.php">
-                    <i class="bi bi-journal-bookmark me-2"></i>My Itineraries</a></li>
+
+              <?php if ($__role === 'shop_owner'): ?>
+                <li><a class="dropdown-item fw-bold" href="<?= APP_URL ?>/pages/shop-dashboard.php">
+                  <i class="bi bi-shop me-2" style="color:var(--terracotta)"></i>My Shop Dashboard</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/shop-dashboard.php#orders">
+                  <i class="bi bi-receipt me-2"></i>Manage Orders</a></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/shop-dashboard.php#products">
+                  <i class="bi bi-grid me-2"></i>Manage Products</a></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/shop-dashboard.php#settings">
+                  <i class="bi bi-gear me-2"></i>Shop Settings</a></li>
+
+              <?php elseif ($__role === 'hotel_owner'): ?>
+                <li><a class="dropdown-item fw-bold" href="<?= APP_URL ?>/pages/hotel-dashboard.php">
+                  <i class="bi bi-building me-2" style="color:#534AB7"></i>My Hotel Dashboard</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/hotel-dashboard.php#bookings">
+                  <i class="bi bi-calendar-check me-2"></i>Manage Bookings</a></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/hotel-dashboard.php#rooms">
+                  <i class="bi bi-door-open me-2"></i>Manage Rooms</a></li>
+
+              <?php else: ?>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/itineraries.php">
+                  <i class="bi bi-journal-bookmark me-2"></i>My Itineraries</a></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/my-orders.php">
+                  <i class="bi bi-bag-check me-2"></i>My Orders</a></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/explore.php">
+                  <i class="bi bi-basket3 me-2"></i>Explore & Plan</a></li>
+              <?php endif; ?>
+
               <li><hr class="dropdown-divider"></li>
               <li><a class="dropdown-item text-danger" href="<?= APP_URL ?>/pages/logout.php">
-                    <i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+                <i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
             </ul>
           </li>
         <?php else: ?>

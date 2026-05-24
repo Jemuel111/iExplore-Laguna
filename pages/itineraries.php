@@ -1,11 +1,12 @@
 <?php
+ob_start();
 // ============================================================
 // IEXPLORE LAGUNA — My Itineraries Page
 // pages/itineraries.php
 // ============================================================
 $page_title  = 'My Itineraries';
 $active_page = '';
-require_once __DIR__ . '/../includes/header.php';
+
 
 if (!is_logged_in()) {
     header('Location: ' . APP_URL . '/pages/login.php?redirect=' . urlencode(APP_URL . '/pages/itineraries.php'));
@@ -24,6 +25,8 @@ $itineraries = db_fetch_all(
      ORDER BY i.created_at DESC",
     [$user['id']]
 );
+
+require_once __DIR__ . '/../includes/header.php';
 ?>
 
 <section class="py-4" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">

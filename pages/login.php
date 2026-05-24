@@ -1,12 +1,19 @@
 <?php
+ob_start();
 // ============================================================
 // iEXPLORE LAGUNA — Login Page (Polished v2)
 // ============================================================
 $page_title  = 'Login';
 $active_page = '';
-require_once __DIR__ . '/../includes/header.php';
 
-if (is_logged_in()) { header('Location: ' . APP_URL); exit; }
+
+// Redirect already-logged-in users BEFORE any output
+if (is_logged_in()) {
+    $__role = current_user()['role'] ?? 'tourist';
+    if ($__role === 'shop_owner')  { header('Location: ' . APP_URL . '/pages/shop-dashboard.php');  exit; }
+    if ($__role === 'hotel_owner') { header('Location: ' . APP_URL . '/pages/hotel-dashboard.php'); exit; }
+    header('Location: ' . APP_URL); exit;
+}
 
 $error = '';
 $email = '';
@@ -20,14 +27,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user = db_fetch_one("SELECT * FROM users WHERE email = ?", [$email]);
         if ($user && password_verify($password, $user['password'])) {
             login_user($user);
-            $redirect = input('redirect', 'get', APP_URL);
+            $role     = $user['role'] ?? 'tourist';
+            $redirect = input('redirect', 'get', '');
+            if ($redirect) {
+                header('Location: ' . $redirect); exit;
+            }
+            if ($role === 'shop_owner') {
+                header('Location: ' . APP_URL . '/pages/shop-dashboard.php'); exit;
+            }
+            if ($role === 'hotel_owner') {
+                header('Location: ' . APP_URL . '/pages/hotel-dashboard.php'); exit;
+            }
             $_SESSION['flash']['success'] = 'Welcome back, ' . $user['name'] . '!';
-            header('Location: ' . $redirect); exit;
+            header('Location: ' . APP_URL); exit;
         } else {
             $error = 'Incorrect email or password.';
         }
     }
 }
+
+require_once __DIR__ . '/../includes/header.php';
 ?>
 
 <section style="min-height:80vh;display:flex;align-items:center;background:linear-gradient(135deg,var(--green-pale) 0%,var(--sand) 100%)">

@@ -11,7 +11,7 @@ require_once __DIR__ . '/db.php';
 /**
  * Send a JSON response and exit.
  */
-function json_response(bool $success, mixed $data = null, string $message = '', int $code = 200): void {
+function json_response(bool $success, $data = null, string $message = '', int $code = 200): void {
     http_response_code($code);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode([
@@ -25,14 +25,14 @@ function json_response(bool $success, mixed $data = null, string $message = '', 
 /**
  * Send a success JSON response.
  */
-function json_ok(mixed $data = null, string $message = 'OK'): void {
+function json_ok($data = null, string $message = 'OK'): void {
     json_response(true, $data, $message, 200);
 }
 
 /**
  * Send an error JSON response.
  */
-function json_error(string $message, int $code = 400, mixed $data = null): void {
+function json_error(string $message, int $code = 400, $data = null): void {
     json_response(false, $data, $message, $code);
 }
 
@@ -48,12 +48,14 @@ function e(string $str): string {
 /**
  * Get a sanitized value from $_GET or $_POST.
  */
-function input(string $key, string $source = 'request', mixed $default = null): mixed {
-    $arr = match($source) {
-        'get'   => $_GET,
-        'post'  => $_POST,
-        default => $_REQUEST,
-    };
+function input(string $key, string $source = 'request', $default = null) {
+    if ($source === 'get') {
+        $arr = $_GET;
+    } elseif ($source === 'post') {
+        $arr = $_POST;
+    } else {
+        $arr = $_REQUEST;
+    }
     if (!isset($arr[$key])) return $default;
     $val = trim($arr[$key]);
     return $val === '' ? $default : $val;
@@ -103,6 +105,8 @@ function login_user(array $user): void {
         'id'    => $user['id'],
         'name'  => $user['name'],
         'email' => $user['email'],
+        'role'  => $user['role']  ?? 'tourist',
+        'phone' => $user['phone'] ?? null,
     ];
 }
 

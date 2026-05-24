@@ -22,7 +22,7 @@ $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
   </div>
 </section>
 
-<section class="py-5">
+<section class="py-4">
 <div class="container">
 <div class="row g-4 justify-content-center">
 

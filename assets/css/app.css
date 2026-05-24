@@ -583,7 +583,7 @@ img { max-width: 100%; height: auto; display: block; }
 .hero-section {
   background: linear-gradient(135deg, var(--green-dark) 0%, var(--green-mid) 60%, #3a7d5c 100%);
   color: #fff;
-  padding: 6rem 0 5rem;
+  padding: 4rem 0 3.5rem;
   position: relative;
   overflow: hidden;
 }
@@ -894,3 +894,164 @@ img { max-width: 100%; height: auto; display: block; }
 
 /* ── Leaflet routing panel hidden ──────────────────────────── */
 .leaflet-routing-container { display: none !important; }
+
+/* ============================================================
+   iEXPLORE LAGUNA — Enhancement v3 Additions
+   Pagination · Toolbar · View toggle · Compact cards
+   ============================================================ */
+
+/* ── Sticky toolbar ──────────────────────────────────────── */
+.spots-toolbar {
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  z-index: 100;
+}
+.spots-toolbar .filter-pill {
+  padding: .28rem .78rem;
+  font-size: .78rem;
+}
+
+/* ── Pagination ──────────────────────────────────────────── */
+.pagination-app {
+  gap: .2rem;
+}
+.pagination-app .page-link {
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm) !important;
+  color: var(--green-mid);
+  background: #fff;
+  padding: .42rem .82rem;
+  font-size: .88rem;
+  font-weight: 500;
+  transition: all var(--transition);
+  line-height: 1.4;
+}
+.pagination-app .page-link:hover {
+  background: var(--green-pale);
+  border-color: var(--green-light);
+  color: var(--green-dark);
+}
+.pagination-app .page-item.active .page-link {
+  background: linear-gradient(135deg, var(--green-mid), var(--green-dark));
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(45,106,79,.28);
+}
+.pagination-app .page-item.disabled .page-link {
+  color: #bbb;
+  background: #f9f9f9;
+  border-color: var(--border);
+  pointer-events: none;
+}
+
+/* ── View toggle active state ────────────────────────────── */
+.btn-group .btn-outline-secondary.active {
+  background: var(--green-mid);
+  border-color: var(--green-mid);
+  color: #fff;
+}
+.btn-group .btn-outline-secondary:hover:not(.active) {
+  background: var(--green-pale);
+  border-color: var(--green-light);
+  color: var(--green-dark);
+}
+
+/* ── Compact card image ──────────────────────────────────── */
+.card-app .card-img-placeholder {
+  height: 150px;
+  font-size: 2.5rem;
+}
+
+/* ── Results summary box ─────────────────────────────────── */
+.results-summary {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: .75rem 1rem;
+  font-size: .83rem;
+}
+
+/* ── List view spot item (tighter) ──────────────────────── */
+.spot-list-item {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: .75rem 1rem;
+  display: flex;
+  gap: .85rem;
+  align-items: flex-start;
+  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+}
+.spot-list-item:hover {
+  border-color: var(--green-light);
+  background: var(--green-pale);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Toolbar sort select ─────────────────────────────────── */
+.spots-toolbar .form-select {
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  font-size: .8rem;
+  padding: .28rem .75rem;
+  height: auto;
+}
+.spots-toolbar .form-select:focus {
+  border-color: var(--green-light);
+  box-shadow: 0 0 0 3px rgba(82,183,136,.15);
+}
+
+/* ── Homepage featured spots — tighter cards ─────────────── */
+.hero-section .card-app,
+section .card-app {
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+section .card-app:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+
+/* ── Per-page selector ───────────────────────────────────── */
+.per-page-select {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .8rem;
+  color: var(--text-muted);
+}
+.per-page-select select {
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: .2rem .5rem;
+  font-size: .8rem;
+  color: var(--charcoal);
+  background: #fff;
+}
+
+/* ── Amenity tags compact ────────────────────────────────── */
+.amenity-tag {
+  font-size: .68rem;
+  background: var(--green-pale);
+  color: var(--green-dark);
+  padding: .15rem .5rem;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+/* ── Mobile toolbar scroll ───────────────────────────────── */
+@media (max-width: 767px) {
+  .spots-toolbar .d-flex {
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .spots-toolbar .d-flex::-webkit-scrollbar { display: none; }
+  .spots-toolbar .filter-pill { flex-shrink: 0; }
+  .spots-toolbar .ms-auto { margin-left: 0 !important; }
+  .pagination-app .page-link { padding: .38rem .65rem; font-size: .82rem; }
+}
+
+/* ── Scroll-to-top (moved to avoid overlap with pagination) ── */
+#scroll-top { bottom: 4.5rem; }

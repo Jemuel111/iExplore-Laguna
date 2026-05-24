@@ -148,9 +148,14 @@ $transport_labels = [
     </div>
 
     <!-- No route found message -->
-    <div id="no-route-msg" class="d-none alert" style="background:var(--sand);border:1px solid var(--sand-dark);border-radius:var(--radius-sm)">
-      <i class="bi bi-exclamation-triangle me-2" style="color:var(--terracotta)"></i>
-      <small>No direct route data found. Showing map with straight-line path.</small>
+    <div id="no-route-msg" class="d-none" style="background:var(--sand);border:1px solid var(--sand-dark);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:.82rem">
+      <div class="d-flex gap-2 align-items-start">
+        <i class="bi bi-map" style="color:var(--terracotta);flex-shrink:0;margin-top:.1rem"></i>
+        <div>
+          <div class="fw-bold mb-1" style="color:var(--green-dark)">Approximate path shown</div>
+          <span class="text-muted">No road route in database for this pair. Spots along the way are still accurate — road data can be added to the <code>routes</code> table.</span>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -598,7 +603,15 @@ function drawSpotMarkers(spots) {
 function renderTransportOptions(options) {
   const container = document.getElementById('transport-list');
   if (!options.length) {
-    container.innerHTML = `<p class="text-muted small mb-0">No direct transport data found.</p>`;
+    container.innerHTML = `
+      <div class="text-center py-2">
+        <i class="bi bi-signpost-2 d-block mb-2" style="font-size:1.6rem;color:var(--green-pale)"></i>
+        <p class="text-muted small mb-1 fw-500">No scheduled transport data</p>
+        <p class="text-muted" style="font-size:.75rem;line-height:1.5">
+          Try a <strong>private car</strong> or <strong>tricycle</strong> for this route.
+          Check local terminals for jeepney schedules.
+        </p>
+      </div>`;
     return;
   }
 
@@ -655,19 +668,23 @@ function renderTransportOptions(options) {
 // ── Render route stats ──────────────────────────────────────
 function renderRouteStats(data) {
   const t = data.transport_options[0] || {};
+  const distVal  = t.distance_km  ? `${t.distance_km} km`        : '<span style="color:var(--text-muted);font-size:.85rem">Estimating…</span>';
+  const timeVal  = t.duration_min ? formatDuration(t.duration_min): '<span style="color:var(--text-muted);font-size:.85rem">Varies</span>';
+  const fareVal  = t.fare_php > 0 ? '₱ ' + parseFloat(t.fare_php).toFixed(2)
+                                  : '<span style="font-size:.82rem">Own vehicle</span>';
   document.getElementById('route-stats').innerHTML = `
     <div class="route-bar flex-column gap-2 p-0 shadow-none border-0 bg-transparent">
       <div class="route-stat">
         <i class="bi bi-geo-alt-fill"></i>
-        <div><div class="val">${t.distance_km || '—'} km</div><div class="lbl">Distance</div></div>
+        <div><div class="val">${distVal}</div><div class="lbl">Distance</div></div>
       </div>
       <div class="route-stat">
         <i class="bi bi-clock"></i>
-        <div><div class="val">${t.duration_min ? formatDuration(t.duration_min) : '—'}</div><div class="lbl">Travel Time</div></div>
+        <div><div class="val">${timeVal}</div><div class="lbl">Travel Time</div></div>
       </div>
       <div class="route-stat">
         <i class="bi bi-cash-coin"></i>
-        <div><div class="val">${t.fare_php > 0 ? '₱ '+parseFloat(t.fare_php).toFixed(2) : 'Own vehicle'}</div><div class="lbl">Min. Fare</div></div>
+        <div><div class="val">${fareVal}</div><div class="lbl">Min. Fare</div></div>
       </div>
     </div>
   `;

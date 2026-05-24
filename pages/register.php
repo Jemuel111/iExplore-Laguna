@@ -1,10 +1,11 @@
 <?php
+ob_start();
 // ============================================================
 // iEXPLORE LAGUNA — Register Page (Polished v2)
 // ============================================================
 $page_title  = 'Create Account';
 $active_page = '';
-require_once __DIR__ . '/../includes/header.php';
+
 
 if (is_logged_in()) { header('Location: ' . APP_URL); exit; }
 
@@ -36,6 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+
+require_once __DIR__ . '/../includes/header.php';
 ?>
 
 <section style="min-height:80vh;display:flex;align-items:center;background:linear-gradient(135deg,var(--green-pale) 0%,var(--sand) 100%)">
@@ -113,6 +116,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <p class="text-center text-muted small mb-0">
             Already have an account?
             <a href="login.php" class="fw-bold text-green">Log in here</a>
+          </p>
+          <hr class="my-3" style="border-color:var(--border)">
+          <p class="text-center small mb-0" style="color:var(--text-muted)">
+            Own a shop or hotel?
+            <a href="register-shop.php" class="fw-bold" style="color:var(--terracotta)">Register as Shop Owner</a>
+            &nbsp;·&nbsp;
+            <a href="register-hotel.php" class="fw-bold" style="color:var(--terracotta)">Register as Hotel Owner</a>
           </p>
         </div>
 
