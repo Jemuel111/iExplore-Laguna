@@ -37,6 +37,7 @@
           <li><a href="<?= APP_URL ?>/pages/planner.php"><i class="bi bi-compass me-2 opacity-50"></i>Trip Planner</a></li>
           <li><a href="<?= APP_URL ?>/pages/spots.php"><i class="bi bi-geo-alt me-2 opacity-50"></i>Tourist Spots</a></li>
           <li><a href="<?= APP_URL ?>/pages/hotels.php"><i class="bi bi-building me-2 opacity-50"></i>Hotels</a></li>
+          <li><a href="<?= APP_URL ?>/pages/shops.php"><i class="bi bi-shop me-2 opacity-50"></i>Local Shops</a></li>
           <li><a href="<?= APP_URL ?>/pages/budget.php"><i class="bi bi-calculator me-2 opacity-50"></i>Budget Estimator</a></li>
         </ul>
       </div>

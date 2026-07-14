@@ -408,15 +408,15 @@ img { max-width: 100%; height: auto; display: block; }
 /* ── Itinerary timeline ────────────────────────────────────── */
 .itinerary-day {
   position: relative;
-  padding-left: 2.6rem;
-  margin-bottom: 2rem;
+  padding-left: 3rem;
+  margin-bottom: 2.25rem;
 }
 .itinerary-day::before {
   content: '';
   position: absolute;
-  left: .92rem;
-  top: 2.2rem;
-  bottom: -2rem;
+  left: 1.07rem;
+  top: 2.4rem;
+  bottom: -2.25rem;
   width: 2px;
   background: linear-gradient(180deg, var(--green-pale), transparent);
 }
@@ -425,50 +425,65 @@ img { max-width: 100%; height: auto; display: block; }
   position: absolute;
   left: 0;
   top: .2rem;
-  width: 1.85rem;
-  height: 1.85rem;
+  width: 2.15rem;
+  height: 2.15rem;
   background: linear-gradient(135deg, var(--green-mid), var(--green-dark));
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: .72rem;
+  font-size: .82rem;
   font-weight: 700;
   box-shadow: 0 0 0 4px var(--green-pale), 0 2px 8px rgba(45,106,79,.3);
 }
 .day-label {
   font-family: 'Playfair Display', serif;
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   color: var(--green-dark);
-  margin-bottom: .75rem;
+  margin-bottom: .9rem;
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: wrap;
+}
+.day-stop-count {
+  font-family: 'Poppins', sans-serif;
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  background: var(--green-pale);
+  padding: .2rem .65rem;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
 }
 .itinerary-item {
   background: var(--white);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: .9rem 1.1rem;
-  margin-bottom: .5rem;
+  padding: 1.1rem 1.3rem;
+  margin-bottom: .65rem;
   display: flex;
   align-items: flex-start;
-  gap: .85rem;
-  transition: border-color var(--transition), box-shadow var(--transition);
+  gap: 1rem;
+  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
 }
 .itinerary-item:hover {
   border-color: var(--green-light);
   box-shadow: var(--shadow-sm);
+  transform: translateX(2px);
 }
 .item-time {
-  font-size: .76rem;
+  font-size: .82rem;
   font-weight: 700;
   color: var(--green-light);
-  min-width: 58px;
+  min-width: 68px;
   padding-top: .1rem;
   white-space: nowrap;
 }
-.item-name { font-weight: 600; font-size: .93rem; }
-.item-desc { font-size: .8rem; color: var(--text-muted); margin-top: .1rem; }
+.item-name { font-weight: 600; font-size: 1.05rem; }
+.item-desc { font-size: .88rem; color: var(--text-muted); margin-top: .2rem; line-height: 1.45; }
 
 /* ── Route info ────────────────────────────────────────────── */
 .route-bar {

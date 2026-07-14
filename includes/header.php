@@ -75,6 +75,12 @@ $user        = current_user();
           </a>
         </li>
         <li class="nav-item">
+          <a class="nav-link <?= $active_page === 'shops'     ? 'active' : '' ?>"
+             href="<?= APP_URL ?>/pages/shops.php">
+            <i class="bi bi-shop me-1"></i>Shops
+          </a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link <?= $active_page === 'explore'   ? 'active' : '' ?>"
              href="<?= APP_URL ?>/pages/explore.php">
             <i class="bi bi-basket3 me-1"></i>Explore

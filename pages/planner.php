@@ -161,7 +161,7 @@ $transport_labels = [
   </div>
 
   <!-- ── CENTER PANEL: Map ──────────────────────────────── -->
-  <div class="col-lg-5 col-xl-6">
+  <div class="col-lg-4 col-xl-4">
 
     <!-- Map -->
     <div class="position-relative mb-3" id="map-wrapper">
@@ -262,7 +262,7 @@ $transport_labels = [
   </div>
 
   <!-- ── RIGHT PANEL: Budget + Itinerary ───────────────── -->
-  <div class="col-lg-4 col-xl-3">
+  <div class="col-lg-5 col-xl-5">
 
     <div id="right-panel-placeholder" class="form-panel text-center py-5" style="color:var(--text-muted)">
       <i class="bi bi-map fs-1 d-block mb-3" style="color:var(--green-pale)"></i>
@@ -288,9 +288,9 @@ $transport_labels = [
     <!-- Itinerary Panel (hidden until searched) -->
     <div id="itinerary-panel" class="d-none">
       <div class="d-flex align-items-center justify-content-between mb-3">
-        <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
+        <h5 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
           <i class="bi bi-journal-bookmark me-2" style="color:var(--green-light)"></i>Suggested Itinerary
-        </h6>
+        </h5>
         <button class="btn btn-sm btn-outline-app" id="save-itinerary-btn">
           <i class="bi bi-bookmark-plus me-1"></i>Save
         </button>
@@ -800,7 +800,10 @@ function renderItinerary(routeData, spots, days) {
     html += `
       <div class="itinerary-day">
         <div class="day-dot">${day}</div>
-        <div class="day-label">Day ${day} — ${cityName}</div>
+        <div class="day-label">
+          <span>Day ${day} — ${cityName}</span>
+          <span class="day-stop-count"><i class="bi bi-geo-alt-fill me-1"></i>${daySpots.length} stop${daySpots.length !== 1 ? 's' : ''}</span>
+        </div>
     `;
 
     if (day === 1) {
@@ -837,14 +840,14 @@ function renderItinerary(routeData, spots, days) {
 
 function itineraryItem(time, icon, name, desc, isSpot = false) {
   return `
-    <div class="itinerary-item" style="display:flex;align-items:flex-start;gap:.75rem;padding:.9rem 1.1rem">
-      <div class="item-time" style="min-width:64px;flex-shrink:0;white-space:nowrap">${time}</div>
+    <div class="itinerary-item" style="display:flex;align-items:flex-start;gap:1rem;padding:1.1rem 1.3rem">
+      <div class="item-time" style="min-width:68px;flex-shrink:0;white-space:nowrap">${time}</div>
       <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;gap:.35rem;flex-wrap:nowrap;margin-bottom:.2rem">
-          <i class="bi ${icon}" style="color:${isSpot?'var(--terracotta)':'var(--green-light)'};flex-shrink:0"></i>
-          <span class="item-name" style="font-weight:600;font-size:.95rem">${name}</span>
+        <div style="display:flex;align-items:center;gap:.45rem;flex-wrap:nowrap;margin-bottom:.25rem">
+          <i class="bi ${icon}" style="color:${isSpot?'var(--terracotta)':'var(--green-light)'};flex-shrink:0;font-size:1.05rem"></i>
+          <span class="item-name">${name}</span>
         </div>
-        <div class="item-desc" style="font-size:.82rem;color:var(--text-muted)">${desc}</div>
+        <div class="item-desc">${desc}</div>
       </div>
     </div>
   `;

@@ -79,6 +79,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         header('Location: ' . APP_URL . '/pages/admin-dashboard.php#hotels'); exit;
     }
+
+    if ($action === 'revoke_shop') {
+        $sid  = (int) input('shop_id', 'post', 0);
+        $shop = db_fetch_one("SELECT * FROM shops WHERE id = ?", [$sid]);
+        if ($shop) {
+            db_execute("UPDATE shops SET is_verified = 0, is_active = 0 WHERE id = ?", [$sid]);
+            db_execute(
+                "INSERT INTO notifications (user_id, type, title, message, link)
+                 VALUES (?, 'shop_revoked', ?, ?, ?)",
+                [$shop['owner_id'], 'Shop Unpublished',
+                 "\"{$shop['name']}\" has been taken offline by an admin and is no longer visible to tourists.",
+                 APP_URL . '/pages/shop-dashboard.php']
+            );
+            $_SESSION['flash']['danger'] = "\"{$shop['name']}\" unpublished.";
+        }
+        header('Location: ' . APP_URL . '/pages/admin-dashboard.php#shops'); exit;
+    }
+
+    if ($action === 'revoke_hotel') {
+        $hid   = (int) input('hotel_id', 'post', 0);
+        $hotel = db_fetch_one("SELECT * FROM hotels WHERE id = ?", [$hid]);
+        if ($hotel) {
+            db_execute("UPDATE hotels SET is_verified = 0, is_active = 0 WHERE id = ?", [$hid]);
+            if ($hotel['owner_id']) {
+                db_execute(
+                    "INSERT INTO notifications (user_id, type, title, message, link)
+                     VALUES (?, 'hotel_revoked', ?, ?, ?)",
+                    [$hotel['owner_id'], 'Hotel Unpublished',
+                     "\"{$hotel['name']}\" has been taken offline by an admin and is no longer visible to tourists.",
+                     APP_URL . '/pages/hotel-dashboard.php']
+                );
+            }
+            $_SESSION['flash']['danger'] = "\"{$hotel['name']}\" unpublished.";
+        }
+        header('Location: ' . APP_URL . '/pages/admin-dashboard.php#hotels'); exit;
+    }
 }
 
 // ── Fetch data ────────────────────────────────────────────────
@@ -100,8 +136,26 @@ $pending_hotels = db_fetch_all(
      ORDER BY h.id DESC"
 );
 
-$verified_shops_count  = db_fetch_one("SELECT COUNT(*) n FROM shops WHERE is_verified=1")['n']  ?? 0;
-$verified_hotels_count = db_fetch_one("SELECT COUNT(*) n FROM hotels WHERE is_verified=1")['n'] ?? 0;
+$verified_shops = db_fetch_all(
+    "SELECT s.*, u.name AS owner_name, u.email AS owner_email, u.phone AS owner_phone, c.name AS city_name
+     FROM shops s
+     JOIN users u  ON s.owner_id = u.id
+     JOIN cities c ON s.city_id  = c.id
+     WHERE s.is_verified = 1
+     ORDER BY s.name"
+);
+
+$verified_hotels = db_fetch_all(
+    "SELECT h.*, u.name AS owner_name, u.email AS owner_email, u.phone AS owner_phone, c.name AS city_name
+     FROM hotels h
+     LEFT JOIN users u ON h.owner_id = u.id
+     JOIN cities c      ON h.city_id  = c.id
+     WHERE h.is_verified = 1
+     ORDER BY h.name"
+);
+
+$verified_shops_count  = count($verified_shops);
+$verified_hotels_count = count($verified_hotels);
 $total_users            = db_fetch_one("SELECT COUNT(*) n FROM users")['n'] ?? 0;
 
 require_once __DIR__ . '/../includes/header.php';
@@ -224,6 +278,42 @@ require_once __DIR__ . '/../includes/header.php';
           <?php endforeach; ?>
         </div>
       <?php endif; ?>
+
+      <!-- ── VERIFIED SHOPS ── -->
+      <div class="d-flex align-items-center gap-2 mt-5 mb-3 pb-2" style="border-bottom:2px solid var(--green-pale)">
+        <i class="bi bi-patch-check-fill" style="color:var(--green-mid)"></i>
+        <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
+          Verified Shops (<?= count($verified_shops) ?>)
+        </h6>
+      </div>
+      <?php if (empty($verified_shops)): ?>
+        <p class="text-muted small">No verified shops yet.</p>
+      <?php else: ?>
+        <div class="d-flex flex-column gap-2">
+          <?php foreach ($verified_shops as $s): ?>
+          <div class="d-flex align-items-center justify-content-between gap-3 p-3"
+               style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+            <div class="min-w-0">
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="fw-bold" style="font-size:.92rem"><?= e($s['name']) ?></span>
+                <span class="badge" style="background:var(--green-pale);color:var(--green-dark);font-size:.68rem"><?= e(ucfirst($s['category'])) ?></span>
+              </div>
+              <div class="small text-muted">
+                <i class="bi bi-geo-alt me-1"></i><?= e($s['city_name']) ?>
+                &nbsp;·&nbsp;<i class="bi bi-person-circle me-1"></i><?= e($s['owner_name']) ?>
+              </div>
+            </div>
+            <form method="POST" onsubmit="return confirm('Unpublish this shop? It will be hidden from tourists until re-approved.')" class="flex-shrink-0">
+              <input type="hidden" name="action"  value="revoke_shop">
+              <input type="hidden" name="shop_id" value="<?= $s['id'] ?>">
+              <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill);font-size:.78rem;padding:.3rem .8rem">
+                <i class="bi bi-eye-slash me-1"></i>Unpublish
+              </button>
+            </form>
+          </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
     </div>
 
     <!-- ── PENDING HOTELS ── -->
@@ -275,6 +365,46 @@ require_once __DIR__ . '/../includes/header.php';
                 </form>
               </div>
             </div>
+          </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+
+      <!-- ── VERIFIED HOTELS ── -->
+      <div class="d-flex align-items-center gap-2 mt-5 mb-3 pb-2" style="border-bottom:2px solid var(--green-pale)">
+        <i class="bi bi-patch-check-fill" style="color:var(--green-mid)"></i>
+        <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
+          Verified Hotels (<?= count($verified_hotels) ?>)
+        </h6>
+      </div>
+      <?php if (empty($verified_hotels)): ?>
+        <p class="text-muted small">No verified hotels yet.</p>
+      <?php else: ?>
+        <div class="d-flex flex-column gap-2">
+          <?php foreach ($verified_hotels as $h): ?>
+          <div class="d-flex align-items-center justify-content-between gap-3 p-3"
+               style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+            <div class="min-w-0">
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="fw-bold" style="font-size:.92rem"><?= e($h['name']) ?></span>
+                <span style="color:var(--sand-dark);font-size:.75rem"><?= str_repeat('★',(int)$h['star_rating']) ?></span>
+              </div>
+              <div class="small text-muted">
+                <i class="bi bi-geo-alt me-1"></i><?= e($h['city_name']) ?>
+                <?php if ($h['owner_name']): ?>
+                  &nbsp;·&nbsp;<i class="bi bi-person-circle me-1"></i><?= e($h['owner_name']) ?>
+                <?php else: ?>
+                  &nbsp;·&nbsp;<span class="fst-italic">Legacy listing (no owner account)</span>
+                <?php endif; ?>
+              </div>
+            </div>
+            <form method="POST" onsubmit="return confirm('Unpublish this hotel? It will be hidden from tourists until re-approved.')" class="flex-shrink-0">
+              <input type="hidden" name="action"   value="revoke_hotel">
+              <input type="hidden" name="hotel_id" value="<?= $h['id'] ?>">
+              <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill);font-size:.78rem;padding:.3rem .8rem">
+                <i class="bi bi-eye-slash me-1"></i>Unpublish
+              </button>
+            </form>
           </div>
           <?php endforeach; ?>
         </div>
