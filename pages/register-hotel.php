@@ -123,7 +123,7 @@ $cities = db_fetch_all("SELECT id, name FROM cities ORDER BY name");
 
         <!-- Header -->
         <div class="text-center mb-4 fade-up">
-          <div style="width:64px;height:64px;background:linear-gradient(135deg,#534AB7,#7b6ff0);border-radius:18px;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(83,74,183,.3);margin-bottom:.75rem">
+          <div style="width:64px;height:64px;background:linear-gradient(135deg,#8e2434,#c65a68);border-radius:18px;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(83,74,183,.3);margin-bottom:.75rem">
             <i class="bi bi-building fs-3" style="color:#fff"></i>
           </div>
           <h2 class="mt-2 mb-1" style="font-family:'Playfair Display',serif;color:var(--green-dark)">

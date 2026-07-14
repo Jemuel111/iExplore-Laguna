@@ -88,7 +88,7 @@ $catLabels = [
 $emojis = ['nature'=>'🌿','heritage'=>'🏛️','waterfall'=>'💧','hotspring'=>'♨️',
            'museum'=>'🏺','religious'=>'⛪','beach_lake'=>'🏞️','adventure'=>'🧗','food'=>'🍜'];
 $badgeColors = [
-    'nature'=>['#d8f3dc','#1a3a2a'],'heritage'=>['#fef3c7','#92400e'],
+    'nature'=>['#fbdede','#6b0f14'],'heritage'=>['#fef3c7','#92400e'],
     'waterfall'=>['#dbeafe','#1e40af'],'hotspring'=>['#ffe4e6','#9f1239'],
     'museum'=>['#f3e8ff','#6b21a8'],'religious'=>['#fff7ed','#9a3412'],
     'beach_lake'=>['#e0f2fe','#075985'],'adventure'=>['#fef9c3','#713f12'],

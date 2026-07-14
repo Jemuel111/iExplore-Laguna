@@ -271,7 +271,7 @@ $amenityIcons = [
                 <span class="text-muted" style="font-size:.78rem"> – ₱<?= number_format($hotel['price_max'], 0) ?></span>
                 <div style="font-size:.68rem;color:var(--text-muted)">per night</div>
               </div>
-              <a href="hotel.php?id=<?= $hotel['id'] ?>" class="btn btn-sm" style="padding:.3rem .9rem;background:#534AB7;color:#fff;border-radius:var(--radius-pill)">
+              <a href="hotel.php?id=<?= $hotel['id'] ?>" class="btn btn-sm" style="padding:.3rem .9rem;background:#8e2434;color:#fff;border-radius:var(--radius-pill)">
                 <i class="bi bi-calendar-check me-1"></i>Book
               </a>
             </div>
@@ -313,7 +313,7 @@ $amenityIcons = [
                 </div>
                 <div style="font-size:.7rem;color:var(--text-muted)">per night</div>
               </div>
-              <a href="hotel.php?id=<?= $hotel['id'] ?>" class="btn btn-sm" style="padding:.3rem .8rem;font-size:.78rem;background:#534AB7;color:#fff;border-radius:var(--radius-pill)">
+              <a href="hotel.php?id=<?= $hotel['id'] ?>" class="btn btn-sm" style="padding:.3rem .8rem;font-size:.78rem;background:#8e2434;color:#fff;border-radius:var(--radius-pill)">
                 <i class="bi bi-calendar-check me-1"></i>Book
               </a>
             </div>

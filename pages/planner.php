@@ -171,7 +171,7 @@ $transport_labels = [
       <div class="position-absolute bottom-0 start-0 m-2 p-2 bg-white rounded shadow-sm"
            style="font-size:.75rem;z-index:999;border:1px solid var(--border)">
         <div class="d-flex align-items-center gap-2 mb-1">
-          <span style="width:14px;height:14px;background:#2d6a4f;border-radius:50%;display:inline-block"></span>
+          <span style="width:14px;height:14px;background:#a61c1c;border-radius:50%;display:inline-block"></span>
           <span>Start / End</span>
         </div>
         <div class="d-flex align-items-center gap-2 mb-1">
@@ -179,7 +179,7 @@ $transport_labels = [
           <span>Tourist Spot</span>
         </div>
         <div class="d-flex align-items-center gap-2">
-          <span style="width:18px;height:3px;background:#2d6a4f;display:inline-block;border-radius:2px"></span>
+          <span style="width:18px;height:3px;background:#a61c1c;display:inline-block;border-radius:2px"></span>
           <span>Road Route (OSRM)</span>
         </div>
       </div>
@@ -357,8 +357,8 @@ function makeIcon(color, icon = '●', size = 32) {
   });
 }
 
-const iconStart = makeIcon('#2d6a4f', '▶', 34);
-const iconEnd   = makeIcon('#1a3a2a', '■', 34);
+const iconStart = makeIcon('#a61c1c', '▶', 34);
+const iconEnd   = makeIcon('#6b0f14', '■', 34);
 const iconSpot  = makeIcon('#c77c48', '★', 28);
 
 // ── Plan button ─────────────────────────────────────────────
@@ -466,7 +466,7 @@ function drawRoute(data) {
       useHints: false,
     }),
     lineOptions: {
-      styles: [{ color: '#2d6a4f', weight: 5, opacity: 0.85 }],
+      styles: [{ color: '#a61c1c', weight: 5, opacity: 0.85 }],
       extendToWaypoints: true,
       missingRouteTolerance: 0,
     },
@@ -497,7 +497,7 @@ function drawRoute(data) {
   routeControl.on('routingerror', function(e) {
     console.warn('OSRM routing error, falling back to straight line:', e);
     const fallback = L.polyline([startLatLng, endLatLng], {
-      color: '#2d6a4f',
+      color: '#a61c1c',
       weight: 4,
       opacity: 0.6,
       dashArray: '10 6',
@@ -724,7 +724,7 @@ function renderSpotsGrid(spots, filterCat = 'all') {
            data-spot-id="${spot.id}"
            style="border:1.5px solid var(--border);cursor:pointer;transition:all .22s"
            onmouseenter="this.style.borderColor='var(--green-light)';this.style.background='var(--green-pale)'"
-           onmouseleave="this.style.borderColor=this.classList.contains('spot-card-active')?'var(--green-mid)':'var(--border)';this.style.background=this.classList.contains('spot-card-active')?'#eaf4ef':'#fff'"
+           onmouseleave="this.style.borderColor=this.classList.contains('spot-card-active')?'var(--green-mid)':'var(--border)';this.style.background=this.classList.contains('spot-card-active')?'#fbe4e4':'#fff'"
            onclick="flyToSpot(${spot.id})">
         <div style="width:52px;height:52px;border-radius:10px;background:var(--green-pale);
                     display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0">
@@ -941,7 +941,7 @@ function highlightSpotCard(spotId) {
   if (card) {
     card.classList.add('spot-card-active');
     card.style.borderColor = 'var(--green-mid)';
-    card.style.background  = '#eaf4ef';
+    card.style.background  = '#fbe4e4';
     card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 }
@@ -952,7 +952,7 @@ window.showSpotDetail = window.flyToSpot;
 // ── Category background color helper ───────────────────────
 function catBg(cat) {
   const m = {
-    nature:'#d8f3dc', heritage:'#fef3c7', waterfall:'#dbeafe',
+    nature:'#fbdede', heritage:'#fef3c7', waterfall:'#dbeafe',
     hotspring:'#ffe4e6', museum:'#f3e8ff', religious:'#fff7ed',
     beach_lake:'#e0f2fe', adventure:'#fef9c3', food:'#fce7f3'
   };

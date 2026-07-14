@@ -31,7 +31,7 @@ $amenities = json_decode($hotel['amenities'] ?? '[]', true) ?: [];
 ?>
 
 <!-- Hotel hero -->
-<section class="py-4" style="background:linear-gradient(135deg,#3d3480,#534AB7);color:#fff">
+<section class="py-4" style="background:linear-gradient(135deg,#5c1620,#8e2434);color:#fff">
   <div class="container">
     <div class="d-flex align-items-start gap-4 flex-wrap">
       <div style="width:72px;height:72px;background:rgba(255,255,255,.15);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:2.5rem;flex-shrink:0">
@@ -86,7 +86,7 @@ $amenities = json_decode($hotel['amenities'] ?? '[]', true) ?: [];
              data-room-name="<?= e($r['room_type']) ?>" data-room-price="<?= $r['price_per_night'] ?>"
              style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:border-color .2s">
           <div class="d-flex align-items-center gap-3">
-            <div style="width:52px;height:52px;background:#e6e0fa;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;flex-shrink:0">
+            <div style="width:52px;height:52px;background:#f7dde1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;flex-shrink:0">
               🛏️
             </div>
             <div class="flex-grow-1 min-w-0">
@@ -99,7 +99,7 @@ $amenities = json_decode($hotel['amenities'] ?? '[]', true) ?: [];
               <?php endif; ?>
             </div>
             <div class="text-end flex-shrink-0">
-              <div class="fw-bold" style="color:#534AB7;font-size:1.05rem">
+              <div class="fw-bold" style="color:#8e2434;font-size:1.05rem">
                 ₱<?= number_format($r['price_per_night'],2) ?>
               </div>
               <div class="small text-muted">per night</div>
@@ -118,7 +118,7 @@ $amenities = json_decode($hotel['amenities'] ?? '[]', true) ?: [];
   <div class="col-lg-4">
     <div style="position:sticky;top:80px">
       <div style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden">
-        <div class="p-3" style="background:linear-gradient(135deg,#3d3480,#534AB7);color:#fff">
+        <div class="p-3" style="background:linear-gradient(135deg,#5c1620,#8e2434);color:#fff">
           <h6 class="mb-0" style="font-family:'Playfair Display',serif">
             <i class="bi bi-calendar-check me-2" style="color:var(--sand-dark)"></i>Reserve a Room
           </h6>
@@ -176,7 +176,7 @@ $amenities = json_decode($hotel['amenities'] ?? '[]', true) ?: [];
             <span style="color:var(--green-dark)" id="booking-total">₱0.00</span>
           </div>
 
-          <button class="btn w-100" id="book-btn" style="background:#534AB7;color:#fff;border-radius:var(--radius-sm)"
+          <button class="btn w-100" id="book-btn" style="background:#8e2434;color:#fff;border-radius:var(--radius-sm)"
                   onclick="submitBooking(<?= $hotel_id ?>)" disabled>
             <i class="bi bi-calendar-check me-2"></i>Reserve Now
           </button>
@@ -196,7 +196,7 @@ $amenities = json_decode($hotel['amenities'] ?? '[]', true) ?: [];
 </div>
 
 <style>
-.room-option.selected { border-color:#534AB7 !important; background:#f6f4ff !important; }
+.room-option.selected { border-color:#8e2434 !important; background:#f7dde1 !important; }
 </style>
 
 <script>

@@ -79,7 +79,7 @@ $cat_labels = [
     'beach_lake'=>'Lake / Beach','adventure'=>'Adventure','food'=>'Food'
 ];
 $cat_bgs = [
-    'nature'=>'#d8f3dc','heritage'=>'#fef3c7','waterfall'=>'#dbeafe',
+    'nature'=>'#fbdede','heritage'=>'#fef3c7','waterfall'=>'#dbeafe',
     'hotspring'=>'#ffe4e6','museum'=>'#f3e8ff','religious'=>'#fff7ed',
     'beach_lake'=>'#e0f2fe','adventure'=>'#fef9c3','food'=>'#fce7f3'
 ];

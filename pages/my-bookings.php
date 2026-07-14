@@ -38,7 +38,7 @@ $statusColors = [
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
-<section class="py-3" style="background:linear-gradient(135deg,#3d3480,#534AB7);color:#fff">
+<section class="py-3" style="background:linear-gradient(135deg,#5c1620,#8e2434);color:#fff">
   <div class="container">
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-calendar-check-fill fs-2" style="color:var(--sand-dark)"></i>

@@ -176,7 +176,7 @@ require_once __DIR__ . '/../includes/header.php';
 <?php endif; ?>
 
 <!-- Page header -->
-<section class="py-3" style="background:linear-gradient(135deg,#534AB7,#7b6ff0);color:#fff">
+<section class="py-3" style="background:linear-gradient(135deg,#8e2434,#c65a68);color:#fff">
   <div class="container">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
       <div class="d-flex align-items-center gap-3">
@@ -195,7 +195,7 @@ require_once __DIR__ . '/../includes/header.php';
       </div>
       <?php if ($pending_count > 0): ?>
         <a href="#bookings" class="btn btn-sm"
-           style="background:#fff;color:#534AB7;font-weight:700;border-radius:var(--radius-pill)">
+           style="background:#fff;color:#8e2434;font-weight:700;border-radius:var(--radius-pill)">
           <i class="bi bi-bell-fill me-1"></i><?= $pending_count ?> New Booking<?= $pending_count > 1 ? 's' : '' ?>
         </a>
       <?php endif; ?>
@@ -211,7 +211,7 @@ require_once __DIR__ . '/../includes/header.php';
     $stats = [
       ['📅', 'Today\'s Bookings', $today_bookings, '#dbeafe','#1e40af'],
       ['⏳', 'Pending Bookings', $pending_count,  '#fef3c7','#92400e'],
-      ['🛏️', 'Room Types',       $total_rooms,    '#e6e0fa','#3d3480'],
+      ['🛏️', 'Room Types',       $total_rooms,    '#f7dde1','#5c1620'],
       ['💰', 'Total Revenue',    '₱'.number_format($total_revenue,2), '#f3e8ff','#6b21a8'],
     ];
     foreach ($stats as [$ico,$lbl,$val,$bg,$fg]): ?>
@@ -231,7 +231,7 @@ require_once __DIR__ . '/../includes/header.php';
       <a class="nav-link active" data-bs-toggle="tab" href="#bookings" style="font-weight:600">
         <i class="bi bi-calendar-check me-1"></i>Bookings
         <?php if ($pending_count): ?>
-          <span class="badge rounded-pill ms-1" style="background:#534AB7;font-size:.7rem"><?= $pending_count ?></span>
+          <span class="badge rounded-pill ms-1" style="background:#8e2434;font-size:.7rem"><?= $pending_count ?></span>
         <?php endif; ?>
       </a>
     </li>
@@ -369,7 +369,7 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="col-lg-4">
           <div class="form-panel">
             <h6 class="fw-bold mb-3" style="color:var(--green-dark);font-family:'Playfair Display',serif">
-              <i class="bi bi-plus-circle me-2" style="color:#534AB7"></i>Add Room Type
+              <i class="bi bi-plus-circle me-2" style="color:#8e2434"></i>Add Room Type
             </h6>
             <form method="POST">
               <input type="hidden" name="action" value="add_room">
@@ -421,7 +421,7 @@ require_once __DIR__ . '/../includes/header.php';
             <div class="d-flex align-items-center gap-3 p-3"
                  style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);
                         opacity:<?= $r['is_available'] ? '1' : '.55' ?>">
-              <div style="width:44px;height:44px;background:#e6e0fa;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">
+              <div style="width:44px;height:44px;background:#f7dde1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">
                 🛏️
               </div>
               <div class="flex-grow-1 min-w-0">
@@ -431,7 +431,7 @@ require_once __DIR__ . '/../includes/header.php';
                   <?= $r['room_count'] ?> room<?= $r['room_count']!=1?'s':'' ?>
                 </div>
               </div>
-              <div class="fw-bold" style="color:#534AB7;font-size:1rem;white-space:nowrap">
+              <div class="fw-bold" style="color:#8e2434;font-size:1rem;white-space:nowrap">
                 ₱<?= number_format($r['price_per_night'],2) ?>/night
               </div>
               <div class="d-flex gap-2 flex-shrink-0">

@@ -211,7 +211,7 @@ require_once __DIR__ . '/../includes/header.php';
     $stats = [
       ['📦', 'Today\'s Orders',  $today_orders,   '#dbeafe','#1e40af'],
       ['⏳', 'Pending Orders',   $pending_count,  '#fef3c7','#92400e'],
-      ['🛍️', 'Products Listed', $total_products, '#d8f3dc','#1a3a2a'],
+      ['🛍️', 'Products Listed', $total_products, '#fbdede','#6b0f14'],
       ['💰', 'Total Revenue',    '₱'.number_format($total_revenue,2), '#f3e8ff','#6b21a8'],
     ];
     foreach ($stats as [$ico,$lbl,$val,$bg,$fg]): ?>
