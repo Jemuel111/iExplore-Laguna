@@ -17,7 +17,7 @@ $view_mode     = input('view',      'get', 'grid');
 $per_page = 9;
 $page     = max(1, (int) input('p', 'get', 1));
 
-$where  = ['h.is_active = 1'];
+$where  = ['h.is_active = 1', 'h.is_verified = 1'];
 $params = [];
 
 if ($filter_city) {
@@ -271,11 +271,9 @@ $amenityIcons = [
                 <span class="text-muted" style="font-size:.78rem"> – ₱<?= number_format($hotel['price_max'], 0) ?></span>
                 <div style="font-size:.68rem;color:var(--text-muted)">per night</div>
               </div>
-              <?php if ($hotel['phone']): ?>
-              <a href="tel:<?= e($hotel['phone']) ?>" class="btn btn-sm btn-outline-app" style="padding:.3rem .7rem">
-                <i class="bi bi-telephone me-1"></i>Call
+              <a href="hotel.php?id=<?= $hotel['id'] ?>" class="btn btn-sm" style="padding:.3rem .9rem;background:#534AB7;color:#fff;border-radius:var(--radius-pill)">
+                <i class="bi bi-calendar-check me-1"></i>Book
               </a>
-              <?php endif; ?>
             </div>
           </div>
         </div>
@@ -315,11 +313,9 @@ $amenityIcons = [
                 </div>
                 <div style="font-size:.7rem;color:var(--text-muted)">per night</div>
               </div>
-              <?php if ($hotel['phone']): ?>
-              <a href="tel:<?= e($hotel['phone']) ?>" class="btn btn-sm btn-outline-app" style="padding:.3rem .7rem;font-size:.78rem">
-                <i class="bi bi-telephone"></i>
+              <a href="hotel.php?id=<?= $hotel['id'] ?>" class="btn btn-sm" style="padding:.3rem .8rem;font-size:.78rem;background:#534AB7;color:#fff;border-radius:var(--radius-pill)">
+                <i class="bi bi-calendar-check me-1"></i>Book
               </a>
-              <?php endif; ?>
             </div>
           </div>
           <?php if ($amenities): ?>

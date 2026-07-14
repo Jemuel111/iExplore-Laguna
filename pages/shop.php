@@ -1,5 +1,6 @@
 <?php
 ob_start();
+require_once __DIR__ . '/../includes/helpers.php';
 // ============================================================
 // iEXPLORE LAGUNA — Public Shop Page (Tourist View)
 // pages/shop.php?id=SHOP_ID
@@ -15,7 +16,7 @@ if (!$shop_id) { header('Location: ' . APP_URL . '/pages/explore.php'); exit; }
 $shop = db_fetch_one(
     "SELECT s.*, c.name AS city_name FROM shops s
      JOIN cities c ON s.city_id = c.id
-     WHERE s.id = ? AND s.is_active = 1",
+     WHERE s.id = ? AND s.is_active = 1 AND s.is_verified = 1",
     [$shop_id]
 );
 if (!$shop) { header('Location: ' . APP_URL . '/pages/explore.php'); exit; }

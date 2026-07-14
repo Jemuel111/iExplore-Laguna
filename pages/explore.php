@@ -27,7 +27,7 @@ $hotels = db_fetch_all(
             h.address, h.phone, c.name AS city_name, c.id AS city_id, 'hotel' AS item_type
      FROM hotels h
      JOIN cities c ON h.city_id = c.id
-     WHERE h.is_active = 1
+     WHERE h.is_active = 1 AND h.is_verified = 1
      ORDER BY h.star_rating DESC, h.price_min ASC"
 );
 

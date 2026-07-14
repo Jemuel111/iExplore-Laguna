@@ -66,12 +66,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'update_order') {
         $oid    = (int) input('order_id', 'post', 0);
         $status = input('status', 'post', '');
-        $allowed = ['confirmed','preparing','ready','cancelled'];
+        $allowed = ['confirmed','preparing','ready','picked_up','cancelled'];
         if (in_array($status, $allowed)) {
             if ($status === 'confirmed') {
                 $ts_col = ', confirmed_at = NOW()';
             } elseif ($status === 'ready') {
                 $ts_col = ', ready_at = NOW()';
+            } elseif ($status === 'picked_up') {
+                $ts_col = ', picked_up_at = NOW()';
             } elseif ($status === 'cancelled') {
                 $ts_col = ', cancelled_at = NOW()';
             } else {
@@ -89,6 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'confirmed' => ['Order Confirmed! 🎉', "Your order #{$order['order_number']} has been confirmed by the shop."],
                     'preparing' => ['Order Being Prepared 🍳', "Your order #{$order['order_number']} is now being prepared!"],
                     'ready'     => ['Ready for Pickup! ✅', "Your order #{$order['order_number']} is ready. Show your pickup code: {$order['pickup_code']}"],
+                    'picked_up' => ['Order Completed 🎉', "Your order #{$order['order_number']} has been picked up. Thanks for ordering!"],
                     'cancelled' => ['Order Cancelled', "Your order #{$order['order_number']} was cancelled by the shop."],
                 ];
                 if (isset($msgs[$status])) {
@@ -360,6 +363,15 @@ require_once __DIR__ . '/../includes/header.php';
                     <input type="hidden" name="status"   value="ready">
                     <button class="btn btn-sm" style="background:var(--green-mid);color:#fff;border-radius:var(--radius-pill)">
                       <i class="bi bi-box-seam me-1"></i>Mark Ready
+                    </button>
+                  </form>
+                  <?php elseif ($ord['status'] === 'ready'): ?>
+                  <form method="POST" class="mt-2">
+                    <input type="hidden" name="action"   value="update_order">
+                    <input type="hidden" name="order_id" value="<?= $ord['id'] ?>">
+                    <input type="hidden" name="status"   value="picked_up">
+                    <button class="btn btn-sm" style="background:var(--terracotta);color:#fff;border-radius:var(--radius-pill)">
+                      <i class="bi bi-check2-circle me-1"></i>Mark Picked Up
                     </button>
                   </form>
                   <?php endif; ?>

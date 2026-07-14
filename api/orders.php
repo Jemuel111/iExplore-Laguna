@@ -35,7 +35,7 @@ if (!$shop_id || empty($items)) {
     exit;
 }
 
-$shop = db_fetch_one("SELECT * FROM shops WHERE id = ? AND is_active = 1", [$shop_id]);
+$shop = db_fetch_one("SELECT * FROM shops WHERE id = ? AND is_active = 1 AND is_verified = 1", [$shop_id]);
 if (!$shop) {
     echo json_encode(['success'=>false,'message'=>'Shop not found']);
     exit;

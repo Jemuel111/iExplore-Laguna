@@ -98,6 +98,8 @@ $user        = current_user();
                 <span class="badge ms-1" style="background:var(--terracotta);font-size:.65rem">Shop</span>
               <?php elseif ($__role === 'hotel_owner'): ?>
                 <span class="badge ms-1" style="background:#534AB7;font-size:.65rem">Hotel</span>
+              <?php elseif ($__role === 'admin'): ?>
+                <span class="badge ms-1" style="background:var(--green-dark);font-size:.65rem">Admin</span>
               <?php endif; ?>
             </a>
             <ul class="dropdown-menu dropdown-menu-end shadow">
@@ -122,11 +124,22 @@ $user        = current_user();
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/hotel-dashboard.php#rooms">
                   <i class="bi bi-door-open me-2"></i>Manage Rooms</a></li>
 
+              <?php elseif ($__role === 'admin'): ?>
+                <li><a class="dropdown-item fw-bold" href="<?= APP_URL ?>/pages/admin-dashboard.php">
+                  <i class="bi bi-shield-check me-2" style="color:var(--green-dark)"></i>Admin Dashboard</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-dashboard.php#shops">
+                  <i class="bi bi-shop me-2"></i>Approve Shops</a></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-dashboard.php#hotels">
+                  <i class="bi bi-building me-2"></i>Approve Hotels</a></li>
+
               <?php else: ?>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/itineraries.php">
                   <i class="bi bi-journal-bookmark me-2"></i>My Itineraries</a></li>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/my-orders.php">
                   <i class="bi bi-bag-check me-2"></i>My Orders</a></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/my-bookings.php">
+                  <i class="bi bi-calendar-check me-2"></i>My Bookings</a></li>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/explore.php">
                   <i class="bi bi-basket3 me-2"></i>Explore & Plan</a></li>
               <?php endif; ?>
