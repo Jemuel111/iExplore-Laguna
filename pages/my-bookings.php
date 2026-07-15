@@ -13,6 +13,8 @@ if (!is_logged_in()) { header('Location: ' . APP_URL . '/pages/login.php'); exit
 $u = current_user();
 
 $new_booking = input('new', 'get', '');
+$new_spot    = input('spot', 'get', '');
+$is_package  = input('package', 'get', '');
 
 $bookings = db_fetch_all(
     "SELECT b.*, h.name AS hotel_name, h.id AS hotel_id,
@@ -56,11 +58,26 @@ require_once __DIR__ . '/../includes/header.php';
   <div class="alert alert-success d-flex align-items-start gap-3 mb-4" style="border-radius:var(--radius)">
     <i class="bi bi-check-circle-fill fs-4 flex-shrink-0"></i>
     <div>
-      <div class="fw-bold mb-1">Reservation Placed Successfully! 🎉</div>
+      <div class="fw-bold mb-1"><?= $is_package ? 'Package Booked Successfully! 🎉' : 'Reservation Placed Successfully! 🎉' ?></div>
       <div>Your booking <strong><?= e($new_booking) ?></strong> has been sent to the hotel.
         You'll be notified once it's confirmed.</div>
+      <?php if ($is_package): ?>
+      <div class="mt-1">Your full itinerary was saved automatically —
+        <a href="itineraries.php" class="fw-bold" style="color:inherit;text-decoration:underline">view it in My Itineraries →</a></div>
+      <?php endif; ?>
     </div>
   </div>
+  <?php if ($new_spot): ?>
+  <div class="alert d-flex align-items-start gap-3 mb-4"
+       style="border-radius:var(--radius);background:#f7dde1;border:1px solid #c65a68;color:#8e2434">
+    <i class="bi bi-signpost-split-fill fs-4 flex-shrink-0"></i>
+    <div>
+      <div class="fw-bold mb-1">Added to your itinerary! 🗺️</div>
+      <div>This hotel is near <strong><?= e($new_spot) ?></strong> — we added it to your trip list.</div>
+      <a href="explore.php" class="fw-bold" style="color:#8e2434">Open My Itinerary →</a>
+    </div>
+  </div>
+  <?php endif; ?>
   <?php endif; ?>
 
   <?php if (empty($bookings)): ?>

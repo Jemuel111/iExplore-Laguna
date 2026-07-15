@@ -13,6 +13,7 @@ if (!is_logged_in()) { header('Location: ' . APP_URL . '/pages/login.php'); exit
 $u = current_user();
 
 $new_order = input('new', 'get', '');
+$new_spot  = input('spot', 'get', '');
 
 $orders = db_fetch_all(
     "SELECT o.*, s.name AS shop_name, s.id AS shop_id,
@@ -58,6 +59,17 @@ require_once __DIR__ . '/../includes/header.php';
       <div class="fw-bold mb-1">Order Placed Successfully! 🎉</div>
       <div>Your order <strong><?= e($new_order) ?></strong> has been sent to the shop.
         You'll be notified when it's confirmed and ready for pickup.</div>
+    </div>
+  </div>
+  <div id="itinerary-nudge" class="alert <?= $new_spot ? 'd-flex' : 'd-none' ?> align-items-start gap-3 mb-4"
+       style="border-radius:var(--radius);background:var(--green-pale);border:1px solid var(--green-light);color:var(--green-dark)">
+    <i class="bi bi-signpost-split-fill fs-4 flex-shrink-0"></i>
+    <div>
+      <div class="fw-bold mb-1">Added to your itinerary! 🗺️</div>
+      <?php if ($new_spot): ?>
+      <div>The shop you ordered from is near <strong><?= e($new_spot) ?></strong> — we added it to your trip list.</div>
+      <?php endif; ?>
+      <a href="explore.php" class="fw-bold" style="color:var(--green-dark)">Open My Itinerary →</a>
     </div>
   </div>
   <?php endif; ?>

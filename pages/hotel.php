@@ -27,6 +27,16 @@ $rooms = db_fetch_all(
     [$hotel_id]
 );
 
+// The top-rated tourist spot in this hotel's city — used to nudge the
+// itinerary builder ("this hotel is near X, add it to your trip?")
+$nearby_spot = db_fetch_one(
+    "SELECT id, name, entrance_fee, category FROM tourist_spots
+     WHERE city_id = ? AND is_active = 1
+     ORDER BY rating DESC, name ASC
+     LIMIT 1",
+    [$hotel['city_id']]
+);
+
 $amenities = json_decode($hotel['amenities'] ?? '[]', true) ?: [];
 ?>
 
@@ -158,6 +168,16 @@ $amenities = json_decode($hotel['amenities'] ?? '[]', true) ?: [];
                       placeholder="e.g. Early check-in, extra pillow…" style="resize:none"></textarea>
           </div>
 
+          <?php if ($nearby_spot): ?>
+          <div class="mb-3 p-2 d-flex align-items-center gap-2" style="background:#f7dde1;border-radius:var(--radius-sm);font-size:.78rem">
+            <i class="bi bi-signpost-split-fill" style="color:#8e2434"></i>
+            <span style="color:#8e2434">
+              📍 <strong><?= e($hotel['name']) ?></strong> is near <strong><?= e($nearby_spot['name']) ?></strong> —
+              we'll add it to your itinerary when you reserve!
+            </span>
+          </div>
+          <?php endif; ?>
+
           <!-- Payment method -->
           <div class="mb-3">
             <label class="form-label small fw-600">Payment Method</label>
@@ -201,6 +221,29 @@ $amenities = json_decode($hotel['amenities'] ?? '[]', true) ?: [];
 
 <script>
 let selectedRoom = null;
+
+// Data needed to auto-add this hotel (and its nearby spot) to the
+// shared "My List" itinerary cart used on explore.php
+const HOTEL_CART_ITEM = {
+  key: 'hotel-<?= $hotel_id ?>', type: 'hotel', id: <?= $hotel_id ?>,
+  name: <?= json_encode($hotel['name']) ?>, city: <?= json_encode($hotel['city_name']) ?>,
+  price: <?= (float) ($hotel['price_min'] ?: 0) ?>
+};
+let NEARBY_SPOT_ITEM = null;
+<?php if ($nearby_spot): ?>
+NEARBY_SPOT_ITEM = {
+  key: 'spot-<?= $nearby_spot['id'] ?>', type: 'spot', id: <?= $nearby_spot['id'] ?>,
+  name: <?= json_encode($nearby_spot['name']) ?>, city: <?= json_encode($hotel['city_name']) ?>,
+  price: <?= (float) $nearby_spot['entrance_fee'] ?>
+};
+<?php endif; ?>
+
+function addToItineraryCart(item) {
+  let cart = [];
+  try { cart = JSON.parse(localStorage.getItem('iexplore_cart') || '[]'); } catch (e) { cart = []; }
+  if (!cart.some(i => i.key === item.key)) cart.push(item);
+  localStorage.setItem('iexplore_cart', JSON.stringify(cart));
+}
 
 document.querySelectorAll('.room-option').forEach(el => {
   el.addEventListener('click', () => {
@@ -291,7 +334,10 @@ function submitBooking(hotelId) {
   .then(r => r.json())
   .then(data => {
     if (data.success) {
-      window.location.href = '<?= APP_URL ?>/pages/my-bookings.php?new=' + data.booking_number;
+      addToItineraryCart(HOTEL_CART_ITEM);
+      let spotQS = '';
+      if (NEARBY_SPOT_ITEM) { addToItineraryCart(NEARBY_SPOT_ITEM); spotQS = '&spot=' + encodeURIComponent(NEARBY_SPOT_ITEM.name); }
+      window.location.href = '<?= APP_URL ?>/pages/my-bookings.php?new=' + data.booking_number + spotQS;
     } else {
       IExploreApp.toast(data.message || 'Failed to reserve. Please try again.', 'danger');
       btn.disabled = false;

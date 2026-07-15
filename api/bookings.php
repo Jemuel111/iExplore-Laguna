@@ -20,6 +20,11 @@ if (!is_logged_in()) {
 }
 
 $u    = current_user();
+if (($u['role'] ?? '') === 'admin') {
+    http_response_code(403);
+    echo json_encode(['success'=>false,'message'=>'Admin accounts cannot make bookings']);
+    exit;
+}
 $data = json_decode(file_get_contents('php://input'), true);
 
 $hotel_id         = (int)   ($data['hotel_id']         ?? 0);

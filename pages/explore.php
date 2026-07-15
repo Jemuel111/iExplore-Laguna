@@ -31,6 +31,26 @@ $hotels = db_fetch_all(
      ORDER BY h.star_rating DESC, h.price_min ASC"
 );
 
+// Fetch all active shops
+$shops = db_fetch_all(
+    "SELECT s.id, s.name, s.category, s.description, s.address, s.open_time, s.close_time,
+            c.name AS city_name, c.id AS city_id, 'shop' AS item_type
+     FROM shops s
+     JOIN cities c ON s.city_id = c.id
+     WHERE s.is_active = 1 AND s.is_verified = 1
+     ORDER BY s.name ASC"
+);
+
+$shopCatLabels = [
+    'milktea'=>'Milk Tea','cafe'=>'Café','restaurant'=>'Restaurant','bakery'=>'Bakery',
+    'street_food'=>'Street Food','souvenir'=>'Souvenir','pasalubong'=>'Pasalubong',
+    'grocery'=>'Grocery','other'=>'Other',
+];
+$shopCatEmojis = [
+    'milktea'=>'🧋','cafe'=>'☕','restaurant'=>'🍜','bakery'=>'🥐','street_food'=>'🍢',
+    'souvenir'=>'🛍️','pasalubong'=>'🎁','grocery'=>'🛒','other'=>'🏪',
+];
+
 $catLabels = [
     'nature'=>'Nature','heritage'=>'Heritage','waterfall'=>'Waterfall',
     'hotspring'=>'Hot Spring','museum'=>'Museum','religious'=>'Religious',
@@ -57,7 +77,7 @@ $catColors = [
         <i class="bi bi-basket3-fill fs-2" style="color:var(--sand-dark)"></i>
         <div>
           <h1 class="mb-0 fs-3" style="font-family:'Playfair Display',serif">Explore &amp; Plan</h1>
-          <p class="mb-0 small opacity-75">Pick spots &amp; hotels, then generate your perfect itinerary</p>
+          <p class="mb-0 small opacity-75">Pick spots, hotels &amp; shops, then generate your perfect itinerary</p>
         </div>
       </div>
       <!-- Cart button (shown on mobile too) -->
@@ -84,6 +104,7 @@ $catColors = [
         <button class="filter-pill active" data-tab="all">🗺️ All</button>
         <button class="filter-pill" data-tab="spot">📍 Spots</button>
         <button class="filter-pill" data-tab="hotel">🏨 Hotels</button>
+        <button class="filter-pill" data-tab="shop">🧋 Shops</button>
       </div>
 
       <div class="vr d-none d-md-block mx-1" style="opacity:.2"></div>
@@ -232,6 +253,52 @@ $catColors = [
       </div>
       <?php endforeach; ?>
 
+      <?php foreach ($shops as $shop): ?>
+      <div class="col-sm-6 col-xl-4 explore-item"
+           data-type="shop"
+           data-id="<?= $shop['id'] ?>"
+           data-city="<?= $shop['city_id'] ?>"
+           data-cat=""
+           data-fee="0"
+           data-name="<?= e(strtolower($shop['name'])) ?>"
+           data-cityname="<?= e(strtolower($shop['city_name'])) ?>">
+        <div class="explore-card h-100" data-id="shop-<?= $shop['id'] ?>">
+          <div class="explore-card-img" style="background:var(--sand)">
+            <span class="explore-emoji"><?= $shopCatEmojis[$shop['category']] ?? '🏪' ?></span>
+            <button class="add-to-cart-btn" onclick="toggleCart('shop',<?= $shop['id'] ?>,'<?= e(addslashes($shop['name'])) ?>','<?= e($shop['city_name']) ?>',0,'shop')"
+                    data-key="shop-<?= $shop['id'] ?>" title="Add to My List">
+              <i class="bi bi-plus-lg"></i>
+            </button>
+          </div>
+          <div class="explore-card-body">
+            <div class="mb-1">
+              <span class="cat-badge" style="background:var(--green-pale);color:var(--green-dark)">
+                <?= $shopCatEmojis[$shop['category']] ?? '🏪' ?> <?= $shopCatLabels[$shop['category']] ?? ucfirst($shop['category']) ?>
+              </span>
+            </div>
+            <h6 class="explore-card-title"><?= e($shop['name']) ?></h6>
+            <div class="explore-card-meta">
+              <i class="bi bi-geo-alt text-green"></i>
+              <span><?= e($shop['city_name']) ?></span>
+            </div>
+            <?php if ($shop['open_time'] && $shop['close_time']): ?>
+            <div class="explore-card-meta mt-1">
+              <i class="bi bi-clock text-muted"></i>
+              <span class="text-muted" style="font-size:.74rem"><?= date('g:i A', strtotime($shop['open_time'])) ?>–<?= date('g:i A', strtotime($shop['close_time'])) ?></span>
+            </div>
+            <?php endif; ?>
+            <div class="explore-card-footer">
+              <span class="explore-price free">🛍️ Order there</span>
+              <button class="btn-add-list" onclick="toggleCart('shop',<?= $shop['id'] ?>,'<?= e(addslashes($shop['name'])) ?>','<?= e($shop['city_name']) ?>',0,'shop')"
+                      data-key="shop-<?= $shop['id'] ?>">
+                <i class="bi bi-plus-lg me-1"></i>Add
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <?php endforeach; ?>
+
     </div><!-- /explore-grid -->
 
     <!-- Empty state -->
@@ -287,8 +354,8 @@ $catColors = [
           <i class="bi bi-printer me-1"></i>Print
         </button>
         <button class="btn btn-sm" style="background:var(--sand-dark);color:var(--green-dark);font-weight:700"
-                onclick="saveItinerary()">
-          <i class="bi bi-floppy me-1"></i>Save Itinerary
+                id="save-itin-btn" onclick="saveItinerary()">
+          <i class="bi bi-bookmark-check me-2"></i>Save This Itinerary
         </button>
       </div>
     </div>
@@ -548,9 +615,13 @@ $catColors = [
 <script>
 // ── Cart State ────────────────────────────────────────────────
 let cart = JSON.parse(localStorage.getItem('iexplore_cart') || '[]');
+let lastGeneratedItinerary = null;
+
+// City name → id, needed to save the itinerary (API stores origin/dest as city IDs)
+const CITY_NAME_TO_ID = <?= json_encode(array_column($cities, 'id', 'name')) ?>;
 
 // ── Filter State ─────────────────────────────────────────────
-let activeTab = 'all';   // all | spot | hotel
+let activeTab = 'all';   // all | spot | hotel | shop
 let activeCat = '';
 let activeCity = '';
 let searchQ    = '';
@@ -683,18 +754,21 @@ function renderCartPanel(panelId) {
     listEl.innerHTML = `
       <div class="cart-empty-msg">
         <i class="bi bi-basket3"></i>
-        <p class="mb-0 small">Nothing added yet.<br>Browse spots &amp; hotels above.</p>
+        <p class="mb-0 small">Nothing added yet.<br>Browse spots, hotels &amp; shops above.</p>
       </div>`;
   } else {
     listEl.innerHTML = cart.map(item => {
       const emoji = item.type === 'hotel' ? '🏨'
+        : item.type === 'shop'  ? '🧋'
         : (item.icon || '📍');
-      const priceStr = item.price > 0
-        ? (item.type === 'hotel' ? '₱'+Number(item.price).toLocaleString()+'/night' : '₱'+Number(item.price).toLocaleString())
-        : (item.type === 'hotel' ? 'Price varies' : 'Free');
+      const priceStr = item.type === 'hotel'
+        ? (item.price > 0 ? '₱'+Number(item.price).toLocaleString()+'/night' : 'Price varies')
+        : item.type === 'shop'
+        ? 'Order there'
+        : (item.price > 0 ? '₱'+Number(item.price).toLocaleString() : 'Free');
       return `
         <div class="cart-item">
-          <div class="cart-item-icon" style="background:${item.type==='hotel'?'#e8f4f8':'var(--green-pale)'}">
+          <div class="cart-item-icon" style="background:${item.type==='hotel'?'#e8f4f8':item.type==='shop'?'var(--sand)':'var(--green-pale)'}">
             ${emoji}
           </div>
           <div class="cart-item-info">
@@ -722,32 +796,46 @@ function generateItinerary() {
     return;
   }
 
-  // Separate spots and hotels
+  // Separate spots, shops, and hotels
   const spots  = cart.filter(i => i.type === 'spot');
+  const shops  = cart.filter(i => i.type === 'shop');
   const hotels = cart.filter(i => i.type === 'hotel');
 
-  // Group spots by city for logical day ordering
+  // Group spots + shops by city for logical day ordering
+  // (shops are placed after the spots in the same city, since you'd
+  // typically sightsee first, then grab food/drinks nearby)
   const cityGroups = {};
   spots.forEach(s => {
-    if (!cityGroups[s.city]) cityGroups[s.city] = [];
-    cityGroups[s.city].push(s);
+    if (!cityGroups[s.city]) cityGroups[s.city] = { spots: [], shops: [] };
+    cityGroups[s.city].spots.push(s);
+  });
+  shops.forEach(s => {
+    if (!cityGroups[s.city]) cityGroups[s.city] = { spots: [], shops: [] };
+    cityGroups[s.city].shops.push(s);
   });
 
-  // Build days — max 3 spots per day
+  // Build days — max 3 spots per day, shops tag along on the same day as their city's spots
   const days = [];
   let dayNum = 1;
   const cityList = Object.keys(cityGroups);
 
   cityList.forEach(city => {
-    const citySpots = cityGroups[city];
-    // chunk into groups of 3
-    for (let i = 0; i < citySpots.length; i += 3) {
-      days.push({
-        day: dayNum++,
-        city,
-        spots: citySpots.slice(i, i + 3),
-        hotel: null,
-      });
+    const citySpots = cityGroups[city].spots;
+    const cityShops = cityGroups[city].shops;
+    // chunk spots into groups of 3; shops for this city all ride along on the first chunk
+    if (citySpots.length === 0) {
+      // city has only shops, no spots — still give it its own day
+      days.push({ day: dayNum++, city, spots: [], shops: cityShops, hotel: null });
+    } else {
+      for (let i = 0; i < citySpots.length; i += 3) {
+        days.push({
+          day: dayNum++,
+          city,
+          spots: citySpots.slice(i, i + 3),
+          shops: i === 0 ? cityShops : [],
+          hotel: null,
+        });
+      }
     }
   });
 
@@ -795,6 +883,20 @@ function generateItinerary() {
         </div>`;
     });
 
+    d.shops.forEach((sh, idx) => {
+      const t = startTimes[d.spots.length + idx + 1] || startTimes[startTimes.length - 1];
+      html += `
+        <div class="itinerary-row">
+          <div class="itinerary-time">${t}</div>
+          <div class="itinerary-icon" style="background:var(--sand)">🧋</div>
+          <div class="itinerary-info">
+            <div class="itinerary-name">Stop by ${sh.name}</div>
+            <div class="itinerary-sub">${sh.city} · order ahead for pickup</div>
+          </div>
+          <div class="itinerary-cost">—</div>
+        </div>`;
+    });
+
     if (d.hotel) {
       html += `
         <div class="itinerary-row" style="background:var(--sand)">
@@ -830,7 +932,7 @@ function generateItinerary() {
         <div>
           <div style="font-size:.82rem;color:var(--green-dark);font-weight:600">
             <i class="bi bi-info-circle me-1"></i>
-            ${days.length} day${days.length>1?'s':''} · ${spots.length} spot${spots.length!==1?'s':''} · ${hotels.length} hotel${hotels.length!==1?'s':''}
+            ${days.length} day${days.length>1?'s':''} · ${spots.length} spot${spots.length!==1?'s':''} · ${shops.length} shop${shops.length!==1?'s':''} · ${hotels.length} hotel${hotels.length!==1?'s':''}
           </div>
           <div style="font-size:.75rem;color:var(--text-muted)">Times are approximate. Allow buffer for travel.</div>
         </div>
@@ -844,6 +946,9 @@ function generateItinerary() {
     `Your ${days.length}-Day Laguna Itinerary`;
   document.getElementById('itinerary-modal-body').innerHTML = html;
   new bootstrap.Modal(document.getElementById('itinerary-modal')).show();
+
+  // Keep this around so the Save button can persist it
+  lastGeneratedItinerary = { days, spots, shops, hotels, totalCost };
 }
 
 function printItinerary() {
@@ -851,13 +956,63 @@ function printItinerary() {
 }
 
 function saveItinerary() {
-  // Redirect to planner with notification, or save via API if user is logged in
-  <?php if ($user): ?>
-  alert('Itinerary saved! You can view it in My Itineraries.');
-  <?php else: ?>
+  <?php if (!$user): ?>
   if (confirm('Log in to save your itinerary. Go to login page?')) {
-    window.location.href = '<?= APP_URL ?>/pages/login.php';
+    window.location.href = '<?= APP_URL ?>/pages/login.php?redirect=<?= urlencode(APP_URL.'/pages/explore.php') ?>';
   }
+  return;
+  <?php else: ?>
+  if (!lastGeneratedItinerary) {
+    IExploreApp.toast('Generate an itinerary first.', 'warning');
+    return;
+  }
+
+  const { days, hotels, totalCost } = lastGeneratedItinerary;
+
+  // Pick the most-visited city as the "destination" (origin defaults to the same,
+  // since this cart-built trip isn't a point-A-to-point-B route like the Trip Planner)
+  const cityCounts = {};
+  days.forEach(d => { cityCounts[d.city] = (cityCounts[d.city] || 0) + 1; });
+  const primaryCity = Object.keys(cityCounts).sort((a,b) => cityCounts[b]-cityCounts[a])[0] || Object.keys(CITY_NAME_TO_ID)[0];
+  const cityId = CITY_NAME_TO_ID[primaryCity];
+
+  if (!cityId) {
+    IExploreApp.toast('Could not determine a city for this itinerary.', 'danger');
+    return;
+  }
+
+  const btn = document.getElementById('save-itin-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving…'; }
+
+  fetch('<?= APP_URL ?>/api/itineraries.php?action=save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      origin_id: cityId,
+      dest_id:   cityId,
+      days:      days.length,
+      persons:   1,
+      budget_level: 'midrange',
+      transport_pref: 'any',
+      total_budget: totalCost,
+      itinerary_json: days,
+      title: `My ${primaryCity} Trip (${days.length}d)`,
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      IExploreApp.toast('Itinerary saved! View it in My Itineraries.', 'success');
+      setTimeout(() => { window.location.href = '<?= APP_URL ?>/pages/itineraries.php'; }, 1200);
+    } else {
+      IExploreApp.toast(data.message || 'Failed to save itinerary.', 'danger');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-bookmark-check me-2"></i>Save This Itinerary'; }
+    }
+  })
+  .catch(() => {
+    IExploreApp.toast('Connection error. Please try again.', 'danger');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-bookmark-check me-2"></i>Save This Itinerary'; }
+  });
   <?php endif; ?>
 }
 </script>

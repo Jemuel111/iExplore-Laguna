@@ -11,6 +11,17 @@ session_start_safe();
 $page_title  = $page_title  ?? APP_NAME;
 $active_page = $active_page ?? '';
 $user        = current_user();
+
+// Admins are restricted to the admin area — bounce them off every
+// tourist-facing page (browsing, planner, ordering, booking, etc.)
+if ($user && ($user['role'] ?? '') === 'admin') {
+    $__admin_allowed = ['admin-dashboard.php', 'admin-packages.php', 'logout.php'];
+    $__current_page  = basename($_SERVER['SCRIPT_NAME'] ?? '');
+    if (!in_array($__current_page, $__admin_allowed, true)) {
+        header('Location: ' . APP_URL . '/pages/admin-dashboard.php');
+        exit;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -50,6 +61,18 @@ $user        = current_user();
 
     <div class="collapse navbar-collapse" id="navMenu">
       <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-1">
+        <?php if ($user && ($user['role'] ?? '') === 'admin'): ?>
+        <li class="nav-item">
+          <a class="nav-link active" href="<?= APP_URL ?>/pages/admin-dashboard.php">
+            <i class="bi bi-shield-check me-1"></i>Admin Dashboard
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="<?= APP_URL ?>/pages/admin-packages.php">
+            <i class="bi bi-box-seam me-1"></i>Manage Packages
+          </a>
+        </li>
+        <?php else: ?>
         <li class="nav-item">
           <a class="nav-link <?= $active_page === 'home'      ? 'active' : '' ?>"
              href="<?= APP_URL ?>">
@@ -81,6 +104,12 @@ $user        = current_user();
           </a>
         </li>
         <li class="nav-item">
+          <a class="nav-link <?= $active_page === 'packages'  ? 'active' : '' ?>"
+             href="<?= APP_URL ?>/pages/packages.php">
+            <i class="bi bi-box-seam me-1"></i>Packages
+          </a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link <?= $active_page === 'explore'   ? 'active' : '' ?>"
              href="<?= APP_URL ?>/pages/explore.php">
             <i class="bi bi-basket3 me-1"></i>Explore
@@ -92,6 +121,7 @@ $user        = current_user();
             <i class="bi bi-calculator me-1"></i>Budget
           </a>
         </li>
+        <?php endif; ?>
 
         <!-- Auth links -->
         <?php if ($user):
@@ -138,6 +168,8 @@ $user        = current_user();
                   <i class="bi bi-shop me-2"></i>Approve Shops</a></li>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-dashboard.php#hotels">
                   <i class="bi bi-building me-2"></i>Approve Hotels</a></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-packages.php">
+                  <i class="bi bi-box-seam me-2"></i>Manage Packages</a></li>
 
               <?php else: ?>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/itineraries.php">

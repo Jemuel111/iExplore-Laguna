@@ -34,7 +34,7 @@ $pid = $cart_include_count === 1 ? 'cart-panel-desktop' : 'cart-panel-offcanvas'
   <div class="cart-items-list">
     <div class="cart-empty-msg">
       <i class="bi bi-basket3"></i>
-      <p class="mb-0 small">Nothing added yet.<br>Browse spots &amp; hotels and tap <strong>Add</strong>.</p>
+      <p class="mb-0 small">Nothing added yet.<br>Browse spots, hotels &amp; shops and tap <strong>Add</strong>.</p>
     </div>
   </div>
 

@@ -30,6 +30,7 @@
         </div>
       </div>
 
+      <?php if (!(is_logged_in() && (current_user()['role'] ?? '') === 'admin')): ?>
       <!-- Quick links -->
       <div class="col-6 col-sm-4 col-lg-2 offset-lg-1">
         <h6 class="footer-heading mb-3">Explore</h6>
@@ -38,6 +39,7 @@
           <li><a href="<?= APP_URL ?>/pages/spots.php"><i class="bi bi-geo-alt me-2 opacity-50"></i>Tourist Spots</a></li>
           <li><a href="<?= APP_URL ?>/pages/hotels.php"><i class="bi bi-building me-2 opacity-50"></i>Hotels</a></li>
           <li><a href="<?= APP_URL ?>/pages/shops.php"><i class="bi bi-shop me-2 opacity-50"></i>Local Shops</a></li>
+          <li><a href="<?= APP_URL ?>/pages/packages.php"><i class="bi bi-box-seam me-2 opacity-50"></i>Trip Packages</a></li>
           <li><a href="<?= APP_URL ?>/pages/budget.php"><i class="bi bi-calculator me-2 opacity-50"></i>Budget Estimator</a></li>
         </ul>
       </div>
@@ -53,16 +55,19 @@
           <li><a href="<?= APP_URL ?>/pages/spots.php?city=nagcarlan">Nagcarlan</a></li>
         </ul>
       </div>
+      <?php endif; ?>
 
       <!-- Account -->
-      <div class="col-6 col-sm-4 col-lg-2">
+      <div class="col-6 col-sm-4 col-lg-2 <?= (is_logged_in() && (current_user()['role'] ?? '') === 'admin') ? 'offset-lg-1' : '' ?>">
         <h6 class="footer-heading mb-3">Account</h6>
         <ul class="list-unstyled footer-links">
           <?php if (is_logged_in()):
             $__u = current_user(); ?>
+            <?php if ($__u['role'] !== 'admin'): ?>
             <li><a href="<?= APP_URL ?>/pages/itineraries.php"><i class="bi bi-journal-bookmark me-2 opacity-50"></i>My Itineraries</a></li>
             <li><a href="<?= APP_URL ?>/pages/my-orders.php"><i class="bi bi-bag-check me-2 opacity-50"></i>My Orders</a></li>
             <li><a href="<?= APP_URL ?>/pages/my-bookings.php"><i class="bi bi-calendar-check me-2 opacity-50"></i>My Bookings</a></li>
+            <?php endif; ?>
             <?php if ($__u['role'] === 'shop_owner'): ?>
             <li><a href="<?= APP_URL ?>/pages/shop-dashboard.php"><i class="bi bi-shop me-2 opacity-50"></i>My Shop</a></li>
             <?php endif; ?>
@@ -71,6 +76,7 @@
             <?php endif; ?>
             <?php if ($__u['role'] === 'admin'): ?>
             <li><a href="<?= APP_URL ?>/pages/admin-dashboard.php"><i class="bi bi-shield-check me-2 opacity-50"></i>Admin Dashboard</a></li>
+            <li><a href="<?= APP_URL ?>/pages/admin-packages.php"><i class="bi bi-box-seam me-2 opacity-50"></i>Manage Packages</a></li>
             <?php endif; ?>
             <li><a href="<?= APP_URL ?>/pages/logout.php"><i class="bi bi-box-arrow-right me-2 opacity-50"></i>Logout</a></li>
           <?php else: ?>

@@ -16,6 +16,9 @@ $user = current_user();
 if (!$user) {
     json_error('Authentication required.', 401);
 }
+if (($user['role'] ?? '') === 'admin') {
+    json_error('Admin accounts cannot save itineraries.', 403);
+}
 
 switch ($action) {
 

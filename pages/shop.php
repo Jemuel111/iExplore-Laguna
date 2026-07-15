@@ -28,6 +28,16 @@ $products = db_fetch_all(
     [$shop_id]
 );
 
+// The top-rated tourist spot in this shop's city — used to nudge the
+// itinerary builder ("this shop is near X, add it to your trip?")
+$nearby_spot = db_fetch_one(
+    "SELECT id, name, entrance_fee, category FROM tourist_spots
+     WHERE city_id = ? AND is_active = 1
+     ORDER BY rating DESC, name ASC
+     LIMIT 1",
+    [$shop['city_id']]
+);
+
 // Group by category
 $grouped = [];
 foreach ($products as $p) {
@@ -184,6 +194,16 @@ require_once __DIR__ . '/../includes/header.php';
           </p>
         </div>
 
+        <?php if ($nearby_spot): ?>
+        <div class="mx-3 mb-0 p-2 d-flex align-items-center gap-2" style="background:var(--green-pale);border-radius:var(--radius-sm);font-size:.78rem">
+          <i class="bi bi-signpost-split-fill" style="color:var(--green-dark)"></i>
+          <span style="color:var(--green-dark)">
+            📍 <strong><?= e($shop['name']) ?></strong> is near <strong><?= e($nearby_spot['name']) ?></strong> —
+            we'll add it to your itinerary when you order!
+          </span>
+        </div>
+        <?php endif; ?>
+
         <div class="p-3" style="border-top:1px solid var(--border);background:var(--cream)">
           <!-- Pickup date/time -->
           <div class="mb-3">
@@ -239,6 +259,29 @@ require_once __DIR__ . '/../includes/header.php';
 
 <script>
 let orderCart = {};
+
+// Data needed to auto-add this shop (and its nearby spot) to the
+// shared "My List" itinerary cart used on explore.php
+const SHOP_CART_ITEM  = {
+  key: 'shop-<?= $shop_id ?>', type: 'shop', id: <?= $shop_id ?>,
+  name: <?= json_encode($shop['name']) ?>, city: <?= json_encode($shop['city_name']) ?>,
+  price: 0
+};
+let NEARBY_SPOT_ITEM = null;
+<?php if ($nearby_spot): ?>
+NEARBY_SPOT_ITEM = {
+  key: 'spot-<?= $nearby_spot['id'] ?>', type: 'spot', id: <?= $nearby_spot['id'] ?>,
+  name: <?= json_encode($nearby_spot['name']) ?>, city: <?= json_encode($shop['city_name']) ?>,
+  price: <?= (float) $nearby_spot['entrance_fee'] ?>
+};
+<?php endif; ?>
+
+function addToItineraryCart(item) {
+  let cart = [];
+  try { cart = JSON.parse(localStorage.getItem('iexplore_cart') || '[]'); } catch (e) { cart = []; }
+  if (!cart.some(i => i.key === item.key)) cart.push(item);
+  localStorage.setItem('iexplore_cart', JSON.stringify(cart));
+}
 
 function changeQty(pid, delta, name, price) {
   if (!orderCart[pid]) orderCart[pid] = { name: name || '', price: price || 0, qty: 0 };
@@ -299,7 +342,10 @@ function placeOrder(shopId) {
   .then(r => r.json())
   .then(data => {
     if (data.success) {
-      window.location.href = '<?= APP_URL ?>/pages/my-orders.php?new=' + data.order_number;
+      addToItineraryCart(SHOP_CART_ITEM);
+      let spotQS = '';
+      if (NEARBY_SPOT_ITEM) { addToItineraryCart(NEARBY_SPOT_ITEM); spotQS = '&spot=' + encodeURIComponent(NEARBY_SPOT_ITEM.name); }
+      window.location.href = '<?= APP_URL ?>/pages/my-orders.php?new=' + data.order_number + spotQS;
     } else {
       alert(data.message || 'Failed to place order. Please try again.');
       btn.disabled = false;
