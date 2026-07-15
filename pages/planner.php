@@ -16,6 +16,7 @@ $pre_persons = (int) input('persons',     'get', 1);
 
 // Load all cities for dropdowns
 $cities = db_fetch_all("SELECT id, name, slug, latitude, longitude FROM cities ORDER BY name");
+$budgetRanges = get_budget_level_ranges();
 
 // Transport type labels
 $transport_labels = [
@@ -115,10 +116,11 @@ $transport_labels = [
       <div class="mb-3">
         <label class="form-label">Budget Level</label>
         <select class="form-select" id="budget-select">
-          <option value="budget"   <?= $pre_budget==='budget'   ? 'selected':'' ?>>💰 Budget</option>
-          <option value="midrange" <?= $pre_budget==='midrange' ? 'selected':'' ?>>💳 Mid-range</option>
-          <option value="upscale"  <?= $pre_budget==='upscale'  ? 'selected':'' ?>>💎 Upscale</option>
+          <option value="budget"   <?= $pre_budget==='budget'   ? 'selected':'' ?>>💰 Budget (₱<?= number_format($budgetRanges['budget']['min']) ?>–<?= number_format($budgetRanges['budget']['max']) ?>/day)</option>
+          <option value="midrange" <?= $pre_budget==='midrange' ? 'selected':'' ?>>💳 Mid-range (₱<?= number_format($budgetRanges['midrange']['min']) ?>–<?= number_format($budgetRanges['midrange']['max']) ?>/day)</option>
+          <option value="upscale"  <?= $pre_budget==='upscale'  ? 'selected':'' ?>>💎 Upscale (₱<?= number_format($budgetRanges['upscale']['min']) ?>–<?= number_format($budgetRanges['upscale']['max']) ?>/day)</option>
         </select>
+        <div class="form-text">Per person, per day (food + accommodation)</div>
       </div>
 
       <button class="btn btn-primary-app w-100" id="plan-btn">

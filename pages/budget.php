@@ -8,6 +8,7 @@ $active_page = 'budget';
 require_once __DIR__ . '/../includes/header.php';
 
 $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
+$budgetRanges = get_budget_level_ranges();
 ?>
 
 <section class="py-4" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
@@ -73,12 +74,15 @@ $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
         <div class="col-4">
           <label class="form-label">Level</label>
           <select class="form-select" id="b-level">
-            <option value="budget">💰 Budget</option>
-            <option value="midrange" selected>💳 Mid</option>
-            <option value="upscale">💎 Upscale</option>
+            <option value="budget">💰 ₱<?= number_format($budgetRanges['budget']['min']) ?>–<?= number_format($budgetRanges['budget']['max']) ?></option>
+            <option value="midrange" selected>💳 ₱<?= number_format($budgetRanges['midrange']['min']) ?>–<?= number_format($budgetRanges['midrange']['max']) ?></option>
+            <option value="upscale">💎 ₱<?= number_format($budgetRanges['upscale']['min']) ?>–<?= number_format($budgetRanges['upscale']['max']) ?></option>
           </select>
         </div>
       </div>
+      <p class="text-muted small mt-1 mb-3" style="margin-top:-.5rem">
+        <i class="bi bi-info-circle me-1"></i>Ranges are food + hotel cost per person, per day.
+      </p>
 
       <!-- Entrance fees toggle -->
       <div class="mb-4">

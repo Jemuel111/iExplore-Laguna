@@ -199,3 +199,43 @@ function set_api_headers(): void {
     header('Access-Control-Allow-Headers: Content-Type');
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit(0);
 }
+
+/**
+ * Computes a real ₱min–₱max per-day-per-person range for each budget
+ * level (budget/midrange/upscale) from actual data in budget_estimates
+ * (food + accommodation combined), instead of showing vague labels.
+ * Falls back to reasonable defaults if the table has no data yet.
+ */
+function get_budget_level_ranges(): array {
+    $ranges = [
+        'budget'   => ['min' => 0,    'max' => 1000],
+        'midrange' => ['min' => 1000, 'max' => 3000],
+        'upscale'  => ['min' => 3000, 'max' => 8000],
+    ];
+
+    $rows = db_fetch_all(
+        "SELECT
+            SUBSTRING_INDEX(category,'_',-1) AS level,
+            MIN(amount_php) AS min_amt,
+            MAX(amount_php) AS max_amt
+         FROM budget_estimates
+         WHERE category LIKE 'food_%' OR category LIKE 'accommodation_%'
+         GROUP BY level, SUBSTRING_INDEX(category,'_',1)"
+    );
+
+    if (!empty($rows)) {
+        $computed = ['budget' => ['min'=>0,'max'=>0], 'midrange' => ['min'=>0,'max'=>0], 'upscale' => ['min'=>0,'max'=>0]];
+        foreach ($rows as $r) {
+            $lvl = $r['level'];
+            if (!isset($computed[$lvl])) continue;
+            $computed[$lvl]['min'] += (float) $r['min_amt'];
+            $computed[$lvl]['max'] += (float) $r['max_amt'];
+        }
+        // Only use computed values if they actually resolved to something real
+        foreach ($computed as $lvl => $range) {
+            if ($range['max'] > 0) $ranges[$lvl] = $range;
+        }
+    }
+
+    return $ranges;
+}
