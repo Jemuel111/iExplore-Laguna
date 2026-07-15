@@ -288,16 +288,20 @@ $base_qs = http_build_query(array_filter([
       ?>
       <div class="col-sm-6 col-xl-4">
         <div class="card-app h-100">
+          <a href="spot-detail.php?id=<?= $spot['id'] ?>" class="text-decoration-none">
           <div class="card-img-placeholder" style="height:150px;font-size:2.5rem">
             <?= $emojis[$spot['category']] ?? '📍' ?>
           </div>
+          </a>
           <div class="card-body-app d-flex flex-column">
             <div class="mb-2">
               <span style="background:<?= $bg ?>;color:<?= $fg ?>;padding:.2rem .7rem;border-radius:20px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em">
                 <?= $catLabels[$spot['category']] ?? $spot['category'] ?>
               </span>
             </div>
-            <h5 class="card-title-app mb-1" style="font-size:1rem"><?= e($spot['name']) ?></h5>
+            <a href="spot-detail.php?id=<?= $spot['id'] ?>" class="text-decoration-none">
+              <h5 class="card-title-app mb-1" style="font-size:1rem;color:var(--charcoal)"><?= e($spot['name']) ?></h5>
+            </a>
             <div class="card-meta mb-2">
               <i class="bi bi-geo-alt text-green"></i>
               <span><?= e($spot['city_name']) ?></span>
@@ -316,9 +320,9 @@ $base_qs = http_build_query(array_filter([
                     ? '<span style="color:var(--terracotta)">₱ ' . number_format($spot['entrance_fee'], 0) . '</span>'
                     : '<span style="color:#16a34a;font-size:.82rem">🎉 Free</span>' ?>
               </span>
-              <a href="planner.php?destination=<?= $spot['city_id'] ?>"
-                 class="btn btn-sm btn-outline-app">
-                <i class="bi bi-compass me-1"></i>Plan
+              <a href="spot-detail.php?id=<?= $spot['id'] ?>"
+                 class="btn btn-sm btn-primary-app">
+                <i class="bi bi-info-circle me-1"></i>View Details
               </a>
             </div>
           </div>
@@ -339,7 +343,9 @@ $base_qs = http_build_query(array_filter([
           <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
             <div>
               <h6 class="mb-0 fw-bold" style="font-family:'Playfair Display',serif;font-size:.95rem">
-                <?= e($spot['name']) ?>
+                <a href="spot-detail.php?id=<?= $spot['id'] ?>" class="text-decoration-none" style="color:var(--charcoal)">
+                  <?= e($spot['name']) ?>
+                </a>
               </h6>
               <div class="card-meta mt-1" style="font-size:.78rem">
                 <i class="bi bi-geo-alt text-green"></i>
@@ -360,9 +366,9 @@ $base_qs = http_build_query(array_filter([
               <span class="fw-bold" style="font-size:.85rem;<?= $spot['entrance_fee']>0 ? 'color:var(--terracotta)' : 'color:#16a34a' ?>">
                 <?= $spot['entrance_fee'] > 0 ? '₱'.number_format($spot['entrance_fee'],0) : 'Free' ?>
               </span>
-              <a href="planner.php?destination=<?= $spot['city_id'] ?>"
-                 class="btn btn-sm btn-outline-app" style="padding:.3rem .7rem;font-size:.78rem">
-                Plan
+              <a href="spot-detail.php?id=<?= $spot['id'] ?>"
+                 class="btn btn-sm btn-primary-app" style="padding:.3rem .7rem;font-size:.78rem">
+                View Details
               </a>
             </div>
           </div>

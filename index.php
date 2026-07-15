@@ -186,12 +186,16 @@ function spot_badge(string $category): string {
       ?>
       <div class="col-sm-6 col-lg-4 reveal fade-up-<?= min($i,6) ?>">
         <div class="card-app h-100">
+          <a href="pages/spot-detail.php?id=<?= $spot['id'] ?>" class="text-decoration-none">
           <div class="card-img-placeholder">
             <?= $emojis[$spot['category']] ?? '📍' ?>
           </div>
+          </a>
           <div class="card-body-app">
             <div class="mb-2"><?= spot_badge($spot['category']) ?></div>
-            <h5 class="card-title-app"><?= e($spot['name']) ?></h5>
+            <a href="pages/spot-detail.php?id=<?= $spot['id'] ?>" class="text-decoration-none">
+              <h5 class="card-title-app" style="color:var(--charcoal)"><?= e($spot['name']) ?></h5>
+            </a>
             <div class="card-meta mb-2">
               <i class="bi bi-geo-alt text-green"></i>
               <span><?= e($spot['city_name']) ?></span>
@@ -208,8 +212,8 @@ function spot_badge(string $category): string {
                     ? '<span style="color:var(--terracotta)">₱ ' . number_format($spot['entrance_fee'],2) . '</span>'
                     : '<span class="text-success"><i class="bi bi-ticket-perforated me-1"></i>Free Entry</span>' ?>
               </span>
-              <a href="pages/planner.php?destination=<?= $spot['city_id'] ?>"
-                 class="btn btn-sm btn-outline-app">Plan Visit</a>
+              <a href="pages/spot-detail.php?id=<?= $spot['id'] ?>"
+                 class="btn btn-sm btn-primary-app">View Details</a>
             </div>
           </div>
         </div>

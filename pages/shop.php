@@ -63,6 +63,18 @@ $avg_rating = count($reviews)
     ? round(array_sum(array_column($reviews, 'rating')) / count($reviews), 1)
     : null;
 
+// Orders this tourist can review — must be picked up, and not already reviewed
+$reviewable_order = null;
+if (is_logged_in()) {
+    $reviewable_order = db_fetch_one(
+        "SELECT o.id, o.order_number FROM orders o
+         WHERE o.shop_id = ? AND o.tourist_id = ? AND o.status = 'picked_up'
+           AND o.id NOT IN (SELECT order_id FROM shop_reviews WHERE tourist_id = ?)
+         ORDER BY o.created_at DESC LIMIT 1",
+        [$shop_id, current_user()['id'], current_user()['id']]
+    );
+}
+
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
@@ -155,12 +167,44 @@ require_once __DIR__ . '/../includes/header.php';
     <?php endif; ?>
 
     <!-- Reviews -->
-    <?php if ($reviews): ?>
-    <div class="mt-4">
-      <h6 class="fw-bold mb-3" style="color:var(--green-dark);font-family:'Playfair Display',serif">
-        <i class="bi bi-star-fill me-2" style="color:var(--sand-dark)"></i>Customer Reviews
-      </h6>
-      <div class="d-flex flex-column gap-2">
+    <div class="mt-4" id="reviews-section">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <h6 class="fw-bold mb-0" style="color:var(--green-dark);font-family:'Playfair Display',serif">
+          <i class="bi bi-star-fill me-2" style="color:var(--sand-dark)"></i>Customer Reviews
+          <?php if ($avg_rating): ?>
+            <span class="text-muted small">(<?= $avg_rating ?> avg · <?= count($reviews) ?>)</span>
+          <?php endif; ?>
+        </h6>
+        <?php if ($reviewable_order): ?>
+        <button class="btn btn-sm btn-primary-app" id="write-shop-review-btn">
+          <i class="bi bi-pencil-square me-1"></i>Write a Review
+        </button>
+        <?php endif; ?>
+      </div>
+
+      <?php if ($reviewable_order): ?>
+      <div id="shop-review-form-wrap" class="p-3 mb-3 d-none" style="background:var(--cream);border-radius:var(--radius-sm)">
+        <p class="small text-muted mb-2">Reviewing your order <strong><?= e($reviewable_order['order_number']) ?></strong></p>
+        <div class="mb-2">
+          <?php for ($i=1;$i<=5;$i++): ?>
+            <i class="bi bi-star star-pick-shop" data-val="<?= $i ?>" style="font-size:1.4rem;color:#ccc;cursor:pointer"></i>
+          <?php endfor; ?>
+          <input type="hidden" id="shop-review-rating" value="0">
+        </div>
+        <textarea class="form-control mb-2" id="shop-review-comment" rows="3" maxlength="500"
+                  placeholder="Tell others about your experience with this shop…"></textarea>
+        <button class="btn btn-sm btn-primary-app" id="submit-shop-review-btn">Submit Review</button>
+        <button class="btn btn-sm btn-outline-secondary" id="cancel-shop-review-btn">Cancel</button>
+      </div>
+      <?php endif; ?>
+
+      <?php if (empty($reviews)): ?>
+      <div class="text-center py-3 text-muted">
+        <i class="bi bi-chat-dots fs-3 d-block mb-2 opacity-50"></i>
+        <p class="mb-0 small">No reviews yet. Be the first to share your experience!</p>
+      </div>
+      <?php else: ?>
+      <div class="d-flex flex-column gap-2" id="shop-reviews-list">
         <?php foreach ($reviews as $r): ?>
         <div class="p-3" style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm)">
           <div class="d-flex justify-content-between align-items-start mb-1">
@@ -173,8 +217,8 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
         <?php endforeach; ?>
       </div>
+      <?php endif; ?>
     </div>
-    <?php endif; ?>
   </div>
 
   <!-- ── Order summary sidebar ─────────────────────────────── -->
@@ -356,6 +400,82 @@ function placeOrder(shopId) {
     alert('Connection error. Please try again.');
     btn.disabled = false;
     btn.innerHTML = '<i class="bi bi-bag-check me-2"></i>Place Order';
+  });
+}
+
+// ── Shop review form ──────────────────────────────────────────
+const writeShopReviewBtn  = document.getElementById('write-shop-review-btn');
+const shopReviewFormWrap  = document.getElementById('shop-review-form-wrap');
+const cancelShopReviewBtn = document.getElementById('cancel-shop-review-btn');
+
+if (writeShopReviewBtn) {
+  writeShopReviewBtn.addEventListener('click', () => {
+    shopReviewFormWrap.classList.toggle('d-none');
+    if (!shopReviewFormWrap.classList.contains('d-none')) {
+      shopReviewFormWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+}
+if (cancelShopReviewBtn) {
+  cancelShopReviewBtn.addEventListener('click', () => shopReviewFormWrap.classList.add('d-none'));
+}
+
+let pickedShopRating = 0;
+document.querySelectorAll('.star-pick-shop').forEach(star => {
+  star.addEventListener('mouseenter', () => {
+    const val = +star.dataset.val;
+    document.querySelectorAll('.star-pick-shop').forEach((s, i) => {
+      s.className = 'bi star-pick-shop ' + (i < val ? 'bi-star-fill' : 'bi-star');
+      s.style.color = i < val ? 'var(--sand-dark)' : '#ccc';
+    });
+  });
+  star.addEventListener('mouseleave', () => {
+    document.querySelectorAll('.star-pick-shop').forEach((s, i) => {
+      s.className = 'bi star-pick-shop ' + (i < pickedShopRating ? 'bi-star-fill' : 'bi-star');
+      s.style.color = i < pickedShopRating ? 'var(--sand-dark)' : '#ccc';
+    });
+  });
+  star.addEventListener('click', () => {
+    pickedShopRating = +star.dataset.val;
+    document.getElementById('shop-review-rating').value = pickedShopRating;
+  });
+});
+
+const submitShopReviewBtn = document.getElementById('submit-shop-review-btn');
+if (submitShopReviewBtn) {
+  submitShopReviewBtn.addEventListener('click', () => {
+    const rating = +document.getElementById('shop-review-rating').value;
+    if (!rating) { IExploreApp.toast('Please select a star rating.', 'warning'); return; }
+
+    submitShopReviewBtn.disabled = true;
+    submitShopReviewBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+    fetch('<?= APP_URL ?>/api/shops.php?action=review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        shop_id:  <?= $shop_id ?>,
+        order_id: <?= $reviewable_order['id'] ?? 0 ?>,
+        rating:   rating,
+        comment:  document.getElementById('shop-review-comment').value.trim(),
+      })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        IExploreApp.toast('Review submitted! Thank you.', 'success');
+        setTimeout(() => location.reload(), 1000);
+      } else {
+        IExploreApp.toast(data.message || 'Could not submit review.', 'danger');
+        submitShopReviewBtn.disabled = false;
+        submitShopReviewBtn.innerHTML = 'Submit Review';
+      }
+    })
+    .catch(() => {
+      IExploreApp.toast('Connection error. Please try again.', 'danger');
+      submitShopReviewBtn.disabled = false;
+      submitShopReviewBtn.innerHTML = 'Submit Review';
+    });
   });
 }
 </script>

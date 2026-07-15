@@ -186,7 +186,9 @@ $catColors = [
                 <?= $catLabels[$spot['category']] ?? $spot['category'] ?>
               </span>
             </div>
-            <h6 class="explore-card-title"><?= e($spot['name']) ?></h6>
+            <h6 class="explore-card-title">
+              <a href="spot-detail.php?id=<?= $spot['id'] ?>" class="text-decoration-none" style="color:inherit"><?= e($spot['name']) ?></a>
+            </h6>
             <div class="explore-card-meta">
               <i class="bi bi-geo-alt text-green"></i>
               <span><?= e($spot['city_name']) ?></span>
