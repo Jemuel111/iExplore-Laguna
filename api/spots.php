@@ -168,6 +168,13 @@ switch ($action) {
             json_error('You have already reviewed this spot.', 409);
         }
 
+        // Auto-censor bad words instead of rejecting the review outright
+        $titleCensor = censor_profanity($title);
+        $bodyCensor  = censor_profanity($body);
+        $title = $titleCensor['text'];
+        $body  = $bodyCensor['text'];
+        $wasCensored = $titleCensor['was_censored'] || $bodyCensor['was_censored'];
+
         db_execute(
             "INSERT INTO spot_reviews (spot_id, user_id, rating, title, body, visited_on)
              VALUES (?, ?, ?, ?, ?, ?)",
@@ -183,7 +190,12 @@ switch ($action) {
             [$sid, $sid]
         );
 
-        json_ok(null, 'Review submitted successfully!');
+        json_ok(
+            ['was_censored' => $wasCensored],
+            $wasCensored
+                ? 'Review submitted! Some words were censored for inappropriate language.'
+                : 'Review submitted successfully!'
+        );
         break;
 
     default:

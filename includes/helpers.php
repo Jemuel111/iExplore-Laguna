@@ -153,6 +153,32 @@ function db_last_id(): string {
     return db()->lastInsertId();
 }
 
+/**
+ * Create the hotel_reviews table on first use. This app ships without a
+ * bundled SQL schema file, so table creation happens lazily the same way
+ * hotel_photos does. Column types/charset match hotels.id and the existing
+ * spot_reviews table exactly to avoid FK type-mismatch errors (MySQL 150).
+ */
+function ensure_hotel_reviews_table(): void {
+    db()->exec(
+        "CREATE TABLE IF NOT EXISTS hotel_reviews (
+            id INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            hotel_id INT(10) UNSIGNED NOT NULL,
+            user_id INT(10) UNSIGNED NOT NULL,
+            rating TINYINT(4) NOT NULL,
+            title VARCHAR(120) DEFAULT NULL,
+            body TEXT DEFAULT NULL,
+            stayed_on DATE DEFAULT NULL,
+            is_approved TINYINT(1) DEFAULT 1,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_hotel_reviews_hotel (hotel_id),
+            INDEX idx_hotel_reviews_user (user_id),
+            CONSTRAINT fk_hotel_reviews_hotel FOREIGN KEY (hotel_id) REFERENCES hotels(id) ON DELETE CASCADE,
+            CONSTRAINT fk_hotel_reviews_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+}
+
 // ── Formatting ────────────────────────────────────────────────
 
 /**
@@ -365,4 +391,55 @@ function handle_image_upload(string $fieldName, string $subfolder): ?string {
     }
 
     return APP_URL . '/uploads/' . $subfolder . '/' . $filename;
+}
+
+// ── Content moderation ──────────────────────────────────────────
+
+/**
+ * Words/phrases we auto-censor in user-submitted review text.
+ * Covers common English profanity plus common Filipino/Tagalog swear
+ * words, since this app serves Laguna, Philippines. Not exhaustive —
+ * meant as a reasonable first line of defense, not a perfect filter.
+ */
+function profanity_wordlist(): array {
+    return [
+        // English
+        'fuck', 'fucking', 'fucker', 'shit', 'bullshit', 'bitch', 'asshole',
+        'bastard', 'dick', 'cunt', 'piss', 'slut', 'whore', 'faggot', 'nigger',
+        'nigga', 'retard', 'douche', 'cock', 'pussy', 'motherfucker',
+        // Filipino / Tagalog
+        'putangina', 'putang ina', 'puta', 'putanginamo', 'gago', 'gaga',
+        'tangina', 'tang ina', 'tanginamo', 'ulol', 'bobo', 'tarantado',
+        'leche', 'lintik', 'hayop', 'hayop ka', 'kupal', 'peste', 'pakyu',
+        'punyeta', 'bwisit', 'yawa', 'inutil', 'buwisit', 'siraulo',
+    ];
+}
+
+/**
+ * Replace any censored words found in $text with asterisks (first and
+ * last letter kept so the review stays readable), and report whether
+ * anything was actually censored.
+ *
+ * Returns ['text' => string, 'was_censored' => bool]
+ */
+function censor_profanity(?string $text): array {
+    $text = (string) ($text ?? '');
+    if ($text === '') return ['text' => $text, 'was_censored' => false];
+
+    $wasCensored = false;
+
+    foreach (profanity_wordlist() as $word) {
+        // Word can contain a space (multi-word phrases like "putang ina") —
+        // build a boundary-safe pattern either way.
+        $pattern = '/\b(' . preg_quote($word, '/') . ')\b/iu';
+        $text = preg_replace_callback($pattern, function ($m) use (&$wasCensored) {
+            $wasCensored = true;
+            $matched = $m[1];
+            $len = mb_strlen($matched);
+            if ($len <= 2) return str_repeat('*', $len);
+            return mb_substr($matched, 0, 1) . str_repeat('*', $len - 2) . mb_substr($matched, -1);
+        }, $text);
+    }
+
+    return ['text' => $text, 'was_censored' => $wasCensored];
 }
