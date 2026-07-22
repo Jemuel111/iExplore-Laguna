@@ -65,6 +65,19 @@ $hotels = db_fetch_all(
     $params
 );
 
+// Map view shows every filtered result at once, not just the current page
+$map_hotels = [];
+if ($view_mode === 'map') {
+    $map_hotels = db_fetch_all(
+        "SELECT h.id, h.name, h.star_rating, h.price_min, h.latitude, h.longitude, c.name AS city_name
+         FROM hotels h
+         JOIN cities c ON h.city_id = c.id
+         WHERE {$where_sql} AND h.latitude IS NOT NULL AND h.longitude IS NOT NULL
+         ORDER BY {$order_sql}",
+        $params
+    );
+}
+
 $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
 
 $base_qs = http_build_query(array_filter([
@@ -131,6 +144,10 @@ $amenityIcons = [
           <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'stars'=>$filter_stars?:'','max_price'=>$filter_budget?:'','sort'=>$filter_sort!=='stars'?$filter_sort:'','view'=>'list'])) ?>"
              class="btn btn-outline-secondary <?= $view_mode==='list'?'active':'' ?>" title="List view">
             <i class="bi bi-list-ul"></i>
+          </a>
+          <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'stars'=>$filter_stars?:'','max_price'=>$filter_budget?:'','sort'=>$filter_sort!=='stars'?$filter_sort:'','view'=>'map'])) ?>"
+             class="btn btn-outline-secondary <?= $view_mode==='map'?'active':'' ?>" title="Map view">
+            <i class="bi bi-pin-map"></i>
           </a>
         </div>
       </div>
@@ -215,7 +232,22 @@ $amenityIcons = [
 
   <!-- Hotels content -->
   <div class="col-lg-9">
-    <?php if (empty($hotels)): ?>
+    <?php if ($view_mode === 'map'): ?>
+
+      <?php if (empty($map_hotels)): ?>
+      <div class="text-center py-5">
+        <i class="bi bi-pin-map fs-1 text-muted d-block mb-3"></i>
+        <h5>No mappable hotels found</h5>
+        <p class="text-muted">Try adjusting your filters, or switch back to grid view.</p>
+      </div>
+      <?php else: ?>
+      <div id="hotels-map" style="height:600px;border-radius:var(--radius-sm);overflow:hidden"></div>
+      <p class="text-muted small mt-2 mb-0">
+        <i class="bi bi-info-circle me-1"></i>Showing <?= count($map_hotels) ?> hotel<?= count($map_hotels)!=1?'s':'' ?> matching your filters.
+      </p>
+      <?php endif; ?>
+
+    <?php elseif (empty($hotels)): ?>
       <div class="text-center py-5">
         <i class="bi bi-building fs-1 text-muted d-block mb-3"></i>
         <h5>No hotels found</h5>
@@ -232,7 +264,13 @@ $amenityIcons = [
       ?>
       <div class="col-sm-6 col-xl-4">
         <div class="card-app h-100">
+          <?php if (!empty($hotel['cover_url'])): ?>
+          <div class="card-img-placeholder" style="height:130px;padding:0;overflow:hidden">
+            <img src="<?= e($hotel['cover_url']) ?>" alt="<?= e($hotel['name']) ?>" style="width:100%;height:100%;object-fit:cover">
+          </div>
+          <?php else: ?>
           <div class="card-img-placeholder" style="height:130px;font-size:2.2rem">🏨</div>
+          <?php endif; ?>
           <div class="card-body-app d-flex flex-column">
             <div class="mb-1" style="color:var(--sand-dark);font-size:.85rem">
               <?= str_repeat('★', $hotel['star_rating']) . str_repeat('☆', 5 - $hotel['star_rating']) ?>
@@ -380,6 +418,50 @@ function applySort(val) {
   url.searchParams.delete('p');
   window.location.href = url.toString();
 }
+
+<?php if ($view_mode === 'map' && !empty($map_hotels)): ?>
+// ── Map view: pin every filtered hotel at once ────────────────
+// Wrapped in DOMContentLoaded: Leaflet's JS loads at the bottom of the
+// page (in footer.php), which comes AFTER this script block in document
+// order — so we must wait until everything has finished loading.
+document.addEventListener('DOMContentLoaded', function() {
+  const hotelPins = <?= json_encode($map_hotels) ?>;
+  const hotelsMap = L.map('hotels-map', { zoomControl: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 18
+  }).addTo(hotelsMap);
+
+  const hotelPinIcon = L.divIcon({
+    className: '',
+    html: `<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;
+             background:#8e2434;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
+             transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
+             <span style="transform:rotate(45deg);font-size:14px">🏨</span></div>`,
+    iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30],
+  });
+
+  const hotelBounds = [];
+  hotelPins.forEach(h => {
+    hotelBounds.push([h.latitude, h.longitude]);
+    const stars = '★'.repeat(h.star_rating || 0);
+    const price = h.price_min ? '₱' + Number(h.price_min).toLocaleString() + '+/night' : 'Price varies';
+    L.marker([h.latitude, h.longitude], { icon: hotelPinIcon })
+      .addTo(hotelsMap)
+      .bindPopup(`
+        <div style="min-width:160px">
+          <strong>${h.name}</strong><br>
+          <span style="color:#e9c46a">${stars}</span><br>
+          <span style="font-size:.85rem;color:#666">${h.city_name} · ${price}</span><br>
+          <a href="<?= APP_URL ?>/pages/hotel.php?id=${h.id}"
+             style="display:inline-block;margin-top:.4rem;padding:.25rem .7rem;background:#8e2434;color:#fff;
+                    border-radius:6px;font-size:.78rem;text-decoration:none">View & Book</a>
+        </div>
+      `);
+  });
+  hotelsMap.fitBounds(hotelBounds, { padding: [40, 40] });
+  setTimeout(() => hotelsMap.invalidateSize(), 200);
+});
+<?php endif; ?>
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

@@ -15,7 +15,7 @@ $user        = current_user();
 // Admins are restricted to the admin area — bounce them off every
 // tourist-facing page (browsing, planner, ordering, booking, etc.)
 if ($user && ($user['role'] ?? '') === 'admin') {
-    $__admin_allowed = ['admin-dashboard.php', 'admin-packages.php', 'logout.php'];
+    $__admin_allowed = ['admin-dashboard.php', 'admin-packages.php', 'admin-spot-photos.php', 'admin-spots.php', 'logout.php'];
     $__current_page  = basename($_SERVER['SCRIPT_NAME'] ?? '');
     if (!in_array($__current_page, $__admin_allowed, true)) {
         header('Location: ' . APP_URL . '/pages/admin-dashboard.php');
@@ -70,6 +70,16 @@ if ($user && ($user['role'] ?? '') === 'admin') {
         <li class="nav-item">
           <a class="nav-link" href="<?= APP_URL ?>/pages/admin-packages.php">
             <i class="bi bi-box-seam me-1"></i>Manage Packages
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="<?= APP_URL ?>/pages/admin-spots.php">
+            <i class="bi bi-geo-alt me-1"></i>Manage Spots
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="<?= APP_URL ?>/pages/admin-spot-photos.php">
+            <i class="bi bi-images me-1"></i>Spot Photos
           </a>
         </li>
         <?php else: ?>
@@ -170,6 +180,10 @@ if ($user && ($user['role'] ?? '') === 'admin') {
                   <i class="bi bi-building me-2"></i>Approve Hotels</a></li>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-packages.php">
                   <i class="bi bi-box-seam me-2"></i>Manage Packages</a></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-spots.php">
+                  <i class="bi bi-geo-alt me-2"></i>Manage Spots</a></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-spot-photos.php">
+                  <i class="bi bi-images me-2"></i>Manage Spot Photos</a></li>
 
               <?php else: ?>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/itineraries.php">

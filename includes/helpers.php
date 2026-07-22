@@ -239,3 +239,66 @@ function get_budget_level_ranges(): array {
 
     return $ranges;
 }
+
+/**
+ * Handles an uploaded image file: validates it, saves it to
+ * /uploads/{subfolder}/, and returns the public URL to store in the DB.
+ *
+ * @param string $fieldName  The <input type="file" name="..."> field name
+ * @param string $subfolder  'hotels', 'shops', or 'packages'
+ * @return string|null       Public URL on success, null if no file was
+ *                            uploaded (not an error — just means "keep
+ *                            the existing photo"). Calls json_error() /
+ *                            dies with a message on validation failure.
+ */
+function handle_image_upload(string $fieldName, string $subfolder): ?string {
+    if (empty($_FILES[$fieldName]) || $_FILES[$fieldName]['error'] === UPLOAD_ERR_NO_FILE) {
+        return null; // no file chosen — not an error, just nothing to do
+    }
+
+    $file = $_FILES[$fieldName];
+
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        throw new RuntimeException('Upload failed (error code ' . $file['error'] . '). Try a smaller file.');
+    }
+
+    $maxBytes = 3 * 1024 * 1024; // 3MB
+    if ($file['size'] > $maxBytes) {
+        throw new RuntimeException('Image is too large — please use a file under 3MB.');
+    }
+
+    $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mime  = finfo_file($finfo, $file['tmp_name']);
+    finfo_close($finfo);
+
+    if (!isset($allowed[$mime])) {
+        throw new RuntimeException('Only JPG, PNG, or WEBP images are allowed.');
+    }
+
+    $subfolder = preg_replace('/[^a-z]/', '', $subfolder); // sanitize
+    $uploadDir = __DIR__ . '/../uploads/' . $subfolder . '/';
+    $dirExisted = is_dir($uploadDir);
+    if (!$dirExisted) {
+        @mkdir($uploadDir, 0755, true);
+    }
+    if (!is_dir($uploadDir)) {
+        throw new RuntimeException(
+            "Could not create the uploads/{$subfolder} folder. Check that the 'uploads' folder exists at your project root and that your hosting account can create folders inside it (folder permissions, usually 755)."
+        );
+    }
+    if (!is_writable($uploadDir)) {
+        throw new RuntimeException(
+            "The uploads/{$subfolder} folder exists but isn't writable by the server. In your hosting file manager, set its permissions to 755 (or 775 if that doesn't work), then try again."
+        );
+    }
+
+    $filename = uniqid($subfolder . '_', true) . '.' . $allowed[$mime];
+    $destPath = $uploadDir . $filename;
+
+    if (!move_uploaded_file($file['tmp_name'], $destPath)) {
+        throw new RuntimeException('Could not save the uploaded file. Please try again.');
+    }
+
+    return APP_URL . '/uploads/' . $subfolder . '/' . $filename;
+}

@@ -44,8 +44,12 @@ $amenities = json_decode($hotel['amenities'] ?? '[]', true) ?: [];
 <section class="py-4" style="background:linear-gradient(135deg,#5c1620,#8e2434);color:#fff">
   <div class="container">
     <div class="d-flex align-items-start gap-4 flex-wrap">
-      <div style="width:72px;height:72px;background:rgba(255,255,255,.15);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:2.5rem;flex-shrink:0">
+      <div style="width:72px;height:72px;background:rgba(255,255,255,.15);border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:2.5rem;flex-shrink:0">
+        <?php if (!empty($hotel['cover_url'])): ?>
+        <img src="<?= e($hotel['cover_url']) ?>" alt="<?= e($hotel['name']) ?>" style="width:100%;height:100%;object-fit:cover">
+        <?php else: ?>
         🏨
+        <?php endif; ?>
       </div>
       <div class="flex-grow-1">
         <div class="mb-1" style="color:var(--sand-dark)">
@@ -121,6 +125,19 @@ $amenities = json_decode($hotel['amenities'] ?? '[]', true) ?: [];
         </div>
         <?php endforeach; ?>
       </div>
+    <?php endif; ?>
+
+    <!-- Location mini-map -->
+    <?php if ($hotel['latitude'] && $hotel['longitude']): ?>
+    <div class="mt-4">
+      <h6 class="fw-bold mb-2 pb-2" style="color:var(--green-dark);border-bottom:2px solid var(--green-pale);font-family:'Playfair Display',serif">
+        <i class="bi bi-pin-map-fill me-2" style="color:#8e2434"></i>Location
+      </h6>
+      <div id="mini-map" style="height:220px;border-radius:10px;overflow:hidden"></div>
+      <div class="mt-2 small text-muted">
+        <i class="bi bi-geo-alt me-1"></i><?= e($hotel['address'] ?: $hotel['city_name']) ?>, Laguna
+      </div>
+    </div>
     <?php endif; ?>
   </div>
 
@@ -350,6 +367,33 @@ function submitBooking(hotelId) {
     btn.innerHTML = '<i class="bi bi-calendar-check me-2"></i>Reserve Now';
   });
 }
+
+<?php if ($hotel['latitude'] && $hotel['longitude']): ?>
+// ── Location mini-map ──────────────────────────────────────────
+// Wrapped in DOMContentLoaded: Leaflet's JS loads at the bottom of the
+// page (in footer.php), which comes AFTER this script block in document
+// order — so we must wait until everything has finished loading.
+document.addEventListener('DOMContentLoaded', function() {
+  const hotelMiniMap = L.map('mini-map', { zoomControl: false, scrollWheelZoom: false })
+    .setView([<?= $hotel['latitude'] ?>, <?= $hotel['longitude'] ?>], 15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 18
+  }).addTo(hotelMiniMap);
+  const hotelIcon = L.divIcon({
+    className: '',
+    html: `<div style="width:32px;height:32px;border-radius:50% 50% 50% 0;
+             background:#8e2434;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
+             transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
+             <span style="transform:rotate(45deg);font-size:14px">🏨</span></div>`,
+    iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32],
+  });
+  L.marker([<?= $hotel['latitude'] ?>, <?= $hotel['longitude'] ?>], { icon: hotelIcon })
+    .addTo(hotelMiniMap)
+    .bindPopup(`<strong><?= e(addslashes($hotel['name'])) ?></strong>`)
+    .openPopup();
+  setTimeout(() => hotelMiniMap.invalidateSize(), 200);
+});
+<?php endif; ?>
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

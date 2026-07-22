@@ -14,7 +14,8 @@ $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
 // Fetch all active spots
 $spots = db_fetch_all(
     "SELECT s.id, s.name, s.category, s.rating, s.entrance_fee, s.description,
-            s.operating_hours, c.name AS city_name, c.id AS city_id, 'spot' AS item_type
+            s.operating_hours, c.name AS city_name, c.id AS city_id, 'spot' AS item_type,
+            (SELECT url FROM spot_photos WHERE spot_id = s.id AND photo_type = 'main' LIMIT 1) AS main_photo_url
      FROM tourist_spots s
      JOIN cities c ON s.city_id = c.id
      WHERE s.is_active = 1
@@ -172,8 +173,10 @@ $catColors = [
            data-cityname="<?= e(strtolower($spot['city_name'])) ?>">
         <div class="explore-card h-100" data-id="spot-<?= $spot['id'] ?>">
           <!-- Image placeholder -->
-          <div class="explore-card-img" style="background:<?= $bg ?>">
+          <div class="explore-card-img" style="<?= !empty($spot['main_photo_url']) ? "background-image:url('".e($spot['main_photo_url'])."');background-size:cover;background-position:center;" : "background:{$bg}" ?>">
+            <?php if (empty($spot['main_photo_url'])): ?>
             <span class="explore-emoji"><?= $catEmojis[$spot['category']] ?? '📍' ?></span>
+            <?php endif; ?>
             <!-- Add to cart btn -->
             <button class="add-to-cart-btn" onclick="toggleCart('spot',<?= $spot['id'] ?>,'<?= e(addslashes($spot['name'])) ?>','<?= e($spot['city_name']) ?>',<?= (float)$spot['entrance_fee'] ?>,'spot')"
                     data-key="spot-<?= $spot['id'] ?>" title="Add to My List">

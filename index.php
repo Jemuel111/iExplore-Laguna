@@ -7,13 +7,15 @@ $active_page = 'home';
 require_once 'includes/header.php';
 
 $featured_spots = db_fetch_all(
-  "SELECT s.*, c.name AS city_name
+  "SELECT s.*, c.name AS city_name,
+          (SELECT url FROM spot_photos WHERE spot_id = s.id AND photo_type = 'main' LIMIT 1) AS main_photo_url
    FROM tourist_spots s
    JOIN cities c ON s.city_id = c.id
    WHERE s.is_active = 1
    ORDER BY s.rating DESC
    LIMIT 6"
 );
+$budgetRanges = get_budget_level_ranges();
 
 $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
 
@@ -125,9 +127,9 @@ function spot_badge(string $category): string {
               <div class="col-6">
                 <label class="form-label"><i class="bi bi-wallet2 text-green me-1"></i>Budget</label>
                 <select class="form-select" id="qp-budget" name="budget_level">
-                  <option value="budget">💰 Budget</option>
-                  <option value="midrange" selected>💳 Mid-range</option>
-                  <option value="upscale">💎 Upscale</option>
+                  <option value="budget">💰 ₱<?= number_format($budgetRanges['budget']['min']) ?>–<?= number_format($budgetRanges['budget']['max']) ?>/day</option>
+                  <option value="midrange" selected>💳 ₱<?= number_format($budgetRanges['midrange']['min']) ?>–<?= number_format($budgetRanges['midrange']['max']) ?>/day</option>
+                  <option value="upscale">💎 ₱<?= number_format($budgetRanges['upscale']['min']) ?>–<?= number_format($budgetRanges['upscale']['max']) ?>/day</option>
                 </select>
               </div>
             </div>
@@ -187,9 +189,15 @@ function spot_badge(string $category): string {
       <div class="col-sm-6 col-lg-4 reveal fade-up-<?= min($i,6) ?>">
         <div class="card-app h-100">
           <a href="pages/spot-detail.php?id=<?= $spot['id'] ?>" class="text-decoration-none">
+          <?php if (!empty($spot['main_photo_url'])): ?>
+          <div class="card-img-placeholder" style="padding:0;overflow:hidden">
+            <img src="<?= e($spot['main_photo_url']) ?>" alt="<?= e($spot['name']) ?>" style="width:100%;height:100%;object-fit:cover">
+          </div>
+          <?php else: ?>
           <div class="card-img-placeholder">
             <?= $emojis[$spot['category']] ?? '📍' ?>
           </div>
+          <?php endif; ?>
           </a>
           <div class="card-body-app">
             <div class="mb-2"><?= spot_badge($spot['category']) ?></div>

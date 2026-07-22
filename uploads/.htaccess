@@ -1,0 +1,10 @@
+# ============================================================
+# iEXPLORE LAGUNA — Uploads folder security
+# Prevents any PHP file from ever being executed here, even if
+# someone somehow got one uploaded. Images are served normally.
+# ============================================================
+<FilesMatch "\.(php|phtml|php3|php4|php5|phar)$">
+  Require all denied
+</FilesMatch>
+
+Options -Indexes

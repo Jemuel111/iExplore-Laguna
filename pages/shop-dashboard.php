@@ -110,21 +110,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ── Update shop info ──────────────────────────────────────
     if ($action === 'update_shop') {
-        db_execute(
-            "UPDATE shops SET description=?, address=?, phone=?, email=?,
-                              open_time=?, close_time=?, open_days=?
-             WHERE id = ?",
-            [
-                input('description','post',''),
-                input('address','post',''),
-                input('phone','post',''),
-                input('shop_email','post',''),
-                input('open_time','post',null) ?: null,
-                input('close_time','post',null) ?: null,
-                input('open_days','post',''),
-                $sid
-            ]
-        );
+        $coverUrl = null;
+        try {
+            $coverUrl = handle_image_upload('cover_photo', 'shops');
+        } catch (RuntimeException $e) {
+            $_SESSION['flash']['danger'] = $e->getMessage();
+            header('Location: ' . APP_URL . '/pages/shop-dashboard.php#settings'); exit;
+        }
+
+        $sql    = "UPDATE shops SET description=?, address=?, phone=?, email=?, open_time=?, close_time=?, open_days=?";
+        $params = [
+            input('description','post',''),
+            input('address','post',''),
+            input('phone','post',''),
+            input('shop_email','post',''),
+            input('open_time','post',null) ?: null,
+            input('close_time','post',null) ?: null,
+            input('open_days','post',''),
+        ];
+        if ($coverUrl) {
+            $sql .= ", cover_url=?";
+            $params[] = $coverUrl;
+        }
+        $sql .= " WHERE id = ?";
+        $params[] = $sid;
+
+        db_execute($sql, $params);
         $_SESSION['flash']['success'] = 'Shop info updated.';
         header('Location: ' . APP_URL . '/pages/shop-dashboard.php#settings'); exit;
     }
@@ -489,8 +500,19 @@ require_once __DIR__ . '/../includes/header.php';
             <h6 class="fw-bold mb-3" style="color:var(--green-dark);font-family:'Playfair Display',serif">
               <i class="bi bi-pencil-square me-2"></i>Edit Shop Info
             </h6>
-            <form method="POST">
+            <form method="POST" enctype="multipart/form-data">
               <input type="hidden" name="action" value="update_shop">
+
+              <div class="mb-3">
+                <label class="form-label">Cover Photo</label>
+                <?php if (!empty($shop['cover_url'])): ?>
+                <img src="<?= e($shop['cover_url']) ?>" alt="Current cover"
+                     class="d-block mb-2" style="width:100%;max-height:180px;object-fit:cover;border-radius:var(--radius-sm)">
+                <?php endif; ?>
+                <input type="file" class="form-control" name="cover_photo" accept="image/jpeg,image/png,image/webp">
+                <div class="form-text">JPG, PNG, or WEBP — max 3MB. Leave empty to keep the current photo.</div>
+              </div>
+
               <div class="mb-3">
                 <label class="form-label">Description</label>
                 <textarea class="form-control" name="description" rows="3" style="resize:none"><?= e($shop['description']) ?></textarea>

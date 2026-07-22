@@ -59,6 +59,24 @@ $shops = db_fetch_all(
     $params
 );
 
+// Map view shows every filtered result at once, not just the current page.
+// Shops without their own exact pin fall back to their city's center point.
+$map_shops = [];
+if ($view_mode === 'map') {
+    $map_shops = db_fetch_all(
+        "SELECT s.id, s.name, s.category,
+                COALESCE(s.latitude, c.latitude)   AS latitude,
+                COALESCE(s.longitude, c.longitude) AS longitude,
+                (s.latitude IS NULL) AS is_approximate,
+                c.name AS city_name
+         FROM shops s
+         JOIN cities c ON s.city_id = c.id
+         WHERE {$where_sql}
+         ORDER BY {$order_sql}",
+        $params
+    );
+}
+
 $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
 
 $categories = [
@@ -125,6 +143,10 @@ $base_qs = http_build_query(array_filter([
           <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'category'=>$filter_category,'sort'=>$filter_sort!=='name'?$filter_sort:'','view'=>'list'])) ?>"
              class="btn btn-outline-secondary <?= $view_mode==='list'?'active':'' ?>" title="List view">
             <i class="bi bi-list-ul"></i>
+          </a>
+          <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'category'=>$filter_category,'sort'=>$filter_sort!=='name'?$filter_sort:'','view'=>'map'])) ?>"
+             class="btn btn-outline-secondary <?= $view_mode==='map'?'active':'' ?>" title="Map view">
+            <i class="bi bi-pin-map"></i>
           </a>
         </div>
       </div>
@@ -198,7 +220,23 @@ $base_qs = http_build_query(array_filter([
 
   <!-- Shops content -->
   <div class="col-lg-9">
-    <?php if (empty($shops)): ?>
+    <?php if ($view_mode === 'map'): ?>
+
+      <?php if (empty($map_shops)): ?>
+      <div class="text-center py-5">
+        <i class="bi bi-pin-map fs-1 text-muted d-block mb-3"></i>
+        <h5>No mappable shops found</h5>
+        <p class="text-muted">Try adjusting your filters, or switch back to grid view.</p>
+      </div>
+      <?php else: ?>
+      <div id="shops-map" style="height:600px;border-radius:var(--radius-sm);overflow:hidden"></div>
+      <p class="text-muted small mt-2 mb-0">
+        <i class="bi bi-info-circle me-1"></i>Showing <?= count($map_shops) ?> shop<?= count($map_shops)!=1?'s':'' ?> matching your filters.
+        Pins marked <em>(approx.)</em> use the city center since an exact address hasn't been pinned yet.
+      </p>
+      <?php endif; ?>
+
+    <?php elseif (empty($shops)): ?>
       <div class="text-center py-5">
         <i class="bi bi-shop fs-1 text-muted d-block mb-3"></i>
         <h5>No shops found</h5>
@@ -213,9 +251,15 @@ $base_qs = http_build_query(array_filter([
       <?php foreach ($shops as $shop): ?>
       <div class="col-sm-6 col-xl-4">
         <div class="card-app h-100">
+          <?php if (!empty($shop['cover_url'])): ?>
+          <div class="card-img-placeholder" style="height:130px;padding:0;overflow:hidden">
+            <img src="<?= e($shop['cover_url']) ?>" alt="<?= e($shop['name']) ?>" style="width:100%;height:100%;object-fit:cover">
+          </div>
+          <?php else: ?>
           <div class="card-img-placeholder" style="height:130px;font-size:2.2rem">
             <?= explode(' ', $categories[$shop['category']] ?? '🏪')[0] ?>
           </div>
+          <?php endif; ?>
           <div class="card-body-app d-flex flex-column">
             <div class="mb-1">
               <span class="badge" style="background:var(--green-pale);color:var(--green-dark);font-size:.72rem">
@@ -309,6 +353,48 @@ function applySort(val) {
   url.searchParams.delete('p');
   window.location.href = url.toString();
 }
+
+<?php if ($view_mode === 'map' && !empty($map_shops)): ?>
+// ── Map view: pin every filtered shop at once ──────────────────
+// Wrapped in DOMContentLoaded: Leaflet's JS loads at the bottom of the
+// page (in footer.php), which comes AFTER this script block in document
+// order — so we must wait until everything has finished loading.
+document.addEventListener('DOMContentLoaded', function() {
+  const shopPins = <?= json_encode($map_shops) ?>;
+  const shopsMap = L.map('shops-map', { zoomControl: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 18
+  }).addTo(shopsMap);
+
+  const shopPinIcon = L.divIcon({
+    className: '',
+    html: `<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;
+             background:var(--terracotta,#c77c48);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
+             transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
+             <span style="transform:rotate(45deg);font-size:14px">🏪</span></div>`,
+    iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30],
+  });
+
+  const shopBounds = [];
+  shopPins.forEach(s => {
+    shopBounds.push([s.latitude, s.longitude]);
+    const approx = s.is_approximate == 1 ? ' <em>(approx.)</em>' : '';
+    L.marker([s.latitude, s.longitude], { icon: shopPinIcon })
+      .addTo(shopsMap)
+      .bindPopup(`
+        <div style="min-width:160px">
+          <strong>${s.name}</strong><br>
+          <span style="font-size:.85rem;color:#666">${s.city_name}${approx}</span><br>
+          <a href="<?= APP_URL ?>/pages/shop.php?id=${s.id}"
+             style="display:inline-block;margin-top:.4rem;padding:.25rem .7rem;background:var(--terracotta,#c77c48);color:#fff;
+                    border-radius:6px;font-size:.78rem;text-decoration:none">View &amp; Order</a>
+        </div>
+      `);
+  });
+  shopsMap.fitBounds(shopBounds, { padding: [40, 40] });
+  setTimeout(() => shopsMap.invalidateSize(), 200);
+});
+<?php endif; ?>
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

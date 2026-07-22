@@ -110,20 +110,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ── Update hotel info ──────────────────────────────────────
     if ($action === 'update_hotel') {
-        db_execute(
-            "UPDATE hotels SET description=?, address=?, phone=?,
-                               star_rating=?, price_min=?, price_max=?
-             WHERE id = ?",
-            [
-                input('description','post',''),
-                input('address','post',''),
-                input('phone','post',''),
-                (int) input('star_rating','post',3),
-                (float) input('price_min','post',0) ?: null,
-                (float) input('price_max','post',0) ?: null,
-                $hid
-            ]
-        );
+        $coverUrl = null;
+        try {
+            $coverUrl = handle_image_upload('cover_photo', 'hotels');
+        } catch (RuntimeException $e) {
+            $_SESSION['flash']['danger'] = $e->getMessage();
+            header('Location: ' . APP_URL . '/pages/hotel-dashboard.php#settings'); exit;
+        }
+
+        $sql    = "UPDATE hotels SET description=?, address=?, phone=?, star_rating=?, price_min=?, price_max=?";
+        $params = [
+            input('description','post',''),
+            input('address','post',''),
+            input('phone','post',''),
+            (int) input('star_rating','post',3),
+            (float) input('price_min','post',0) ?: null,
+            (float) input('price_max','post',0) ?: null,
+        ];
+        if ($coverUrl) {
+            $sql .= ", cover_url=?";
+            $params[] = $coverUrl;
+        }
+        $sql .= " WHERE id = ?";
+        $params[] = $hid;
+
+        db_execute($sql, $params);
         $_SESSION['flash']['success'] = 'Hotel info updated.';
         header('Location: ' . APP_URL . '/pages/hotel-dashboard.php#settings'); exit;
     }
@@ -471,8 +482,19 @@ require_once __DIR__ . '/../includes/header.php';
             <h6 class="fw-bold mb-3" style="color:var(--green-dark);font-family:'Playfair Display',serif">
               <i class="bi bi-pencil-square me-2"></i>Edit Hotel Info
             </h6>
-            <form method="POST">
+            <form method="POST" enctype="multipart/form-data">
               <input type="hidden" name="action" value="update_hotel">
+
+              <div class="mb-3">
+                <label class="form-label">Cover Photo</label>
+                <?php if (!empty($hotel['cover_url'])): ?>
+                <img src="<?= e($hotel['cover_url']) ?>" alt="Current cover"
+                     class="d-block mb-2" style="width:100%;max-height:180px;object-fit:cover;border-radius:var(--radius-sm)">
+                <?php endif; ?>
+                <input type="file" class="form-control" name="cover_photo" accept="image/jpeg,image/png,image/webp">
+                <div class="form-text">JPG, PNG, or WEBP — max 3MB. Leave empty to keep the current photo.</div>
+              </div>
+
               <div class="mb-3">
                 <label class="form-label">Description</label>
                 <textarea class="form-control" name="description" rows="3" style="resize:none"><?= e($hotel['description'] ?? '') ?></textarea>

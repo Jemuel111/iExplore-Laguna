@@ -105,46 +105,32 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- ── Hero Photo Gallery ────────────────────────────────────── -->
-<section class="spot-hero-gallery">
+<section class="py-4">
+<div class="container">
 <?php
 $main_photos = array_values(array_filter($photos, fn($p) => $p['photo_type'] === 'main'));
-$gallery     = array_values(array_filter($photos, fn($p) => $p['photo_type'] !== 'main'));
-$hero_url    = $main_photos[0]['url'] ?? ($photos[0]['url'] ?? null);
+$hero_photo  = $main_photos[0] ?? ($photos[0] ?? null);
+$hero_index  = 0;
+foreach ($photos as $idx => $p) {
+    if ($hero_photo && $p['url'] === $hero_photo['url']) { $hero_index = $idx; break; }
+}
 ?>
 
-<?php if ($hero_url): ?>
-  <div class="gallery-grid <?= count($photos) >= 3 ? 'has-multi' : '' ?>">
-    <!-- Main hero image -->
-    <div class="gallery-main" onclick="openLightbox(0)" style="cursor:pointer">
-      <img src="<?= e($hero_url) ?>" alt="<?= e($spot['name']) ?>" loading="eager">
-      <div class="gallery-overlay">
-        <i class="bi bi-arrows-fullscreen"></i>
-      </div>
+<?php if ($hero_photo): ?>
+  <div class="spot-cover-photo" onclick="openLightbox(<?= $hero_index ?>)">
+    <img src="<?= e($hero_photo['url']) ?>" alt="<?= e($spot['name']) ?>" loading="eager">
+    <div class="gallery-overlay">
+      <i class="bi bi-arrows-fullscreen"></i>
     </div>
-
-    <?php if (count($photos) >= 2): ?>
-    <!-- Side thumbnails -->
-    <div class="gallery-side">
-      <?php foreach (array_slice($photos, 1, 4) as $i => $ph): ?>
-      <div class="gallery-thumb <?= ($i === 3 && count($photos) > 5) ? 'gallery-thumb-more' : '' ?>"
-           onclick="openLightbox(<?= $i + 1 ?>)" style="cursor:pointer">
-        <img src="<?= e($ph['url']) ?>" alt="<?= e($ph['caption'] ?? $spot['name']) ?>" loading="lazy">
-        <?php if ($i === 3 && count($photos) > 5): ?>
-          <div class="gallery-more-overlay">+<?= count($photos) - 5 ?> more</div>
-        <?php endif; ?>
-        <div class="gallery-overlay"><i class="bi bi-zoom-in"></i></div>
-      </div>
-      <?php endforeach; ?>
-    </div>
-    <?php endif; ?>
   </div>
 <?php else: ?>
   <!-- No photos: emoji placeholder -->
-  <div class="gallery-placeholder" style="background:<?= e($cat_bg) ?>">
-    <span style="font-size:6rem"><?= $emoji ?></span>
-    <p class="mt-3 text-muted small">No photos yet — be the first to contribute!</p>
+  <div class="spot-cover-placeholder" style="background:<?= e($cat_bg) ?>">
+    <span style="font-size:5rem"><?= $emoji ?></span>
+    <p class="mt-3 text-muted small mb-0">No photos yet — be the first to contribute!</p>
   </div>
 <?php endif; ?>
+</div>
 </section>
 
 <!-- ── Lightbox ──────────────────────────────────────────────── -->
@@ -252,7 +238,7 @@ $hero_url    = $main_photos[0]['url'] ?? ($photos[0]['url'] ?? null);
     <?php endif; ?>
 
     <!-- ── Photo Gallery by Category ───────────────────────── -->
-    <?php if (!empty($photos)): ?>
+    <?php if (count($photos) > 1): ?>
     <div class="detail-section">
       <h4 class="detail-section-title">
         <i class="bi bi-images me-2" style="color:var(--green-light)"></i>Photo Gallery
@@ -279,6 +265,7 @@ $hero_url    = $main_photos[0]['url'] ?? ($photos[0]['url'] ?? null);
 
       <div class="gallery-masonry" id="gallery-grid">
         <?php foreach ($photos as $i => $ph): ?>
+          <?php if ($i === $hero_index) continue; // already shown as the cover photo ?>
         <div class="gallery-tile" data-type="<?= e($ph['photo_type']) ?>" onclick="openLightbox(<?= $i ?>)">
           <img src="<?= e($ph['url']) ?>" alt="<?= e($ph['caption'] ?? '') ?>" loading="lazy">
           <?php if ($ph['caption']): ?>
@@ -729,26 +716,23 @@ if (loadMoreBtn) {
 <!-- ── Spot Detail Page CSS (scoped) ────────────────────────── -->
 <style>
 /* ── Hero gallery ─────────────────────────────────── */
-.spot-hero-gallery { background: #000; }
-.gallery-grid { display: grid; grid-template-columns: 1fr; height: 420px; }
-.gallery-grid.has-multi { grid-template-columns: 60% 1fr; gap: 3px; }
-.gallery-main, .gallery-thumb { position: relative; overflow: hidden; }
-.gallery-main img, .gallery-thumb img { width:100%;height:100%;object-fit:cover;transition:transform .3s; }
-.gallery-main:hover img, .gallery-thumb:hover img { transform:scale(1.04); }
-.gallery-side { display: grid; grid-template-rows: repeat(2, 1fr); gap: 3px; }
+.spot-cover-photo {
+  position: relative; width: 100%; height: 420px;
+  border-radius: var(--radius, 16px); overflow: hidden; cursor: pointer; background: #000;
+}
+.spot-cover-photo img { width:100%; height:100%; object-fit:cover; transition: transform .3s; }
+.spot-cover-photo:hover img { transform: scale(1.03); }
+.spot-cover-placeholder {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  height: 420px; border-radius: var(--radius, 16px);
+}
 .gallery-overlay {
   position:absolute;inset:0;background:rgba(0,0,0,0);
   display:flex;align-items:center;justify-content:center;
   color:#fff;font-size:1.5rem;transition:background .25s;
 }
-.gallery-main:hover .gallery-overlay,
-.gallery-thumb:hover .gallery-overlay { background:rgba(0,0,0,.28); }
-.gallery-placeholder { display:flex;flex-direction:column;align-items:center;justify-content:center;height:240px; }
-.gallery-more-overlay {
-  position:absolute;inset:0;background:rgba(0,0,0,.55);
-  display:flex;align-items:center;justify-content:center;
-  color:#fff;font-size:1.2rem;font-weight:700;
-}
+.spot-cover-photo:hover .gallery-overlay,
+.gallery-tile:hover .gallery-overlay { background:rgba(0,0,0,.28); }
 
 /* ── Lightbox ─────────────────────────────────────── */
 .lightbox {
@@ -869,8 +853,7 @@ if (loadMoreBtn) {
 
 /* ── Responsive ───────────────────────────────────── */
 @media (max-width: 768px) {
-  .gallery-grid { height: 260px; }
-  .gallery-grid.has-multi { grid-template-columns: 65% 1fr; }
+  .spot-cover-photo, .spot-cover-placeholder { height: 240px; }
   .gallery-masonry { grid-template-columns: repeat(2,1fr); }
   .amenities-grid { grid-template-columns: repeat(2,1fr); }
 }

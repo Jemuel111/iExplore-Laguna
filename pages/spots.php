@@ -57,7 +57,8 @@ $offset = ($page - 1) * $per_page;
 
 // Fetch paginated spots
 $spots = db_fetch_all(
-    "SELECT s.*, c.name AS city_name, c.slug AS city_slug
+    "SELECT s.*, c.name AS city_name, c.slug AS city_slug,
+            (SELECT url FROM spot_photos WHERE spot_id = s.id AND photo_type = 'main' LIMIT 1) AS main_photo_url
      FROM tourist_spots s
      JOIN cities c ON s.city_id = c.id
      WHERE {$where_sql}
@@ -65,6 +66,19 @@ $spots = db_fetch_all(
      LIMIT {$per_page} OFFSET {$offset}",
     $params
 );
+
+// Map view shows every filtered result at once, not just the current page
+$map_spots = [];
+if ($view_mode === 'map') {
+    $map_spots = db_fetch_all(
+        "SELECT s.id, s.name, s.category, s.entrance_fee, s.rating, s.latitude, s.longitude, c.name AS city_name
+         FROM tourist_spots s
+         JOIN cities c ON s.city_id = c.id
+         WHERE {$where_sql} AND s.latitude IS NOT NULL AND s.longitude IS NOT NULL
+         ORDER BY {$order_sql}",
+        $params
+    );
+}
 
 $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
 
@@ -153,6 +167,10 @@ $base_qs = http_build_query(array_filter([
           <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'category'=>$filter_cat,'free'=>$filter_free,'sort'=>$filter_sort!=='rating'?$filter_sort:'','view'=>'list'])) ?>"
              class="btn btn-outline-secondary <?= $view_mode==='list'?'active':'' ?>" title="List view">
             <i class="bi bi-list-ul"></i>
+          </a>
+          <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'category'=>$filter_cat,'free'=>$filter_free,'sort'=>$filter_sort!=='rating'?$filter_sort:'','view'=>'map'])) ?>"
+             class="btn btn-outline-secondary <?= $view_mode==='map'?'active':'' ?>" title="Map view">
+            <i class="bi bi-pin-map"></i>
           </a>
         </div>
       </div>
@@ -249,7 +267,22 @@ $base_qs = http_build_query(array_filter([
   <!-- ── Spots grid / list ──────────────────────────────── -->
   <div class="col-lg-9">
 
-    <?php if (empty($spots)): ?>
+    <?php if ($view_mode === 'map'): ?>
+
+      <?php if (empty($map_spots)): ?>
+      <div class="text-center py-5">
+        <i class="bi bi-pin-map fs-1 text-muted d-block mb-3"></i>
+        <h5 class="fw-bold">No mappable spots found</h5>
+        <p class="text-muted">Try adjusting your filters, or switch back to grid view.</p>
+      </div>
+      <?php else: ?>
+      <div id="spots-map" style="height:600px;border-radius:var(--radius-sm);overflow:hidden"></div>
+      <p class="text-muted small mt-2 mb-0">
+        <i class="bi bi-info-circle me-1"></i>Showing <?= count($map_spots) ?> spot<?= count($map_spots)!=1?'s':'' ?> matching your filters.
+      </p>
+      <?php endif; ?>
+
+    <?php elseif (empty($spots)): ?>
       <div class="text-center py-5">
         <i class="bi bi-geo-alt fs-1 text-muted d-block mb-3"></i>
         <h5 class="fw-bold">No spots found</h5>
@@ -289,9 +322,15 @@ $base_qs = http_build_query(array_filter([
       <div class="col-sm-6 col-xl-4">
         <div class="card-app h-100">
           <a href="spot-detail.php?id=<?= $spot['id'] ?>" class="text-decoration-none">
+          <?php if (!empty($spot['main_photo_url'])): ?>
+          <div class="card-img-placeholder" style="height:150px;padding:0;overflow:hidden">
+            <img src="<?= e($spot['main_photo_url']) ?>" alt="<?= e($spot['name']) ?>" style="width:100%;height:100%;object-fit:cover">
+          </div>
+          <?php else: ?>
           <div class="card-img-placeholder" style="height:150px;font-size:2.5rem">
             <?= $emojis[$spot['category']] ?? '📍' ?>
           </div>
+          <?php endif; ?>
           </a>
           <div class="card-body-app d-flex flex-column">
             <div class="mb-2">
@@ -338,7 +377,13 @@ $base_qs = http_build_query(array_filter([
         [$bg,$fg] = $badgeColors[$spot['category']] ?? ['#f1f5f9','#334155'];
       ?>
       <div class="spot-list-item">
+        <?php if (!empty($spot['main_photo_url'])): ?>
+        <div class="spot-emoji-box" style="padding:0;overflow:hidden">
+          <img src="<?= e($spot['main_photo_url']) ?>" alt="<?= e($spot['name']) ?>" style="width:100%;height:100%;object-fit:cover">
+        </div>
+        <?php else: ?>
         <div class="spot-emoji-box"><?= $emojis[$spot['category']] ?? '📍' ?></div>
+        <?php endif; ?>
         <div class="flex-grow-1 min-w-0">
           <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
             <div>
@@ -442,6 +487,50 @@ function applySort(val) {
   url.searchParams.delete('p');
   window.location.href = url.toString();
 }
+
+<?php if ($view_mode === 'map' && !empty($map_spots)): ?>
+// ── Map view: pin every filtered spot at once ───────────────────
+// Wrapped in DOMContentLoaded: Leaflet's JS loads at the bottom of the
+// page (in footer.php), which comes AFTER this script block in document
+// order — so we must wait until everything has finished loading.
+document.addEventListener('DOMContentLoaded', function() {
+  const spotPins = <?= json_encode($map_spots) ?>;
+  const spotCatEmojis = <?= json_encode($emojis) ?>;
+  const spotsMap = L.map('spots-map', { zoomControl: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 18
+  }).addTo(spotsMap);
+
+  const spotBounds = [];
+  spotPins.forEach(s => {
+    spotBounds.push([s.latitude, s.longitude]);
+    const emoji = spotCatEmojis[s.category] || '📍';
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;
+               background:var(--green-mid,#a61c1c);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
+               transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
+               <span style="transform:rotate(45deg);font-size:14px">${emoji}</span></div>`,
+      iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30],
+    });
+    const fee = s.entrance_fee > 0 ? '₱' + Number(s.entrance_fee).toLocaleString() : 'Free';
+    L.marker([s.latitude, s.longitude], { icon })
+      .addTo(spotsMap)
+      .bindPopup(`
+        <div style="min-width:160px">
+          <strong>${s.name}</strong><br>
+          <span style="color:#e9c46a">★ ${parseFloat(s.rating).toFixed(1)}</span><br>
+          <span style="font-size:.85rem;color:#666">${s.city_name} · ${fee}</span><br>
+          <a href="<?= APP_URL ?>/pages/spot-detail.php?id=${s.id}"
+             style="display:inline-block;margin-top:.4rem;padding:.25rem .7rem;background:var(--green-mid,#a61c1c);color:#fff;
+                    border-radius:6px;font-size:.78rem;text-decoration:none">View Details</a>
+        </div>
+      `);
+  });
+  spotsMap.fitBounds(spotBounds, { padding: [40, 40] });
+  setTimeout(() => spotsMap.invalidateSize(), 200);
+});
+<?php endif; ?>
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

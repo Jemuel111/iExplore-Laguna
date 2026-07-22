@@ -14,6 +14,7 @@ if (!$package_id) { header('Location: ' . APP_URL . '/pages/packages.php'); exit
 $pkg = db_fetch_one(
     "SELECT p.*, c.name AS city_name,
             h.name AS hotel_name, h.address AS hotel_address, h.star_rating, h.phone AS hotel_phone,
+            h.latitude AS hotel_latitude, h.longitude AS hotel_longitude,
             r.room_type, r.price_per_night, r.capacity, r.room_count
      FROM packages p
      LEFT JOIN cities c       ON p.city_id = c.id
@@ -25,7 +26,8 @@ $pkg = db_fetch_one(
 if (!$pkg) { header('Location: ' . APP_URL . '/pages/packages.php'); exit; }
 
 $spot_rows = db_fetch_all(
-    "SELECT ps.day_number, s.id, s.name, s.category, s.entrance_fee, s.description, c.name AS city_name
+    "SELECT ps.day_number, s.id, s.name, s.category, s.entrance_fee, s.description,
+            s.latitude, s.longitude, c.name AS city_name
      FROM package_spots ps
      JOIN tourist_spots s ON ps.spot_id = s.id
      JOIN cities c ON s.city_id = c.id
@@ -69,6 +71,11 @@ ksort($byDay);
     <h6 class="fw-bold mb-3 pb-2" style="color:var(--green-dark);border-bottom:2px solid var(--green-pale);font-family:'Playfair Display',serif">
       What's Included
     </h6>
+
+    <!-- Route map -->
+    <?php if ($pkg['hotel_latitude'] || !empty(array_filter($spot_rows, fn($s) => $s['latitude']))): ?>
+    <div id="package-map" style="height:280px;border-radius:var(--radius-sm);overflow:hidden;margin-bottom:1rem"></div>
+    <?php endif; ?>
 
     <!-- Hotel -->
     <div class="p-3 mb-3 d-flex align-items-center gap-3" style="background:#f7dde1;border-radius:var(--radius-sm)">
@@ -229,6 +236,64 @@ function bookPackage(packageId) {
     btn.innerHTML = '<i class="bi bi-box-seam-fill me-2"></i>Book This Package';
   });
 }
+
+<?php
+// Build an ordered list of map points: hotel first, then each spot in
+// day/sort order — mirrors how a traveler would actually move through the trip.
+$mapPoints = [];
+if ($pkg['hotel_latitude'] && $pkg['hotel_longitude']) {
+    $mapPoints[] = [
+        'lat' => (float) $pkg['hotel_latitude'], 'lng' => (float) $pkg['hotel_longitude'],
+        'label' => $pkg['hotel_name'], 'type' => 'hotel', 'day' => 0,
+    ];
+}
+foreach ($spot_rows as $sp) {
+    if ($sp['latitude'] && $sp['longitude']) {
+        $mapPoints[] = [
+            'lat' => (float) $sp['latitude'], 'lng' => (float) $sp['longitude'],
+            'label' => $sp['name'], 'type' => 'spot', 'day' => (int) $sp['day_number'],
+        ];
+    }
+}
+?>
+<?php if (!empty($mapPoints)): ?>
+// ── Package route map ────────────────────────────────────────
+// Wrapped in DOMContentLoaded: Leaflet's JS loads at the bottom of the
+// page (in footer.php), which comes AFTER this script block in document
+// order — so we must wait until everything has finished loading.
+document.addEventListener('DOMContentLoaded', function() {
+  const pkgPoints = <?= json_encode($mapPoints) ?>;
+  const pkgMap = L.map('package-map', { zoomControl: true, scrollWheelZoom: false });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 18
+  }).addTo(pkgMap);
+
+  const pkgLatLngs = [];
+  pkgPoints.forEach((pt, i) => {
+    pkgLatLngs.push([pt.lat, pt.lng]);
+    const isHotel = pt.type === 'hotel';
+    const bg = isHotel ? '#8e2434' : 'var(--green-mid)';
+    const label = isHotel ? '🏨' : String(pt.day);
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;
+               background:${bg};border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
+               transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
+               <span style="transform:rotate(45deg);font-size:${isHotel?'13px':'12px'};color:#fff;font-weight:700">${label}</span></div>`,
+      iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30],
+    });
+    L.marker([pt.lat, pt.lng], { icon })
+      .addTo(pkgMap)
+      .bindPopup(`<strong>${pt.label}</strong>${isHotel ? ' (hotel)' : ' — Day ' + pt.day}`);
+  });
+
+  if (pkgLatLngs.length > 1) {
+    L.polyline(pkgLatLngs, { color: 'var(--green-mid)', weight: 3, opacity: 0.6, dashArray: '6,8' }).addTo(pkgMap);
+  }
+  pkgMap.fitBounds(pkgLatLngs, { padding: [30, 30] });
+  setTimeout(() => pkgMap.invalidateSize(), 200);
+});
+<?php endif; ?>
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

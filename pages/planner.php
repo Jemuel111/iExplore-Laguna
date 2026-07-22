@@ -585,16 +585,6 @@ function drawSpotMarkers(spots) {
     // When marker popup opens directly, close slide-in panel to avoid overlap
     marker.on('popupopen', () => {
       document.getElementById('map-spot-panel').classList.remove('open');
-      highlightSpotCard(spot.id);
-    });
-    marker.on('popupclose', () => {
-      // Deactivate card highlight when popup is closed
-      const card = document.getElementById(`spot-card-${spot.id}`);
-      if (card) {
-        card.classList.remove('spot-card-active');
-        card.style.borderColor = 'var(--border)';
-        card.style.background  = '#fff';
-      }
     });
 
     spotMarkers[spot.id] = marker;
@@ -724,7 +714,7 @@ function renderSpotsGrid(spots, filterCat = 'all') {
       <div class="spot-card-row d-flex gap-3 p-3 bg-white rounded-3 align-items-start"
            id="spot-card-${spot.id}"
            data-spot-id="${spot.id}"
-           style="border:1.5px solid var(--border);cursor:pointer;transition:all .22s"
+           style="border:1.5px solid var(--border);cursor:pointer;transition:all .22s;scroll-margin-top:90px"
            onmouseenter="this.style.borderColor='var(--green-light)';this.style.background='var(--green-pale)'"
            onmouseleave="this.style.borderColor=this.classList.contains('spot-card-active')?'var(--green-mid)':'var(--border)';this.style.background=this.classList.contains('spot-card-active')?'#fbe4e4':'#fff'"
            onclick="flyToSpot(${spot.id})">
@@ -947,7 +937,16 @@ function highlightSpotCard(spotId) {
     card.classList.add('spot-card-active');
     card.style.borderColor = 'var(--green-mid)';
     card.style.background  = '#fbe4e4';
-    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // Always scroll to center of viewport, even if technically "close enough" already —
+    // otherwise clicking a marker can feel like it did nothing.
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.animate(
+      [
+        { boxShadow: '0 0 0 0 rgba(45,106,79,.5)' },
+        { boxShadow: '0 0 0 10px rgba(45,106,79,0)' },
+      ],
+      { duration: 700, easing: 'ease-out' }
+    );
   }
 }
 

@@ -92,7 +92,7 @@
 
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
       <p class="small mb-0" style="color:rgba(255,255,255,.45)">
-        &copy; <?= date('Y') ?> <em>i</em>Explore Laguna &mdash; A capstone project.
+        &copy; <?= date('Y') ?> <em>i</em>Explore Laguna &mdash;
       </p>
       <p class="small mb-0" style="color:rgba(255,255,255,.45)">
         Map data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" class="footer-link">OpenStreetMap</a> contributors

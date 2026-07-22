@@ -14,7 +14,9 @@ $shop_id = (int) input('id', 'get', 0);
 if (!$shop_id) { header('Location: ' . APP_URL . '/pages/explore.php'); exit; }
 
 $shop = db_fetch_one(
-    "SELECT s.*, c.name AS city_name FROM shops s
+    "SELECT s.*, c.name AS city_name,
+            c.latitude AS city_latitude, c.longitude AS city_longitude
+     FROM shops s
      JOIN cities c ON s.city_id = c.id
      WHERE s.id = ? AND s.is_active = 1 AND s.is_verified = 1",
     [$shop_id]
@@ -82,8 +84,12 @@ require_once __DIR__ . '/../includes/header.php';
 <section class="py-4" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
   <div class="container">
     <div class="d-flex align-items-start gap-4 flex-wrap">
-      <div style="width:72px;height:72px;background:rgba(255,255,255,.15);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:2.5rem;flex-shrink:0">
+      <div style="width:72px;height:72px;background:rgba(255,255,255,.15);border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:2.5rem;flex-shrink:0">
+        <?php if (!empty($shop['cover_url'])): ?>
+        <img src="<?= e($shop['cover_url']) ?>" alt="<?= e($shop['name']) ?>" style="width:100%;height:100%;object-fit:cover">
+        <?php else: ?>
         <?= $shopEmoji ?>
+        <?php endif; ?>
       </div>
       <div class="flex-grow-1">
         <h1 class="mb-1 fs-3" style="font-family:'Playfair Display',serif"><?= e($shop['name']) ?></h1>
@@ -219,6 +225,23 @@ require_once __DIR__ . '/../includes/header.php';
       </div>
       <?php endif; ?>
     </div>
+
+    <!-- Location mini-map -->
+    <?php $map_lat = $shop['latitude'] ?: $shop['city_latitude']; $map_lng = $shop['longitude'] ?: $shop['city_longitude']; ?>
+    <?php if ($map_lat && $map_lng): ?>
+    <div class="mt-4">
+      <h6 class="fw-bold mb-2 pb-2" style="color:var(--green-dark);border-bottom:2px solid var(--green-pale);font-family:'Playfair Display',serif">
+        <i class="bi bi-pin-map-fill me-2" style="color:var(--terracotta)"></i>Location
+      </h6>
+      <div id="mini-map" style="height:220px;border-radius:10px;overflow:hidden"></div>
+      <div class="mt-2 small text-muted">
+        <i class="bi bi-geo-alt me-1"></i><?= e($shop['address'] ?: $shop['city_name']) ?>, Laguna
+        <?php if (!$shop['latitude']): ?>
+          <span class="fst-italic">(approximate — exact address not yet pinned)</span>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php endif; ?>
   </div>
 
   <!-- ── Order summary sidebar ─────────────────────────────── -->
@@ -478,6 +501,33 @@ if (submitShopReviewBtn) {
     });
   });
 }
+
+<?php if ($map_lat && $map_lng): ?>
+// ── Location mini-map ──────────────────────────────────────────
+// Wrapped in DOMContentLoaded: Leaflet's JS loads at the bottom of the
+// page (in footer.php), which comes AFTER this script block in document
+// order — so we must wait until everything has finished loading.
+document.addEventListener('DOMContentLoaded', function() {
+  const shopMiniMap = L.map('mini-map', { zoomControl: false, scrollWheelZoom: false })
+    .setView([<?= $map_lat ?>, <?= $map_lng ?>], <?= $shop['latitude'] ? 15 : 12 ?>);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 18
+  }).addTo(shopMiniMap);
+  const shopIcon = L.divIcon({
+    className: '',
+    html: `<div style="width:32px;height:32px;border-radius:50% 50% 50% 0;
+             background:var(--terracotta);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
+             transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
+             <span style="transform:rotate(45deg);font-size:14px"><?= $shopEmoji ?></span></div>`,
+    iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32],
+  });
+  L.marker([<?= $map_lat ?>, <?= $map_lng ?>], { icon: shopIcon })
+    .addTo(shopMiniMap)
+    .bindPopup(`<strong><?= e(addslashes($shop['name'])) ?></strong>`)
+    .openPopup();
+  setTimeout(() => shopMiniMap.invalidateSize(), 200);
+});
+<?php endif; ?>
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
