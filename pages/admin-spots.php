@@ -40,6 +40,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'save
     $lat         = input('latitude', 'post', '');
     $lng         = input('longitude', 'post', '');
     $isActive    = input('is_active', 'post', '') ? 1 : 0;
+    $isClosed    = input('is_closed', 'post', '') ? 1 : 0;
+    $closureReason = trim(input('closure_reason', 'post', ''));
+    $closedUntil   = trim(input('closed_until', 'post', ''));
 
     $allowedCats = array_keys($catLabels);
 
@@ -47,6 +50,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'save
     if (!$cityId)                          $errors[] = 'Please select a city.';
     if (!in_array($category, $allowedCats)) $errors[] = 'Invalid category.';
     if ($entranceFee < 0)                  $errors[] = 'Entrance fee cannot be negative.';
+    if ($isClosed && $closedUntil && $closedUntil < date('Y-m-d')) {
+        $errors[] = 'Expected reopening date should be today or later (leave blank if unknown).';
+    }
 
     // Lat/long are NOT NULL in the schema — fall back to the city's
     // coordinates if the admin doesn't know the exact pin location.
@@ -60,26 +66,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'save
         $slug = slugify($name);
 
         if ($spotId) {
+            // Detect whether the closure state actually changed, so we only
+            // stamp closure_updated_at (used to warn tourists whose itinerary
+            // predates the announcement) when something real changed —
+            // not on every unrelated edit.
+            $prev = db_fetch_one(
+                "SELECT is_closed, closure_reason, closed_until FROM tourist_spots WHERE id = ?",
+                [$spotId]
+            );
+            $closureChanged = !$prev
+                || (int)$prev['is_closed'] !== $isClosed
+                || ($prev['closure_reason'] ?? '') !== ($closureReason ?: '')
+                || ($prev['closed_until']   ?? '') !== ($closedUntil   ?: '');
+
             db_execute(
                 "UPDATE tourist_spots SET
                     name=?, slug=?, city_id=?, category=?, description=?, entrance_fee=?,
                     operating_hours=?, contact_number=?, google_maps_url=?, website_url=?,
-                    tips=?, latitude=?, longitude=?, is_active=?
+                    tips=?, latitude=?, longitude=?, is_active=?,
+                    is_closed=?, closure_reason=?, closed_until=?" .
+                    ($closureChanged ? ", closure_updated_at=NOW()" : "") . "
                  WHERE id=?",
                 [$name, $slug, $cityId, $category, $description ?: null, $entranceFee,
                  $hours ?: null, $contact ?: null, $gmapsUrl ?: null, $websiteUrl ?: null,
-                 $tips ?: null, $lat, $lng, $isActive, $spotId]
+                 $tips ?: null, $lat, $lng, $isActive,
+                 $isClosed, ($isClosed && $closureReason) ? $closureReason : null,
+                 ($isClosed && $closedUntil) ? $closedUntil : null,
+                 $spotId]
             );
+
             $_SESSION['flash']['success'] = "\"{$name}\" updated.";
+
+            // If this save just closed the spot, tell the admin how many
+            // already-saved tourist itineraries include it, so they know
+            // the real-world impact.
+            if ($closureChanged && $isClosed) {
+                $affected = db_fetch_one(
+                    "SELECT COUNT(*) AS n FROM itineraries WHERE spot_ids LIKE ?",
+                    ['%,' . $spotId . ',%']
+                )['n'] ?? 0;
+                if ($affected > 0) {
+                    $_SESSION['flash']['warning'] = "Heads up: {$affected} saved tourist itiner"
+                        . ($affected == 1 ? 'y' : 'ies') . " already include \"{$name}\" — "
+                        . "those tourists will see a closure notice on their My Itineraries page.";
+                }
+            }
+
             header('Location: ' . APP_URL . '/pages/admin-spots.php?id=' . $spotId); exit;
         } else {
             db_execute(
                 "INSERT INTO tourist_spots
                     (city_id, name, slug, description, category, entrance_fee, operating_hours,
-                     contact_number, latitude, longitude, google_maps_url, website_url, tips, is_active)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                     contact_number, latitude, longitude, google_maps_url, website_url, tips, is_active,
+                     is_closed, closure_reason, closed_until, closure_updated_at)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 [$cityId, $name, $slug, $description ?: null, $category, $entranceFee, $hours ?: null,
-                 $contact ?: null, $lat, $lng, $gmapsUrl ?: null, $websiteUrl ?: null, $tips ?: null, $isActive]
+                 $contact ?: null, $lat, $lng, $gmapsUrl ?: null, $websiteUrl ?: null, $tips ?: null, $isActive,
+                 $isClosed, ($isClosed && $closureReason) ? $closureReason : null,
+                 ($isClosed && $closedUntil) ? $closedUntil : null,
+                 $isClosed ? date('Y-m-d H:i:s') : null]
             );
             $newId = db_last_id();
             $_SESSION['flash']['success'] = "\"{$name}\" created!";
@@ -122,7 +167,8 @@ if ($search !== '') {
     $spots_params[] = '%' . $search . '%';
 }
 $spots_list = db_fetch_all(
-    "SELECT s.id, s.name, s.entrance_fee, s.rating, s.is_active, s.category, c.name AS city_name
+    "SELECT s.id, s.name, s.entrance_fee, s.rating, s.is_active, s.category,
+            s.is_closed, s.closure_reason, s.closed_until, c.name AS city_name
      FROM tourist_spots s
      JOIN cities c ON s.city_id = c.id
      WHERE " . implode(' AND ', $spots_where) . "
@@ -267,6 +313,38 @@ require_once __DIR__ . '/../includes/header.php';
           <label class="form-check-label" for="is_active_check">Visible to tourists</label>
         </div>
 
+        <div class="mb-4 p-3" style="background:var(--sand);border-radius:var(--radius-sm);border:1px solid var(--sand-dark)">
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="is_closed" value="1" id="is_closed_check"
+                   onchange="document.getElementById('closure-fields').classList.toggle('d-none', !this.checked)"
+                   <?= !empty($editing_spot['is_closed']) ? 'checked' : '' ?>>
+            <label class="form-check-label fw-bold" for="is_closed_check">
+              🚧 Temporarily closed
+            </label>
+            <div class="form-text mb-0">
+              Use this for renovations, weather, maintenance, etc. — the spot stays
+              on the site, but tourists are warned and it's kept out of new itineraries
+              until it reopens. This is different from "Visible to tourists" above,
+              which is for permanently retiring a spot.
+            </div>
+          </div>
+
+          <div id="closure-fields" class="<?= empty($editing_spot['is_closed']) ? 'd-none' : '' ?>">
+            <div class="mb-2">
+              <label class="form-label small">Reason (shown to tourists)</label>
+              <input type="text" class="form-control form-control-sm" name="closure_reason"
+                     value="<?= e($editing_spot['closure_reason'] ?? '') ?>"
+                     placeholder="e.g. Boat dock renovation">
+            </div>
+            <div>
+              <label class="form-label small">Expected reopening date (optional)</label>
+              <input type="date" class="form-control form-control-sm" name="closed_until"
+                     value="<?= e($editing_spot['closed_until'] ?? '') ?>">
+              <div class="form-text">Leave blank if unknown — spot will stay flagged closed until you uncheck the box above.</div>
+            </div>
+          </div>
+        </div>
+
         <button type="submit" class="btn btn-primary-app w-100">
           <i class="bi bi-check-lg me-2"></i><?= $editing_spot ? 'Save Changes' : 'Create Spot' ?>
         </button>
@@ -304,7 +382,15 @@ require_once __DIR__ . '/../includes/header.php';
       <?php foreach ($spots_list as $sp): ?>
       <div class="d-flex align-items-center gap-3 p-3" style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);opacity:<?= $sp['is_active']?'1':'.55' ?>">
         <div class="flex-grow-1 min-w-0">
-          <div class="fw-bold" style="font-size:.9rem"><?= e($sp['name']) ?></div>
+          <div class="fw-bold d-flex align-items-center gap-2" style="font-size:.9rem">
+            <?= e($sp['name']) ?>
+            <?php if (!empty($sp['is_closed'])): ?>
+              <span class="badge rounded-pill" style="background:#fee2e2;color:#a61c1c;font-size:.65rem;font-weight:700"
+                    title="<?= e($sp['closure_reason'] ?: 'Temporarily closed') ?>">
+                🚧 Closed<?= $sp['closed_until'] ? ' until '.date('M j', strtotime($sp['closed_until'])) : '' ?>
+              </span>
+            <?php endif; ?>
+          </div>
           <div class="text-muted small">
             <?= $catLabels[$sp['category']] ?? $sp['category'] ?> · <?= e($sp['city_name']) ?> · ★ <?= number_format($sp['rating'],1) ?>
           </div>

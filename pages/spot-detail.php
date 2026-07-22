@@ -29,6 +29,8 @@ if (!$spot) {
     exit;
 }
 
+$closure = spot_closure_status($spot);
+
 // Load photos
 $photos = db_fetch_all(
     "SELECT url, caption, photo_type, sort_order
@@ -118,6 +120,7 @@ foreach ($photos as $idx => $p) {
 
 <?php if ($hero_photo): ?>
   <div class="spot-cover-photo" onclick="openLightbox(<?= $hero_index ?>)">
+    <div class="spot-cover-bg" style="background-image:url('<?= e($hero_photo['url']) ?>')"></div>
     <img src="<?= e($hero_photo['url']) ?>" alt="<?= e($spot['name']) ?>" loading="eager">
     <div class="gallery-overlay">
       <i class="bi bi-arrows-fullscreen"></i>
@@ -154,6 +157,23 @@ foreach ($photos as $idx => $p) {
 
     <!-- Name + Category + Quick Stats -->
     <div class="mb-4">
+      <?php if ($closure['closed']): ?>
+      <div class="mb-3 p-3 d-flex gap-2 align-items-start" style="background:#fee2e2;border:1.5px solid #fca5a5;border-radius:var(--radius-sm)">
+        <i class="bi bi-cone-striped" style="color:#a61c1c;font-size:1.2rem;flex-shrink:0;margin-top:.1rem"></i>
+        <div style="font-size:.88rem">
+          <div class="fw-bold mb-1" style="color:#a61c1c">Temporarily Closed</div>
+          <div style="color:#7f1d1d">
+            <?= e($closure['reason'] ?: 'This spot is currently unavailable to visitors.') ?>
+            <?php if ($closure['closed_until']): ?>
+              Expected to reopen around <strong><?= date('F j, Y', strtotime($closure['closed_until'])) ?></strong>.
+            <?php else: ?>
+              No confirmed reopening date yet — check back for updates.
+            <?php endif; ?>
+          </div>
+        </div>
+      </div>
+      <?php endif; ?>
+
       <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
         <span class="badge-category badge-<?= e($spot['category']) ?>"><?= e($cat_name) ?></span>
         <?php if ($spot['entrance_fee'] == 0): ?>
@@ -720,7 +740,21 @@ if (loadMoreBtn) {
   position: relative; width: 100%; height: 420px;
   border-radius: var(--radius, 16px); overflow: hidden; cursor: pointer; background: #000;
 }
-.spot-cover-photo img { width:100%; height:100%; object-fit:cover; transition: transform .3s; }
+/* Blurred, zoomed copy of the same photo fills the box behind it, so portrait
+   or unusually-shaped photos don't get a jarring crop — they just get a soft
+   backdrop instead of empty bars. */
+.spot-cover-bg {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  filter: blur(30px) brightness(.65); transform: scale(1.15);
+}
+/* The actual photo is never cropped — object-fit:contain shows it in full,
+   centered over the blurred backdrop. */
+.spot-cover-photo img {
+  position: relative; z-index: 1;
+  width: 100%; height: 100%; object-fit: contain;
+  transition: transform .3s;
+}
 .spot-cover-photo:hover img { transform: scale(1.03); }
 .spot-cover-placeholder {
   display:flex; flex-direction:column; align-items:center; justify-content:center;

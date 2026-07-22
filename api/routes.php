@@ -129,6 +129,7 @@ switch ($action) {
             "SELECT s.id, s.name, s.slug, s.description, s.category,
                     s.latitude, s.longitude, s.entrance_fee,
                     s.operating_hours, s.rating, s.image_url,
+                    s.is_closed, s.closure_reason, s.closed_until,
                     c.name AS city_name, c.id AS city_id
              FROM tourist_spots s
              JOIN cities c ON s.city_id = c.id
@@ -141,12 +142,20 @@ switch ($action) {
             [$min_lat, $max_lat, $min_lng, $max_lng, $origin, $dest]
         );
 
-        // Cast numeric fields
+        // Cast numeric fields, and resolve each spot's closure status
+        // relative to today (auto-expires closures whose closed_until
+        // date has already passed, even if the admin never flipped the
+        // flag back).
         foreach ($spots as &$s) {
             $s['latitude']     = (float) $s['latitude'];
             $s['longitude']    = (float) $s['longitude'];
             $s['entrance_fee'] = (float) $s['entrance_fee'];
             $s['rating']       = (float) $s['rating'];
+
+            $status = spot_closure_status($s);
+            $s['is_closed']     = $status['closed'];
+            $s['closure_reason']= $status['reason'];
+            $s['closed_until']  = $status['closed_until'];
         }
         unset($s);
 

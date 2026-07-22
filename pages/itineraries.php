@@ -28,6 +28,38 @@ $itineraries = db_fetch_all(
     [$user['id']]
 );
 
+// For each saved itinerary, check whether any of its included spots have
+// since been marked temporarily closed in a way that actually conflicts
+// with the tourist's planned travel date (or "now", if no date was set).
+foreach ($itineraries as &$it) {
+    $it['closure_warnings'] = [];
+    $spotIds = parse_spot_ids($it['spot_ids'] ?? null);
+    if (!$spotIds) continue;
+
+    $placeholders = implode(',', array_fill(0, count($spotIds), '?'));
+    $spotsInfo = db_fetch_all(
+        "SELECT id, name, is_closed, closure_reason, closed_until, closure_updated_at
+         FROM tourist_spots WHERE id IN ($placeholders)",
+        $spotIds
+    );
+
+    foreach ($spotsInfo as $s) {
+        $status = spot_closure_status($s, $it['travel_date'] ?: null);
+        if (!$status['closed'] || $status['reopens_before_reference']) continue; // no real conflict
+
+        $announcedAfterPlanning = !empty($s['closure_updated_at']) && !empty($it['created_at'])
+            && strtotime($s['closure_updated_at']) > strtotime($it['created_at']);
+
+        $it['closure_warnings'][] = [
+            'name'                     => $s['name'],
+            'reason'                   => $status['reason'],
+            'closed_until'             => $status['closed_until'],
+            'announced_after_planning' => $announcedAfterPlanning,
+        ];
+    }
+}
+unset($it);
+
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
@@ -61,6 +93,26 @@ require_once __DIR__ . '/../includes/header.php';
       <div class="col-md-6 col-lg-4">
         <div class="card-app h-100">
           <div class="card-body-app">
+            <?php if (!empty($it['closure_warnings'])): ?>
+            <div class="mb-3 p-2 d-flex gap-2 align-items-start" style="background:#fee2e2;border:1.5px solid #fca5a5;border-radius:var(--radius-sm)">
+              <i class="bi bi-exclamation-triangle-fill" style="color:#a61c1c;flex-shrink:0;margin-top:.15rem"></i>
+              <div style="font-size:.78rem;color:#7f1d1d">
+                <?php foreach ($it['closure_warnings'] as $w): ?>
+                  <div class="mb-1">
+                    <strong><?= e($w['name']) ?></strong> is temporarily closed<?= $w['reason'] ? ' (' . e($w['reason']) . ')' : '' ?>
+                    <?= $w['closed_until']
+                          ? ', expected back around ' . date('M j, Y', strtotime($w['closed_until'])) . '.'
+                          : ', with no confirmed reopening date yet.' ?>
+                    <?php if ($w['announced_after_planning']): ?>
+                      <em>This was announced after you saved this trip.</em>
+                    <?php endif; ?>
+                  </div>
+                <?php endforeach; ?>
+                <div class="fw-bold">You may want to adjust your plans before you go.</div>
+              </div>
+            </div>
+            <?php endif; ?>
+
             <div class="card-meta mb-2">
               <i class="bi bi-calendar3 text-green"></i>
               <span><?= $it['travel_date'] ? date('M d, Y', strtotime($it['travel_date'])) : 'Date not set' ?></span>
@@ -86,7 +138,7 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
             <?php endif; ?>
             <div class="d-flex gap-2">
-              <a href="planner.php?origin=<?= $it['origin_city_id'] ?>&destination=<?= $it['dest_city_id'] ?>&days=<?= $it['num_days'] ?>&persons=<?= $it['num_persons'] ?>&budget_level=<?= $it['budget_level'] ?>"
+              <a href="planner.php?origin=<?= $it['origin_city_id'] ?>&destination=<?= $it['dest_city_id'] ?>&days=<?= $it['num_days'] ?>&persons=<?= $it['num_persons'] ?>&budget_level=<?= $it['budget_level'] ?><?= $it['travel_date'] ? '&travel_date=' . urlencode($it['travel_date']) : '' ?>"
                  class="btn btn-sm btn-primary-app flex-grow-1">
                 <i class="bi bi-compass me-1"></i>Re-plan
               </a>

@@ -90,6 +90,13 @@ $transport_labels = [
         </select>
       </div>
 
+      <div class="mb-3">
+        <label class="form-label">Travel Date <span class="text-muted fw-normal">(optional)</span></label>
+        <input type="date" class="form-control" id="travel-date-input" min="<?= date('Y-m-d') ?>"
+               value="<?= e(input('travel_date', 'get', '')) ?>">
+        <div class="form-text">Lets us warn you if a spot is closed on your actual trip date.</div>
+      </div>
+
       <div class="row g-2 mb-3">
         <div class="col-6">
           <label class="form-label">Days</label>
@@ -341,6 +348,8 @@ let markerLayer   = L.layerGroup().addTo(map);
 let allSpots      = [];
 let routeData     = null;
 let selectedTransport = null;
+let travelDate    = null;   // 'YYYY-MM-DD' or null — used to check spot closures
+let includedSpotIds = [];   // spot IDs actually placed into the itinerary (excludes closed ones)
 
 // ── Custom marker icons ─────────────────────────────────────
 function makeIcon(color, icon = '●', size = 32) {
@@ -362,6 +371,58 @@ function makeIcon(color, icon = '●', size = 32) {
 const iconStart = makeIcon('#a61c1c', '▶', 34);
 const iconEnd   = makeIcon('#6b0f14', '■', 34);
 const iconSpot  = makeIcon('#c77c48', '★', 28);
+
+// ── Distance / travel-time estimation ───────────────────────
+// Straight-line (Haversine) distance between two coordinates, in km.
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth radius in km
+  const toRad = deg => deg * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Assumed average road speed (km/h) for local/provincial travel around
+// Laguna, factoring in traffic, stops, and non-highway roads. Used to turn
+// a straight-line distance into a rough "time to reach" estimate.
+const AVG_SPEED_KMH = 30;
+
+function estimateTravelMinutes(km) {
+  return Math.max(1, Math.round((km / AVG_SPEED_KMH) * 60));
+}
+
+// Short "X km · ~Y min" label. isApprox adds a tilde on the distance too,
+// since these are straight-line, not road, distances.
+function distanceTimeLabel(km) {
+  const mins = estimateTravelMinutes(km);
+  return `${km < 10 ? km.toFixed(1) : Math.round(km)} km · ~${formatDuration(mins)}`;
+}
+
+// ── Spot closure / availability helpers ─────────────────────
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// Returns null if the spot is open. Otherwise returns details about the
+// closure, resolved against the tourist's chosen travel date (or today,
+// if no date was picked).
+function spotClosureInfo(spot) {
+  if (!spot.is_closed) return null;
+  const ref = travelDate || todayStr();
+  const reopensBeforeTravel = !!(spot.closed_until && spot.closed_until < ref);
+  return {
+    reopensBeforeTravel,
+    reason: spot.closure_reason || null,
+    closedUntil: spot.closed_until || null,
+  };
+}
+
+function formatDateNice(isoDate) {
+  return new Date(isoDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 // ── Plan button ─────────────────────────────────────────────
 document.getElementById('plan-btn').addEventListener('click', planRoute);
@@ -387,6 +448,7 @@ async function planRoute() {
   const days    = parseInt(document.getElementById('days-select').value);
   const persons = parseInt(document.getElementById('persons-select').value);
   const budget  = document.getElementById('budget-select').value;
+  travelDate    = document.getElementById('travel-date-input').value || null;
 
   if (!origin || !dest) {
     IExploreApp.toast('Please select both origin and destination.', 'warning');
@@ -709,14 +771,42 @@ function renderSpotsGrid(spots, filterCat = 'all') {
     return;
   }
 
-  grid.innerHTML = filtered.map(spot => `
+  const originPt = routeData ? {
+    lat: parseFloat(routeData.origin.latitude),
+    lng: parseFloat(routeData.origin.longitude),
+  } : null;
+
+  grid.innerHTML = filtered.map(spot => {
+    const distKm = originPt ? haversineKm(originPt.lat, originPt.lng, spot.latitude, spot.longitude) : null;
+    const distHtml = distKm !== null ? `
+      <span>·</span>
+      <span title="Straight-line distance & estimated drive time from ${routeData.origin.name}">
+        <i class="bi bi-signpost-2"></i> ${distanceTimeLabel(distKm)}
+      </span>` : '';
+
+    const closure = spotClosureInfo(spot);
+    const closureBanner = closure ? `
+      <div style="background:${closure.reopensBeforeTravel ? '#fef3c7' : '#fee2e2'};
+                  color:${closure.reopensBeforeTravel ? '#92400e' : '#a61c1c'};
+                  font-size:.72rem;font-weight:700;padding:.3rem .6rem;border-radius:6px;margin-top:.45rem">
+        🚧 Temporarily Closed${closure.reason ? ' — ' + closure.reason : ''}
+        ${closure.closedUntil
+          ? (closure.reopensBeforeTravel
+              ? ` · expected to reopen ${formatDateNice(closure.closedUntil)}, before your trip`
+              : ` · expected back ${formatDateNice(closure.closedUntil)}`)
+          : ' · no reopening date yet'}
+      </div>` : '';
+
+    return `
     <div class="col-12">
       <div class="spot-card-row d-flex gap-3 p-3 bg-white rounded-3 align-items-start"
            id="spot-card-${spot.id}"
            data-spot-id="${spot.id}"
-           style="border:1.5px solid var(--border);cursor:pointer;transition:all .22s;scroll-margin-top:90px"
+           style="border:1.5px solid ${closure && !closure.reopensBeforeTravel ? '#fca5a5' : 'var(--border)'};
+                  cursor:pointer;transition:all .22s;scroll-margin-top:90px;
+                  opacity:${closure && !closure.reopensBeforeTravel ? '.75' : '1'}"
            onmouseenter="this.style.borderColor='var(--green-light)';this.style.background='var(--green-pale)'"
-           onmouseleave="this.style.borderColor=this.classList.contains('spot-card-active')?'var(--green-mid)':'var(--border)';this.style.background=this.classList.contains('spot-card-active')?'#fbe4e4':'#fff'"
+           onmouseleave="this.style.borderColor=this.classList.contains('spot-card-active')?'var(--green-mid)':'${closure && !closure.reopensBeforeTravel ? '#fca5a5' : 'var(--border)'}';this.style.background=this.classList.contains('spot-card-active')?'#fbe4e4':'#fff'"
            onclick="flyToSpot(${spot.id})">
         <div style="width:52px;height:52px;border-radius:10px;background:var(--green-pale);
                     display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0">
@@ -732,7 +822,9 @@ function renderSpotsGrid(spots, filterCat = 'all') {
             <span class="fw-bold" style="color:var(--terracotta)">
               ${spot.entrance_fee > 0 ? '₱'+parseFloat(spot.entrance_fee).toFixed(0) : 'Free'}
             </span>
+            ${distHtml}
           </div>
+          ${closureBanner}
         </div>
         <div class="d-flex flex-column align-items-end gap-1">
           <i class="bi bi-map text-green small" title="Fly to on map"></i>
@@ -740,7 +832,8 @@ function renderSpotsGrid(spots, filterCat = 'all') {
         </div>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 // ── Render budget breakdown ─────────────────────────────────
@@ -780,11 +873,29 @@ function budgetRow(icon, label, amount) {
 // ── Render itinerary ────────────────────────────────────────
 function renderItinerary(routeData, spots, days) {
   const container = document.getElementById('itinerary-days');
-  const spotsPerDay = Math.ceil(spots.length / days) || 2;
+
+  // Keep a spot in the itinerary if it's open, or if it's closed but
+  // expected to reopen before the tourist's chosen travel date.
+  const availableSpots = spots.filter(s => {
+    const c = spotClosureInfo(s);
+    return !c || c.reopensBeforeTravel;
+  });
+  const excludedSpots = spots.filter(s => !availableSpots.includes(s));
+  includedSpotIds = availableSpots.map(s => s.id);
+
+  const spotsPerDay = Math.ceil(availableSpots.length / days) || 2;
   let html = '';
 
+  // Running "current location" used to estimate distance/time to the next
+  // stop, starting at the trip origin. Updated as we walk through each spot
+  // in route order.
+  let lastPoint = {
+    latitude:  parseFloat(routeData.origin.latitude),
+    longitude: parseFloat(routeData.origin.longitude),
+  };
+
   for (let day = 1; day <= days; day++) {
-    const daySpots = spots.slice((day-1)*spotsPerDay, day*spotsPerDay);
+    const daySpots = availableSpots.slice((day-1)*spotsPerDay, day*spotsPerDay);
     const cityName = day === 1
       ? routeData.origin.name
       : (day === days ? routeData.destination.name : 'En Route');
@@ -810,8 +921,14 @@ function renderItinerary(routeData, spots, days) {
     let time = day === 1 ? 10 : 8;
     daySpots.forEach(spot => {
       const timeStr = `${time > 12 ? time-12 : time}:00 ${time >= 12 ? 'PM' : 'AM'}`;
+
+      // Distance/time to reach this spot from wherever the last stop was.
+      const legKm = haversineKm(lastPoint.latitude, lastPoint.longitude, spot.latitude, spot.longitude);
+      const legLabel = `🚗 ${distanceTimeLabel(legKm)} from previous stop`;
+      lastPoint = spot;
+
       html += itineraryItem(timeStr, 'bi-geo-alt-fill', spot.name,
-        `${spot.city_name} · ${spot.entrance_fee > 0 ? '₱'+parseFloat(spot.entrance_fee).toFixed(0) : 'Free'} entrance`,
+        `${spot.city_name} · ${spot.entrance_fee > 0 ? '₱'+parseFloat(spot.entrance_fee).toFixed(0) : 'Free'} entrance · ${legLabel}`,
         true);
       time += 2;
     });
@@ -827,7 +944,27 @@ function renderItinerary(routeData, spots, days) {
     html += '</div>';
   }
 
-  container.innerHTML = html;
+  // Notice about spots left out due to closures — shown above the days so
+  // it's the first thing a tourist sees if their planned count looks short.
+  let noticeHtml = '';
+  if (excludedSpots.length) {
+    noticeHtml = `
+      <div class="mb-3 p-3" style="background:#fee2e2;border:1.5px solid #fca5a5;border-radius:var(--radius-sm);font-size:.82rem">
+        <div class="fw-bold mb-1" style="color:#a61c1c">
+          <i class="bi bi-exclamation-triangle-fill me-1"></i>
+          ${excludedSpots.length} spot${excludedSpots.length > 1 ? 's' : ''} left out — temporarily closed
+        </div>
+        <ul class="mb-0 ps-3" style="color:#7f1d1d">
+          ${excludedSpots.map(s => `
+            <li>
+              <strong>${s.name}</strong>${s.closure_reason ? ' — ' + s.closure_reason : ''}
+              ${s.closed_until ? ` (expected back ${formatDateNice(s.closed_until)})` : ' (no reopening date yet)'}
+            </li>`).join('')}
+        </ul>
+      </div>`;
+  }
+
+  container.innerHTML = noticeHtml + html;
 }
 
 function itineraryItem(time, icon, name, desc, isSpot = false) {
@@ -982,6 +1119,8 @@ document.getElementById('save-itinerary-btn').addEventListener('click', async ()
         persons:        parseInt(document.getElementById('persons-select').value),
         budget_level:   document.getElementById('budget-select').value,
         transport_pref: selectedTransport?.transport_type || 'any',
+        travel_date:    travelDate,
+        spot_ids:       includedSpotIds,
       })
     }).then(r => r.json());
     IExploreApp.setLoading(btn, false);

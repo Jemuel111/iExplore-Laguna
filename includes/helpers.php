@@ -190,6 +190,70 @@ function is_valid_phone(string $phone): bool {
     return (bool) preg_match('/^(\+639|09)\d{9}$/', $phone);
 }
 
+// ── Spot closures ─────────────────────────────────────────────
+
+/**
+ * Determines whether a tourist spot should be treated as closed for a
+ * given reference date (defaults to today). A spot marked is_closed=1
+ * with a closed_until date that has already passed is treated as open
+ * again automatically — no separate admin action needed to "reopen" it.
+ *
+ * @param array       $spot           Row from tourist_spots (must include
+ *                                    is_closed, closed_until, closure_reason,
+ *                                    closure_updated_at).
+ * @param string|null $referenceDate  'Y-m-d' date to check against
+ *                                    (e.g. a tourist's planned travel date).
+ *                                    Defaults to today.
+ * @return array{closed:bool, reopens_before_reference:bool, reason:?string, closed_until:?string}
+ */
+function spot_closure_status(array $spot, ?string $referenceDate = null): array {
+    $isClosed = !empty($spot['is_closed']);
+    $closedUntil = $spot['closed_until'] ?? null;
+
+    if (!$isClosed) {
+        return ['closed' => false, 'reopens_before_reference' => true, 'reason' => null, 'closed_until' => null];
+    }
+
+    // Auto-expire: if a reopening date was given and it's in the past,
+    // treat the spot as open even if the admin never flipped the flag back.
+    $today = date('Y-m-d');
+    if ($closedUntil && $closedUntil < $today) {
+        return ['closed' => false, 'reopens_before_reference' => true, 'reason' => null, 'closed_until' => null];
+    }
+
+    $reference = $referenceDate ?: $today;
+    // If we know a reopening date and it falls before (or on) the tourist's
+    // planned visit, the spot should be back open by the time they arrive.
+    $reopensBeforeReference = $closedUntil !== null && $closedUntil < $reference;
+
+    return [
+        'closed'                   => true,
+        'reopens_before_reference' => $reopensBeforeReference,
+        'reason'                   => $spot['closure_reason'] ?? null,
+        'closed_until'             => $closedUntil,
+    ];
+}
+
+/**
+ * Parses the comma-delimited spot_ids column (format: ",12,45,7,")
+ * back into an array of ints.
+ */
+function parse_spot_ids(?string $stored): array {
+    if (!$stored) return [];
+    return array_values(array_filter(array_map('intval', explode(',', trim($stored, ',')))));
+}
+
+/**
+ * Encodes an array of spot IDs into the comma-delimited storage format
+ * used by the itineraries.spot_ids column (easy & index-friendly to
+ * search with LIKE '%,12,%').
+ */
+function encode_spot_ids(array $ids): string {
+    $ids = array_values(array_unique(array_map('intval', $ids)));
+    if (empty($ids)) return '';
+    return ',' . implode(',', $ids) . ',';
+}
+
 // ── CORS (for API endpoints) ──────────────────────────────────
 
 function set_api_headers(): void {

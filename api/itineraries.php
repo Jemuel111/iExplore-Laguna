@@ -36,6 +36,7 @@ switch ($action) {
         $plan_json   = isset($body['itinerary_json']) ? json_encode($body['itinerary_json']) : null;
         $title       = trim($body['title'] ?? '');
         $travel_date = $body['travel_date'] ?? null;
+        $spot_ids    = is_array($body['spot_ids'] ?? null) ? $body['spot_ids'] : [];
 
         if (!$origin_id || !$dest_id) json_error('Origin and destination required.', 400);
 
@@ -50,13 +51,13 @@ switch ($action) {
             "INSERT INTO itineraries
                (user_id, title, origin_city_id, dest_city_id, travel_date,
                 num_days, num_persons, budget_level, transport_pref,
-                itinerary_json, total_budget)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                itinerary_json, spot_ids, total_budget)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             [
                 $user['id'], $title, $origin_id, $dest_id,
                 $travel_date ?: null,
                 $days, $persons, $level, $transport,
-                $plan_json, $total
+                $plan_json, encode_spot_ids($spot_ids) ?: null, $total
             ]
         );
 

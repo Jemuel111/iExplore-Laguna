@@ -42,6 +42,11 @@ switch ($action) {
         $spot['review_count'] = (int)   ($review_stats['total']      ?? 0);
         $spot['review_avg']   = (float) ($review_stats['avg_rating'] ?? 0);
 
+        $closure = spot_closure_status($spot);
+        $spot['is_closed']      = $closure['closed'];
+        $spot['closure_reason'] = $closure['reason'];
+        $spot['closed_until']   = $closure['closed_until'];
+
         json_ok($spot);
         break;
 
