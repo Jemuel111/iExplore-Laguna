@@ -37,7 +37,11 @@ $nearby_spot = db_fetch_one(
     [$hotel['city_id']]
 );
 
-$amenities = json_decode($hotel['amenities'] ?? '[]', true) ?: [];
+ensure_hotel_amenities_table();
+$amenities = db_fetch_all(
+    "SELECT label, icon FROM hotel_amenities WHERE hotel_id = ? ORDER BY id ASC",
+    [$hotel_id]
+);
 
 // Photo gallery (table is created lazily by the admin hotel-photos page;
 // guard so this page still works before that table has ever been created)
@@ -55,13 +59,14 @@ $hero_hotel_photo = $hotel_photos[0] ?? null;
 
 // Reviews
 ensure_hotel_reviews_table();
+ensure_review_photos_table();
 $review_stats = db_fetch_one(
     "SELECT COUNT(*) AS total, AVG(rating) AS avg_rating
      FROM hotel_reviews WHERE hotel_id = ? AND is_approved = 1",
     [$hotel_id]
 );
 $reviews = db_fetch_all(
-    "SELECT r.id, r.rating, r.title, r.body, r.stayed_on, r.created_at,
+    "SELECT r.id, r.user_id, r.rating, r.title, r.body, r.stayed_on, r.created_at,
             u.name AS user_name
      FROM hotel_reviews r
      JOIN users u ON r.user_id = u.id
@@ -70,6 +75,11 @@ $reviews = db_fetch_all(
      LIMIT 5",
     [$hotel_id]
 );
+$my_user_id = (int) (current_user()['id'] ?? 0);
+$my_existing_hotel_review = $my_user_id
+    ? db_fetch_one("SELECT id FROM hotel_reviews WHERE hotel_id = ? AND user_id = ?", [$hotel_id, $my_user_id])
+    : null;
+$reviews = attach_review_photos($reviews, 'hotel');
 ?>
 
 <!-- Hotel hero -->
@@ -97,9 +107,6 @@ $reviews = db_fetch_all(
             <span><i class="bi bi-cash me-1"></i>₱<?= number_format($hotel['price_min'],0) ?>–₱<?= number_format($hotel['price_max'],0) ?>/night</span>
           <?php endif; ?>
         </div>
-        <?php if ($hotel['description']): ?>
-          <p class="mb-0 mt-2 opacity-80 small"><?= e($hotel['description']) ?></p>
-        <?php endif; ?>
       </div>
       <?php if ($hotel['phone']): ?>
       <a href="tel:<?= e($hotel['phone']) ?>" class="btn btn-sm"
@@ -155,6 +162,57 @@ $reviews = db_fetch_all(
 
   <!-- ── Room types ────────────────────────────────────────── -->
   <div class="col-lg-8">
+
+    <!-- ── About This Hotel ──────────────────────────────────── -->
+    <div class="mb-2">
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        <div class="hotel-chip">
+          <i class="bi bi-star-fill" style="color:var(--sand-dark)"></i>
+          <span><?= (int)$hotel['star_rating'] ?>-Star Hotel</span>
+        </div>
+        <?php if ($hotel['price_min'] && $hotel['price_max']): ?>
+        <div class="hotel-chip">
+          <i class="bi bi-cash"></i>
+          <span>₱<?= number_format($hotel['price_min'],0) ?>–₱<?= number_format($hotel['price_max'],0) ?>/night</span>
+        </div>
+        <?php endif; ?>
+        <?php if ($hotel['address']): ?>
+        <div class="hotel-chip">
+          <i class="bi bi-pin-map"></i>
+          <span><?= e($hotel['address']) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if ($hotel['phone']): ?>
+        <div class="hotel-chip">
+          <i class="bi bi-telephone"></i>
+          <span><?= e($hotel['phone']) ?></span>
+        </div>
+        <?php endif; ?>
+      </div>
+
+      <p style="font-size:1rem;line-height:1.8;color:var(--charcoal)">
+        <?= nl2br(e($hotel['description'] ?: 'No description available yet — check back soon for more details about this property.')) ?>
+      </p>
+    </div>
+
+    <!-- ── What's Included (Amenities) ───────────────────────── -->
+    <?php if (!empty($amenities)): ?>
+    <div class="hotel-detail-section">
+      <h4 class="hotel-detail-section-title">
+        <i class="bi bi-grid-3x3-gap-fill me-2"></i>What's Included
+      </h4>
+      <div class="hotel-amenities-grid">
+        <?php foreach ($amenities as $am): ?>
+        <div class="hotel-amenity-item">
+          <i class="bi <?= e($am['icon']) ?>"></i>
+          <span><?= e($am['label']) ?></span>
+        </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+    <?php endif; ?>
+
+    <div class="hotel-detail-section">
     <?php if (empty($rooms)): ?>
       <div class="text-center py-5">
         <i class="bi bi-door-closed fs-1 text-muted d-block mb-3"></i>
@@ -197,10 +255,11 @@ $reviews = db_fetch_all(
         <?php endforeach; ?>
       </div>
     <?php endif; ?>
+    </div>
 
     <!-- Location mini-map -->
     <?php if ($hotel['latitude'] && $hotel['longitude']): ?>
-    <div class="mt-4">
+    <div class="hotel-detail-section">
       <h6 class="fw-bold mb-2 pb-2" style="color:var(--green-dark);border-bottom:2px solid var(--green-pale);font-family:'Playfair Display',serif">
         <i class="bi bi-pin-map-fill me-2" style="color:#8e2434"></i>Location
       </h6>
@@ -212,7 +271,7 @@ $reviews = db_fetch_all(
     <?php endif; ?>
 
     <!-- ── Reviews ─────────────────────────────────────────── -->
-    <div class="mt-4" id="reviews-section">
+    <div class="hotel-detail-section" id="reviews-section">
       <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2 pb-2"
            style="border-bottom:2px solid #f7dde1">
         <h6 class="fw-bold mb-0" style="color:#8e2434;font-family:'Playfair Display',serif;font-size:1rem">
@@ -223,10 +282,12 @@ $reviews = db_fetch_all(
             </span>
           <?php endif; ?>
         </h6>
-        <?php if (is_logged_in()): ?>
+        <?php if (is_logged_in() && !$my_existing_hotel_review): ?>
         <button class="btn btn-sm" id="write-hotel-review-btn" style="background:#8e2434;color:#fff;border-radius:var(--radius-pill)">
           <i class="bi bi-pencil me-1"></i>Write a Review
         </button>
+        <?php elseif (is_logged_in()): ?>
+        <span class="small text-muted"><i class="bi bi-check-circle me-1"></i>You've reviewed this hotel — edit it below</span>
         <?php else: ?>
         <a href="<?= APP_URL ?>/pages/login.php?redirect=<?= urlencode(APP_URL.'/pages/hotel.php?id='.$hotel_id) ?>"
            class="btn btn-sm btn-outline-secondary">
@@ -290,6 +351,13 @@ $reviews = db_fetch_all(
           <input type="date" class="form-control" id="hotel-review-stayed" max="<?= date('Y-m-d') ?>">
         </div>
 
+        <div class="mb-3">
+          <label class="form-label">Add Photos <span class="text-muted">(optional, up to 3)</span></label>
+          <input type="file" class="form-control" id="hotel-review-photos" accept="image/jpeg,image/png,image/webp" multiple>
+          <div class="form-text">JPG, PNG, or WEBP — max 3MB each.</div>
+          <div id="hotel-review-photo-preview" class="d-flex flex-wrap gap-2 mt-2"></div>
+        </div>
+
         <div class="d-flex gap-2">
           <button class="btn" id="submit-hotel-review-btn" style="background:#8e2434;color:#fff;border-radius:var(--radius-sm)">
             <i class="bi bi-send me-1"></i>Submit Review
@@ -308,7 +376,7 @@ $reviews = db_fetch_all(
           </div>
         <?php else: ?>
           <?php foreach ($reviews as $rv): ?>
-          <div class="hotel-review-card">
+          <div class="hotel-review-card" data-review-id="<?= $rv['id'] ?>">
             <div class="d-flex align-items-start gap-3 mb-2">
               <div class="hotel-review-avatar">
                 <?= strtoupper(substr($rv['user_name'], 0, 1)) ?>
@@ -336,6 +404,29 @@ $reviews = db_fetch_all(
             <?php endif; ?>
             <?php if ($rv['body']): ?>
               <p class="mb-0 small" style="color:var(--charcoal);line-height:1.6"><?= nl2br(e($rv['body'])) ?></p>
+            <?php endif; ?>
+            <?php if (!empty($rv['photos'])): ?>
+              <div class="d-flex flex-wrap gap-2 mt-2">
+                <?php foreach ($rv['photos'] as $purl): ?>
+                <a href="<?= e($purl) ?>" target="_blank" rel="noopener">
+                  <img src="<?= e($purl) ?>" alt="Review photo" style="width:70px;height:70px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
+                </a>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
+            <?php if ((int)$rv['user_id'] === $my_user_id && $my_user_id): ?>
+            <div class="d-flex gap-3 mt-2">
+              <button class="btn btn-link btn-sm p-0 hotel-review-edit-btn" style="color:#8e2434;text-decoration:none;font-size:.8rem"
+                      data-review-id="<?= $rv['id'] ?>" data-rating="<?= $rv['rating'] ?>"
+                      data-title="<?= e($rv['title'] ?? '') ?>" data-body="<?= e($rv['body'] ?? '') ?>"
+                      data-stayed="<?= e($rv['stayed_on'] ?? '') ?>">
+                <i class="bi bi-pencil me-1"></i>Edit
+              </button>
+              <button class="btn btn-link btn-sm p-0 hotel-review-delete-btn" style="color:#c0392b;text-decoration:none;font-size:.8rem"
+                      data-review-id="<?= $rv['id'] ?>">
+                <i class="bi bi-trash me-1"></i>Delete
+              </button>
+            </div>
             <?php endif; ?>
           </div>
           <?php endforeach; ?>
@@ -444,6 +535,29 @@ $reviews = db_fetch_all(
 
 <style>
 .room-option.selected { border-color:#8e2434 !important; background:#f7dde1 !important; }
+
+/* ── About / detail sections ─────────────────────────────── */
+.hotel-detail-section { border-top:1px solid var(--border);padding-top:1.75rem;margin-top:1.75rem; }
+.hotel-detail-section-title {
+  font-family:'Playfair Display',serif;font-size:1.15rem;
+  color:#8e2434;margin-bottom:1rem;
+}
+.hotel-chip {
+  display:inline-flex;align-items:center;gap:.4rem;
+  background:var(--sand);border:1px solid var(--border);
+  border-radius:20px;padding:.3rem .85rem;font-size:.82rem;color:var(--charcoal);
+}
+
+/* ── Amenities ────────────────────────────────────────────── */
+.hotel-amenities-grid {
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.75rem;
+}
+.hotel-amenity-item {
+  display:flex;align-items:center;gap:.6rem;
+  background:#f7dde1;border-radius:10px;padding:.6rem .85rem;
+  font-size:.84rem;font-weight:500;color:#8e2434;
+}
+.hotel-amenity-item i { font-size:1rem;color:#8e2434;flex-shrink:0; }
 
 /* ── Hotel reviews ────────────────────────────────────────── */
 .hotel-review-card {
@@ -565,6 +679,48 @@ let selectedRoom = null;
 const hotelWriteBtn  = document.getElementById('write-hotel-review-btn');
 const hotelCancelBtn = document.getElementById('cancel-hotel-review-btn');
 const hotelFormWrap  = document.getElementById('hotel-review-form-wrap');
+let editingHotelReviewId = null;
+
+function escapeHotelHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str ?? '';
+  return d.innerHTML;
+}
+
+function resetHotelReviewForm() {
+  editingHotelReviewId = null;
+  hotelPickedRating = 0;
+  document.getElementById('hotel-review-rating').value = 0;
+  document.getElementById('hotel-review-title').value = '';
+  document.getElementById('hotel-review-body').value = '';
+  document.getElementById('hotel-review-stayed').value = '';
+  document.getElementById('hotel-review-photos').value = '';
+  document.getElementById('hotel-review-photo-preview').innerHTML = '';
+  document.querySelectorAll('.hotel-star-pick').forEach(s => {
+    s.className = 'bi hotel-star-pick bi-star';
+    s.style.color = '#ccc';
+  });
+  submitHotelReviewBtn.innerHTML = '<i class="bi bi-send me-1"></i>Submit Review';
+  document.querySelector('#hotel-review-form-wrap h6').textContent = 'Share Your Stay';
+}
+
+const hotelReviewPhotosInput = document.getElementById('hotel-review-photos');
+if (hotelReviewPhotosInput) {
+  hotelReviewPhotosInput.addEventListener('change', () => {
+    const preview = document.getElementById('hotel-review-photo-preview');
+    preview.innerHTML = '';
+    const files = Array.from(hotelReviewPhotosInput.files).slice(0, 3);
+    files.forEach(file => {
+      const chip = document.createElement('span');
+      chip.style.cssText = 'font-size:.75rem;background:#f7dde1;color:#8e2434;padding:.25rem .6rem;border-radius:20px';
+      chip.innerHTML = '<i class="bi bi-image me-1"></i>' + escapeHotelHtml(file.name);
+      preview.appendChild(chip);
+    });
+    if (hotelReviewPhotosInput.files.length > 3) {
+      IExploreApp.toast('Only the first 3 photos will be uploaded.', 'warning');
+    }
+  });
+}
 
 if (hotelWriteBtn) {
   hotelWriteBtn.addEventListener('click', () => {
@@ -575,7 +731,10 @@ if (hotelWriteBtn) {
   });
 }
 if (hotelCancelBtn) {
-  hotelCancelBtn.addEventListener('click', () => hotelFormWrap.classList.add('d-none'));
+  hotelCancelBtn.addEventListener('click', () => {
+    hotelFormWrap.classList.add('d-none');
+    resetHotelReviewForm();
+  });
 }
 
 // ── Hotel star picker ────────────────────────────────────────
@@ -600,30 +759,85 @@ document.querySelectorAll('.hotel-star-pick').forEach(star => {
   });
 });
 
-// ── Submit hotel review ──────────────────────────────────────
+// ── Edit an existing hotel review ─────────────────────────────
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.hotel-review-edit-btn');
+  if (!btn) return;
+
+  editingHotelReviewId = btn.dataset.reviewId;
+  hotelPickedRating = +btn.dataset.rating;
+  document.getElementById('hotel-review-rating').value = hotelPickedRating;
+  document.querySelectorAll('.hotel-star-pick').forEach((s, i) => {
+    s.className = 'bi hotel-star-pick ' + (i < hotelPickedRating ? 'bi-star-fill' : 'bi-star');
+    s.style.color = i < hotelPickedRating ? 'var(--sand-dark)' : '#ccc';
+  });
+  document.getElementById('hotel-review-title').value  = btn.dataset.title  || '';
+  document.getElementById('hotel-review-body').value   = btn.dataset.body   || '';
+  document.getElementById('hotel-review-stayed').value = btn.dataset.stayed || '';
+  submitHotelReviewBtn.innerHTML = '<i class="bi bi-check2 me-1"></i>Update Review';
+  document.querySelector('#hotel-review-form-wrap h6').textContent = 'Edit Your Review';
+
+  hotelFormWrap.classList.remove('d-none');
+  hotelFormWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+// ── Delete a hotel review ─────────────────────────────────────
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.hotel-review-delete-btn');
+  if (!btn) return;
+  if (!confirm('Delete your review? This cannot be undone.')) return;
+
+  const res = await fetch('<?= APP_URL ?>/api/hotel-reviews.php?action=delete_review', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ review_id: btn.dataset.reviewId })
+  }).then(r => r.json()).catch(() => null);
+
+  if (res && res.success) {
+    IExploreApp.toast('Review deleted.', 'success');
+    setTimeout(() => location.reload(), 900);
+  } else {
+    IExploreApp.toast((res && res.message) || 'Could not delete review.', 'danger');
+  }
+});
+
+// ── Submit hotel review (create or update) ────────────────────
 const submitHotelReviewBtn = document.getElementById('submit-hotel-review-btn');
 if (submitHotelReviewBtn) {
   submitHotelReviewBtn.addEventListener('click', async () => {
     const rating = +document.getElementById('hotel-review-rating').value;
     if (!rating) { IExploreApp.toast('Please select a star rating.', 'warning'); return; }
 
+    const isEditing = !!editingHotelReviewId;
+    const endpoint  = isEditing ? 'update_review' : 'review';
+
+    const fd = new FormData();
+    fd.append('rating', rating);
+    fd.append('title', document.getElementById('hotel-review-title').value.trim());
+    fd.append('body', document.getElementById('hotel-review-body').value.trim());
+    fd.append('stayed_on', document.getElementById('hotel-review-stayed').value);
+    if (isEditing) fd.append('review_id', editingHotelReviewId);
+    else fd.append('hotel_id', <?= $hotel_id ?>);
+
+    const photoFiles = document.getElementById('hotel-review-photos').files;
+    for (let i = 0; i < Math.min(photoFiles.length, 3); i++) {
+      fd.append('photos[]', photoFiles[i]);
+    }
+
     submitHotelReviewBtn.disabled = true;
-    const res = await fetch('<?= APP_URL ?>/api/hotel-reviews.php?action=review', {
+    const res = await fetch(`<?= APP_URL ?>/api/hotel-reviews.php?action=${endpoint}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        hotel_id:   <?= $hotel_id ?>,
-        rating,
-        title:      document.getElementById('hotel-review-title').value.trim(),
-        body:       document.getElementById('hotel-review-body').value.trim(),
-        stayed_on:  document.getElementById('hotel-review-stayed').value,
-      })
+      body: fd
     }).then(r => r.json()).catch(() => null);
     submitHotelReviewBtn.disabled = false;
 
     if (res && res.success) {
-      IExploreApp.toast(res.message || 'Review submitted! Thank you.', 'success');
+      IExploreApp.toast(res.message || (isEditing ? 'Review updated!' : 'Review submitted! Thank you.'), 'success');
+      if (res.data && res.data.photo_errors && res.data.photo_errors.length) {
+        IExploreApp.toast('Some photos couldn\'t be uploaded: ' + res.data.photo_errors.join('; '), 'warning');
+      }
       hotelFormWrap.classList.add('d-none');
+      resetHotelReviewForm();
       setTimeout(() => location.reload(), 1200);
     } else {
       IExploreApp.toast((res && res.message) || 'Could not submit review.', 'danger');
@@ -643,26 +857,49 @@ if (loadMoreHotelBtn) {
 
     if (res.success) {
       const list = document.getElementById('hotel-reviews-list');
+      const myUserId = res.data.my_user_id || 0;
       res.data.reviews.forEach(rv => {
         const stars = Array.from({length:5}, (_,i) =>
           `<i class="bi ${i < rv.rating ? 'bi-star-fill' : 'bi-star'}"
               style="color:${i < rv.rating ? 'var(--sand-dark)' : '#ddd'}"></i>`
         ).join('');
+        const isMine = myUserId && rv.user_id === myUserId;
         const div = document.createElement('div');
         div.className = 'hotel-review-card';
+        div.dataset.reviewId = rv.id;
         div.innerHTML = `
           <div class="d-flex align-items-start gap-3 mb-2">
-            <div class="hotel-review-avatar">${rv.user_name.charAt(0).toUpperCase()}</div>
+            <div class="hotel-review-avatar">${escapeHotelHtml(rv.user_name.charAt(0).toUpperCase())}</div>
             <div class="flex-grow-1">
-              <div class="fw-bold small">${rv.user_name}</div>
+              <div class="fw-bold small">${escapeHotelHtml(rv.user_name)}</div>
               <div class="d-flex align-items-center gap-2" style="font-size:.8rem;color:var(--text-muted)">
                 <span>${stars}</span>
                 ${rv.stayed_on ? `<span>· Stayed ${new Date(rv.stayed_on).toLocaleDateString('en-US',{month:'short',year:'numeric'})}</span>` : ''}
               </div>
             </div>
           </div>
-          ${rv.title ? `<div class="fw-bold small mb-1">${rv.title}</div>` : ''}
-          ${rv.body  ? `<p class="mb-0 small" style="color:var(--charcoal);line-height:1.6">${rv.body}</p>` : ''}
+          ${rv.title ? `<div class="fw-bold small mb-1">${escapeHotelHtml(rv.title)}</div>` : ''}
+          ${rv.body  ? `<p class="mb-0 small" style="color:var(--charcoal);line-height:1.6">${escapeHotelHtml(rv.body)}</p>` : ''}
+          ${(rv.photos && rv.photos.length) ? `
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            ${rv.photos.map(p => `
+              <a href="${p}" target="_blank" rel="noopener">
+                <img src="${p}" alt="Review photo" style="width:70px;height:70px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
+              </a>`).join('')}
+          </div>` : ''}
+          ${isMine ? `
+          <div class="d-flex gap-3 mt-2">
+            <button class="btn btn-link btn-sm p-0 hotel-review-edit-btn" style="color:#8e2434;text-decoration:none;font-size:.8rem"
+                    data-review-id="${rv.id}" data-rating="${rv.rating}"
+                    data-title="${escapeHotelHtml(rv.title || '')}" data-body="${escapeHotelHtml(rv.body || '')}"
+                    data-stayed="${rv.stayed_on || ''}">
+              <i class="bi bi-pencil me-1"></i>Edit
+            </button>
+            <button class="btn btn-link btn-sm p-0 hotel-review-delete-btn" style="color:#c0392b;text-decoration:none;font-size:.8rem"
+                    data-review-id="${rv.id}">
+              <i class="bi bi-trash me-1"></i>Delete
+            </button>
+          </div>` : ''}
         `;
         list.insertBefore(div, loadMoreHotelBtn.parentElement);
       });

@@ -46,6 +46,119 @@ function e(string $str): string {
 }
 
 /**
+ * Return the current CSRF token, generating one for this session if it
+ * doesn't have one yet. One token per session, reused across the whole
+ * session lifetime (regenerated on login — see login_user()).
+ */
+function csrf_token(): string {
+    session_start_safe();
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+/**
+ * Hidden <input> for a <form method="POST">. Drop this inside every
+ * form that changes data so csrf_verify() can check it on submit.
+ */
+function csrf_field(): string {
+    return '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
+}
+
+/**
+ * Verify the CSRF token on an incoming POST request. Call this as the
+ * first thing on every POST handler (page or API). Uses a timing-safe
+ * comparison and stops the request cold on mismatch — a missing/wrong
+ * token means the request didn't originate from our own form.
+ */
+function csrf_verify(): void {
+    session_start_safe();
+    $submitted = $_POST['csrf_token'] ?? '';
+    $expected  = $_SESSION['csrf_token'] ?? '';
+
+    if ($expected === '' || $submitted === '' || !hash_equals($expected, $submitted)) {
+        http_response_code(403);
+        if (strpos($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json') !== false
+            || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => false, 'message' => 'Your session expired or this request looks invalid. Please refresh the page and try again.']);
+        } else {
+            echo 'Your session expired or this request looks invalid. Please go back, refresh the page, and try again.';
+        }
+        exit;
+    }
+}
+
+/**
+ * Simple login rate-limiter, tracked per email+IP in the session (no
+ * extra table needed). After MAX_ATTEMPTS failed logins, blocks further
+ * tries for LOCKOUT_SECONDS. Call login_attempt_blocked() before
+ * checking the password, and record_failed_login() / reset_login_attempts()
+ * after checking it.
+ */
+function login_rate_limit_key(string $email): string {
+    // Keyed by email only (not email+IP). On XAMPP, "localhost" can
+    // inconsistently resolve to 127.0.0.1 or ::1 between requests,
+    // which silently reset the counter every attempt. Locking by
+    // account rather than account+IP is also the more standard
+    // behavior anyway — it stops distributed attempts too, not just
+    // ones from a single address.
+    return 'login_attempts_' . md5(strtolower(trim($email)));
+}
+
+const LOGIN_MAX_ATTEMPTS    = 5;
+const LOGIN_LOCKOUT_SECONDS = 300; // 5 minutes
+
+function login_attempt_blocked(string $email): ?int {
+    session_start_safe();
+    $key = login_rate_limit_key($email);
+    $data = $_SESSION[$key] ?? null;
+    if (!$data) return null;
+
+    if ($data['count'] >= LOGIN_MAX_ATTEMPTS) {
+        $elapsed = time() - $data['last'];
+        if ($elapsed < LOGIN_LOCKOUT_SECONDS) {
+            return LOGIN_LOCKOUT_SECONDS - $elapsed; // seconds remaining
+        }
+        // Lockout expired — clear it so they can try again
+        unset($_SESSION[$key]);
+    }
+    return null;
+}
+
+/**
+ * Record a failed attempt and return how many the person has left
+ * before they get locked out (0 means this attempt just triggered the
+ * lockout). Used to show "N attempts remaining" on the login form.
+ */
+function record_failed_login(string $email): int {
+    session_start_safe();
+    $key = login_rate_limit_key($email);
+    $data = $_SESSION[$key] ?? ['count' => 0, 'last' => time()];
+    $data['count']++;
+    $data['last'] = time();
+    $_SESSION[$key] = $data;
+    return max(0, LOGIN_MAX_ATTEMPTS - $data['count']);
+}
+
+function reset_login_attempts(string $email): void {
+    session_start_safe();
+    unset($_SESSION[login_rate_limit_key($email)]);
+}
+
+/**
+ * Send a standard set of defensive HTTP security headers. Call once,
+ * early, on every page/API response.
+ */
+function send_security_headers(): void {
+    header('X-Content-Type-Options: nosniff');       // stop MIME-sniffing away from a declared content type
+    header('X-Frame-Options: SAMEORIGIN');            // block this site from being framed elsewhere (clickjacking)
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    header('Permissions-Policy: geolocation=(self), camera=(), microphone=()');
+}
+
+/**
  * Get a sanitized value from $_GET or $_POST.
  */
 function input(string $key, string $source = 'request', $default = null) {
@@ -78,10 +191,12 @@ function require_fields(array $fields, string $source = 'post'): array {
 function session_start_safe(): void {
     if (session_status() === PHP_SESSION_NONE) {
         session_name(SESSION_NAME);
+        $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
         session_set_cookie_params([
             'lifetime' => SESSION_LIFETIME,
             'path'     => '/',
-            'secure'   => false,     // set true when using HTTPS
+            'secure'   => $isHttps,  // cookie only sent over HTTPS once you're on it
             'httponly' => true,
             'samesite' => 'Lax',
         ]);
@@ -101,6 +216,7 @@ function is_logged_in(): bool {
 function login_user(array $user): void {
     session_start_safe();
     session_regenerate_id(true);
+    unset($_SESSION['csrf_token']); // force a fresh token for the new session
     $_SESSION['user'] = [
         'id'    => $user['id'],
         'name'  => $user['name'],
@@ -177,6 +293,124 @@ function ensure_hotel_reviews_table(): void {
             CONSTRAINT fk_hotel_reviews_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
     );
+}
+
+/**
+ * Create the hotel_amenities table on first use — mirrors spot_amenities
+ * (id, hotel_id, label, icon) so hotels can show a "What's Included"
+ * grid just like tourist spots do.
+ */
+/**
+ * Create the hotel_photos table on first use — same definition already
+ * used in admin-hotel-photos.php, pulled out here so any page that
+ * reads hotel photos (not just the admin uploader) can safely call it
+ * first without duplicating the CREATE TABLE statement.
+ */
+function ensure_hotel_photos_table(): void {
+    db()->exec(
+        "CREATE TABLE IF NOT EXISTS hotel_photos (
+            id INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            hotel_id INT(10) UNSIGNED NOT NULL,
+            url VARCHAR(255) NOT NULL,
+            caption VARCHAR(200) DEFAULT NULL,
+            photo_type ENUM('main','gallery','room','amenity','exterior') DEFAULT 'gallery',
+            sort_order TINYINT(4) DEFAULT 0,
+            INDEX idx_hotel_photos_hotel (hotel_id),
+            CONSTRAINT fk_hotel_photos_hotel FOREIGN KEY (hotel_id) REFERENCES hotels(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+}
+
+function ensure_hotel_amenities_table(): void {
+    db()->exec(
+        "CREATE TABLE IF NOT EXISTS hotel_amenities (
+            id INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            hotel_id INT(10) UNSIGNED NOT NULL,
+            label VARCHAR(80) NOT NULL,
+            icon VARCHAR(50) DEFAULT 'bi-check-circle',
+            INDEX idx_hotel_amenities_hotel (hotel_id),
+            CONSTRAINT fk_hotel_amenities_hotel FOREIGN KEY (hotel_id) REFERENCES hotels(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+}
+
+/**
+ * Create the review_photos table on first use. Shared between spot
+ * reviews and hotel reviews (review_type distinguishes them) since both
+ * need the exact same "attach a few photos to my review" behavior —
+ * one shared table avoids duplicating this twice.
+ */
+function ensure_review_photos_table(): void {
+    db()->exec(
+        "CREATE TABLE IF NOT EXISTS review_photos (
+            id INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            review_type ENUM('spot','hotel') NOT NULL,
+            review_id INT(10) UNSIGNED NOT NULL,
+            url VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_review_photos_review (review_type, review_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+}
+
+/**
+ * Batch-fetch photos for a list of reviews and attach them as a
+ * 'photos' key on each row (array of URL strings). Used everywhere
+ * reviews are displayed — avoids one query per review.
+ */
+function attach_review_photos(array $reviews, string $reviewType): array {
+    if (empty($reviews)) return $reviews;
+
+    $ids = array_column($reviews, 'id');
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $rows = db_fetch_all(
+        "SELECT review_id, url FROM review_photos
+         WHERE review_type = ? AND review_id IN ($placeholders)
+         ORDER BY id ASC",
+        array_merge([$reviewType], $ids)
+    );
+
+    $byReview = [];
+    foreach ($rows as $row) {
+        $byReview[$row['review_id']][] = $row['url'];
+    }
+    foreach ($reviews as &$rv) {
+        $rv['photos'] = $byReview[$rv['id']] ?? [];
+    }
+    unset($rv);
+
+    return $reviews;
+}
+function save_review_photos(string $reviewType, int $reviewId, int $maxPhotos = 3): array {
+    $errors = [];
+    if (empty($_FILES['photos']) || !is_array($_FILES['photos']['name'])) {
+        return $errors;
+    }
+
+    $count = min(count($_FILES['photos']['name']), $maxPhotos);
+    for ($i = 0; $i < $count; $i++) {
+        if ($_FILES['photos']['error'][$i] === UPLOAD_ERR_NO_FILE) continue;
+
+        $_FILES['__review_photo'] = [
+            'name'     => $_FILES['photos']['name'][$i],
+            'type'     => $_FILES['photos']['type'][$i],
+            'tmp_name' => $_FILES['photos']['tmp_name'][$i],
+            'error'    => $_FILES['photos']['error'][$i],
+            'size'     => $_FILES['photos']['size'][$i],
+        ];
+        try {
+            $url = handle_image_upload('__review_photo', 'reviews');
+            if ($url) {
+                db_execute(
+                    "INSERT INTO review_photos (review_type, review_id, url) VALUES (?, ?, ?)",
+                    [$reviewType, $reviewId, $url]
+                );
+            }
+        } catch (RuntimeException $e) {
+            $errors[] = $_FILES['photos']['name'][$i] . ': ' . $e->getMessage();
+        }
+    }
+    return $errors;
 }
 
 // ── Formatting ────────────────────────────────────────────────
@@ -287,6 +521,7 @@ function set_api_headers(): void {
     header('Access-Control-Allow-Origin: ' . APP_URL);
     header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type');
+    send_security_headers();
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit(0);
 }
 

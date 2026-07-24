@@ -13,6 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: ' . APP_URL . '/pages/my-bookings.php'); exit;
 }
 
+csrf_verify();
+
 $booking_id = (int) input('booking_id', 'post', 0);
 
 $booking = db_fetch_one(

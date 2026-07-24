@@ -13,6 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: ' . APP_URL . '/pages/my-orders.php'); exit;
 }
 
+csrf_verify();
+
 $order_id = (int) input('order_id', 'post', 0);
 
 $order = db_fetch_one(

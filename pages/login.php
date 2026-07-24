@@ -21,13 +21,22 @@ $error = '';
 $email = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verify();
+
     $email    = strtolower(trim(input('email', 'post', '')));
     $password = input('password', 'post', '');
-    if (!$email || !$password) {
+
+    $blockedSeconds = $email ? login_attempt_blocked($email) : null;
+
+    if ($blockedSeconds !== null) {
+        $mins  = ceil($blockedSeconds / 60);
+        $error = "Too many failed attempts. Please try again in about {$mins} minute" . ($mins != 1 ? 's' : '') . '.';
+    } elseif (!$email || !$password) {
         $error = 'Please enter your email and password.';
     } else {
         $user = db_fetch_one("SELECT * FROM users WHERE email = ?", [$email]);
         if ($user && password_verify($password, $user['password'])) {
+            reset_login_attempts($email);
             login_user($user);
             $role     = $user['role'] ?? 'tourist';
             $redirect = input('redirect', 'get', '');
@@ -46,7 +55,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['flash']['success'] = 'Welcome back, ' . $user['name'] . '!';
             header('Location: ' . APP_URL); exit;
         } else {
-            $error = 'Incorrect email or password.';
+            $remaining = record_failed_login($email);
+            $error = $remaining > 0
+                ? "Incorrect email or password. You have {$remaining} attempt" . ($remaining != 1 ? 's' : '') . " remaining before your account is temporarily locked."
+                : 'Too many failed attempts. Your account is now temporarily locked — please try again in about 5 minutes.';
         }
     }
 }
@@ -78,6 +90,7 @@ require_once __DIR__ . '/../includes/header.php';
           <?php endif; ?>
 
           <form method="POST" novalidate>
+            <?= csrf_field() ?>
             <div class="mb-3">
               <label class="form-label">Email Address</label>
               <div class="input-icon-wrap">

@@ -1,6 +1,7 @@
 <?php
 ob_start();
 require_once __DIR__ . '/../includes/helpers.php';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') { csrf_verify(); }
 session_start_safe();
 // ============================================================
 // iEXPLORE LAGUNA — Hotel Owner Registration
@@ -150,7 +151,7 @@ $cities = db_fetch_all("SELECT id, name FROM cities ORDER BY name");
 
           <!-- ── STEP 1: Account form ── -->
           <?php if ($step === 1): ?>
-          <form method="POST" action="?step=1" novalidate>
+          <form method="POST" action="?step=1" novalidate><?= csrf_field() ?>
             <div class="mb-3">
               <label class="form-label">Full Name</label>
               <div class="input-icon-wrap">
@@ -201,7 +202,7 @@ $cities = db_fetch_all("SELECT id, name FROM cities ORDER BY name");
 
           <!-- ── STEP 2: Hotel profile form ── -->
           <?php else: ?>
-          <form method="POST" action="?step=2" novalidate>
+          <form method="POST" action="?step=2" novalidate><?= csrf_field() ?>
             <div class="mb-3">
               <label class="form-label fw-600">Hotel Name <span class="text-danger">*</span></label>
               <div class="input-icon-wrap">

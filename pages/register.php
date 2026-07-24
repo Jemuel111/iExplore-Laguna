@@ -1,6 +1,7 @@
 <?php
 ob_start();
 require_once __DIR__ . '/../includes/helpers.php';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') { csrf_verify(); }
 // ============================================================
 // iEXPLORE LAGUNA — Register Page (Polished v2)
 // ============================================================
@@ -68,7 +69,7 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
           <?php endif; ?>
 
-          <form method="POST" novalidate>
+          <form method="POST" novalidate><?= csrf_field() ?>
             <div class="mb-3">
               <label class="form-label">Full Name</label>
               <div class="input-icon-wrap">

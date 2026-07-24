@@ -1,6 +1,7 @@
 <?php
 ob_start();
 require_once __DIR__ . '/../includes/helpers.php';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') { csrf_verify(); }
 // ============================================================
 // iEXPLORE LAGUNA — Admin Dashboard
 // pages/admin-dashboard.php
@@ -258,14 +259,14 @@ require_once __DIR__ . '/../includes/header.php';
                 <div class="small text-muted mt-1"><i class="bi bi-clock me-1"></i>Registered <?= date('M d, Y', strtotime($s['created_at'])) ?></div>
               </div>
               <div class="col-md-4 d-flex gap-2 justify-content-md-end">
-                <form method="POST">
+                <form method="POST"><?= csrf_field() ?>
                   <input type="hidden" name="action"  value="approve_shop">
                   <input type="hidden" name="shop_id" value="<?= $s['id'] ?>">
                   <button class="btn btn-sm" style="background:var(--green-mid);color:#fff;border-radius:var(--radius-pill);padding:.4rem 1rem">
                     <i class="bi bi-check-lg me-1"></i>Approve
                   </button>
                 </form>
-                <form method="POST" onsubmit="return confirm('Reject this shop registration?')">
+                <form method="POST" onsubmit="return confirm('Reject this shop registration?')"><?= csrf_field() ?>
                   <input type="hidden" name="action"  value="reject_shop">
                   <input type="hidden" name="shop_id" value="<?= $s['id'] ?>">
                   <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill);padding:.4rem 1rem">
@@ -303,7 +304,7 @@ require_once __DIR__ . '/../includes/header.php';
                 &nbsp;·&nbsp;<i class="bi bi-person-circle me-1"></i><?= e($s['owner_name']) ?>
               </div>
             </div>
-            <form method="POST" onsubmit="return confirm('Unpublish this shop? It will be hidden from tourists until re-approved.')" class="flex-shrink-0">
+            <form method="POST" onsubmit="return confirm('Unpublish this shop? It will be hidden from tourists until re-approved.')" class="flex-shrink-0"><?= csrf_field() ?>
               <input type="hidden" name="action"  value="revoke_shop">
               <input type="hidden" name="shop_id" value="<?= $s['id'] ?>">
               <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill);font-size:.78rem;padding:.3rem .8rem">
@@ -349,14 +350,14 @@ require_once __DIR__ . '/../includes/header.php';
                 <?php endif; ?>
               </div>
               <div class="col-md-4 d-flex gap-2 justify-content-md-end">
-                <form method="POST">
+                <form method="POST"><?= csrf_field() ?>
                   <input type="hidden" name="action"   value="approve_hotel">
                   <input type="hidden" name="hotel_id" value="<?= $h['id'] ?>">
                   <button class="btn btn-sm" style="background:var(--green-mid);color:#fff;border-radius:var(--radius-pill);padding:.4rem 1rem">
                     <i class="bi bi-check-lg me-1"></i>Approve
                   </button>
                 </form>
-                <form method="POST" onsubmit="return confirm('Reject this hotel registration?')">
+                <form method="POST" onsubmit="return confirm('Reject this hotel registration?')"><?= csrf_field() ?>
                   <input type="hidden" name="action"   value="reject_hotel">
                   <input type="hidden" name="hotel_id" value="<?= $h['id'] ?>">
                   <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill);padding:.4rem 1rem">
@@ -398,7 +399,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <?php endif; ?>
               </div>
             </div>
-            <form method="POST" onsubmit="return confirm('Unpublish this hotel? It will be hidden from tourists until re-approved.')" class="flex-shrink-0">
+            <form method="POST" onsubmit="return confirm('Unpublish this hotel? It will be hidden from tourists until re-approved.')" class="flex-shrink-0"><?= csrf_field() ?>
               <input type="hidden" name="action"   value="revoke_hotel">
               <input type="hidden" name="hotel_id" value="<?= $h['id'] ?>">
               <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill);font-size:.78rem;padding:.3rem .8rem">

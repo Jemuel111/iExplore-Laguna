@@ -7,11 +7,19 @@ $page_title  = 'Hotels & Resorts';
 $active_page = 'hotels';
 require_once __DIR__ . '/../includes/header.php';
 
+ensure_hotel_amenities_table();
+
 $filter_city   = input('city',      'get', '');
 $filter_stars  = (int) input('stars',     'get', 0);
 $filter_budget = (int) input('max_price', 'get', 0);
 $filter_sort   = input('sort',      'get', 'stars');
 $view_mode     = input('view',      'get', 'grid');
+
+// Amenities come in as a checkbox array (amenities[]=X&amenities[]=Y),
+// which the generic input() helper can't handle (it expects scalars).
+$filter_amenities = (isset($_GET['amenities']) && is_array($_GET['amenities']))
+    ? array_values(array_filter(array_map('strval', $_GET['amenities'])))
+    : [];
 
 // Pagination
 $per_page = 9;
@@ -31,6 +39,12 @@ if ($filter_stars) {
 if ($filter_budget) {
     $where[]  = 'h.price_min <= ?';
     $params[] = $filter_budget;
+}
+if (!empty($filter_amenities)) {
+    $placeholders = implode(',', array_fill(0, count($filter_amenities), '?'));
+    $where[]  = "(SELECT COUNT(DISTINCT label) FROM hotel_amenities WHERE hotel_id = h.id AND label IN ($placeholders)) = ?";
+    foreach ($filter_amenities as $a) { $params[] = $a; }
+    $params[] = count($filter_amenities);
 }
 
 $where_sql = implode(' AND ', $where);
@@ -80,23 +94,54 @@ if ($view_mode === 'map') {
 
 $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
 
+// Distinct amenity labels across all hotels, for the filter checkboxes
+$all_amenity_labels = db_fetch_all(
+    "SELECT DISTINCT label, MIN(icon) AS icon FROM hotel_amenities GROUP BY label ORDER BY label ASC"
+);
+
+// Batch-fetch amenities for just the hotels shown on this page (avoids
+// running a query per card)
+$hotel_amenities_map = [];
+$hotel_main_photo_map = [];
+if (!empty($hotels)) {
+    $hotelIds = array_column($hotels, 'id');
+    $placeholders = implode(',', array_fill(0, count($hotelIds), '?'));
+    $rows = db_fetch_all(
+        "SELECT hotel_id, label, icon FROM hotel_amenities WHERE hotel_id IN ($placeholders) ORDER BY id ASC",
+        $hotelIds
+    );
+    foreach ($rows as $row) {
+        $hotel_amenities_map[$row['hotel_id']][] = $row;
+    }
+
+    // Prefer a photo uploaded via "Manage Hotel Photos" over the legacy
+    // cover_url field — that's the field editors actually use now, but
+    // listing cards were still only checking cover_url, so uploads there
+    // never showed up until you clicked into the hotel.
+    ensure_hotel_photos_table();
+    $photoRows = db_fetch_all(
+        "SELECT hotel_id, url FROM hotel_photos
+         WHERE hotel_id IN ($placeholders)
+         ORDER BY photo_type='main' DESC, sort_order ASC, id ASC",
+        $hotelIds
+    );
+    foreach ($photoRows as $row) {
+        if (!isset($hotel_main_photo_map[$row['hotel_id']])) {
+            $hotel_main_photo_map[$row['hotel_id']] = $row['url'];
+        }
+    }
+}
+
 $base_qs = http_build_query(array_filter([
     'city' => $filter_city, 'stars' => $filter_stars ?: '',
     'max_price' => $filter_budget ?: '',
     'sort' => $filter_sort !== 'stars' ? $filter_sort : '',
     'view' => $view_mode !== 'grid' ? $view_mode : '',
+    'amenities' => $filter_amenities,
 ]));
-
-$amenityIcons = [
-    'wifi'       => ['bi-wifi','WiFi'],
-    'pool'       => ['bi-water','Pool'],
-    'restaurant' => ['bi-cup-hot','Restaurant'],
-    'spa'        => ['bi-heart-pulse','Spa'],
-    'parking'    => ['bi-p-square','Parking'],
-    'gym'        => ['bi-lightning','Gym'],
-    'aircon'     => ['bi-thermometer-snow','A/C'],
-];
 ?>
+
+
 
 <section class="py-3" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
   <div class="container">
@@ -119,10 +164,10 @@ $amenityIcons = [
 
       <!-- Star quick filters -->
       <div class="d-flex gap-1 flex-grow-1 flex-wrap">
-        <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'max_price'=>$filter_budget?:'','view'=>$view_mode!=='grid'?$view_mode:''])) ?>"
+        <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'max_price'=>$filter_budget?:'','view'=>$view_mode!=='grid'?$view_mode:'','amenities'=>$filter_amenities])) ?>"
            class="filter-pill <?= !$filter_stars ? 'active' : '' ?>">All Stars</a>
         <?php for ($s = 5; $s >= 1; $s--): ?>
-        <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'stars'=>$s,'max_price'=>$filter_budget?:'','view'=>$view_mode!=='grid'?$view_mode:''])) ?>"
+        <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'stars'=>$s,'max_price'=>$filter_budget?:'','view'=>$view_mode!=='grid'?$view_mode:'','amenities'=>$filter_amenities])) ?>"
            class="filter-pill <?= $filter_stars===$s ? 'active' : '' ?>">
           <?= str_repeat('★',$s) ?>
         </a>
@@ -137,15 +182,15 @@ $amenityIcons = [
           <option value="name"       <?= $filter_sort==='name'?'selected':'' ?>>🔤 A–Z</option>
         </select>
         <div class="btn-group btn-group-sm" role="group">
-          <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'stars'=>$filter_stars?:'','max_price'=>$filter_budget?:'','sort'=>$filter_sort!=='stars'?$filter_sort:''])) ?>"
+          <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'stars'=>$filter_stars?:'','max_price'=>$filter_budget?:'','sort'=>$filter_sort!=='stars'?$filter_sort:'','amenities'=>$filter_amenities])) ?>"
              class="btn btn-outline-secondary <?= $view_mode==='grid'?'active':'' ?>" title="Grid view">
             <i class="bi bi-grid-3x3-gap"></i>
           </a>
-          <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'stars'=>$filter_stars?:'','max_price'=>$filter_budget?:'','sort'=>$filter_sort!=='stars'?$filter_sort:'','view'=>'list'])) ?>"
+          <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'stars'=>$filter_stars?:'','max_price'=>$filter_budget?:'','sort'=>$filter_sort!=='stars'?$filter_sort:'','view'=>'list','amenities'=>$filter_amenities])) ?>"
              class="btn btn-outline-secondary <?= $view_mode==='list'?'active':'' ?>" title="List view">
             <i class="bi bi-list-ul"></i>
           </a>
-          <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'stars'=>$filter_stars?:'','max_price'=>$filter_budget?:'','sort'=>$filter_sort!=='stars'?$filter_sort:'','view'=>'map'])) ?>"
+          <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'stars'=>$filter_stars?:'','max_price'=>$filter_budget?:'','sort'=>$filter_sort!=='stars'?$filter_sort:'','view'=>'map','amenities'=>$filter_amenities])) ?>"
              class="btn btn-outline-secondary <?= $view_mode==='map'?'active':'' ?>" title="Map view">
             <i class="bi bi-pin-map"></i>
           </a>
@@ -199,6 +244,23 @@ $amenityIcons = [
             <option value="6000"  <?= $filter_budget===6000?'selected':'' ?>>Under ₱6,000</option>
           </select>
         </div>
+        <?php if (!empty($all_amenity_labels)): ?>
+        <div class="mb-3">
+          <label class="form-label">Amenities</label>
+          <div style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:.6rem .75rem">
+            <?php foreach ($all_amenity_labels as $al): ?>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="amenities[]"
+                     value="<?= e($al['label']) ?>" id="am-<?= md5($al['label']) ?>"
+                     <?= in_array($al['label'], $filter_amenities, true) ? 'checked' : '' ?>>
+              <label class="form-check-label small" for="am-<?= md5($al['label']) ?>">
+                <i class="bi <?= e($al['icon']) ?> me-1" style="color:var(--green-mid)"></i><?= e($al['label']) ?>
+              </label>
+            </div>
+            <?php endforeach; ?>
+          </div>
+        </div>
+        <?php endif; ?>
         <div class="mb-4">
           <label class="form-label">Sort By</label>
           <select class="form-select form-select-sm" name="sort">
@@ -260,23 +322,28 @@ $amenityIcons = [
     <?php if ($view_mode !== 'list'): ?>
     <div class="row g-3">
       <?php foreach ($hotels as $hotel):
-        $amenities = json_decode($hotel['amenities'] ?? '[]', true) ?: [];
+        $amenities = $hotel_amenities_map[$hotel['id']] ?? [];
       ?>
       <div class="col-sm-6 col-xl-4">
         <div class="card-app h-100">
-          <?php if (!empty($hotel['cover_url'])): ?>
+          <a href="hotel.php?id=<?= $hotel['id'] ?>" class="text-decoration-none">
+          <?php $cardImg = $hotel_main_photo_map[$hotel['id']] ?? $hotel['cover_url'] ?? ''; ?>
+          <?php if (!empty($cardImg)): ?>
           <div class="card-img-placeholder" style="height:130px;padding:0;overflow:hidden">
-            <img src="<?= e($hotel['cover_url']) ?>" alt="<?= e($hotel['name']) ?>" style="width:100%;height:100%;object-fit:cover">
+            <img src="<?= e($cardImg) ?>" alt="<?= e($hotel['name']) ?>" style="width:100%;height:100%;object-fit:cover">
           </div>
           <?php else: ?>
           <div class="card-img-placeholder" style="height:130px;font-size:2.2rem">🏨</div>
           <?php endif; ?>
+          </a>
           <div class="card-body-app d-flex flex-column">
             <div class="mb-1" style="color:var(--sand-dark);font-size:.85rem">
               <?= str_repeat('★', $hotel['star_rating']) . str_repeat('☆', 5 - $hotel['star_rating']) ?>
               <small class="text-muted ms-1"><?= $hotel['star_rating'] ?>-star</small>
             </div>
-            <h5 class="card-title-app mb-1" style="font-size:.98rem"><?= e($hotel['name']) ?></h5>
+            <a href="hotel.php?id=<?= $hotel['id'] ?>" class="text-decoration-none" style="color:inherit">
+              <h5 class="card-title-app mb-1" style="font-size:.98rem"><?= e($hotel['name']) ?></h5>
+            </a>
             <div class="card-meta mb-1">
               <i class="bi bi-geo-alt text-green"></i>
               <span><?= e($hotel['city_name']) ?></span>
@@ -289,11 +356,9 @@ $amenityIcons = [
             <!-- Amenities -->
             <?php if ($amenities): ?>
             <div class="d-flex flex-wrap gap-1 mb-2">
-              <?php foreach (array_slice($amenities,0,4) as $a):
-                [$icon,$label] = $amenityIcons[$a] ?? ['bi-check',''];
-                if (!$label) continue; ?>
+              <?php foreach (array_slice($amenities,0,4) as $a): ?>
                 <span style="font-size:.68rem;background:var(--green-pale);color:var(--green-dark);padding:.15rem .5rem;border-radius:20px">
-                  <i class="bi <?= $icon ?> me-1"></i><?= $label ?>
+                  <i class="bi <?= e($a['icon']) ?> me-1"></i><?= e($a['label']) ?>
                 </span>
               <?php endforeach; ?>
               <?php if (count($amenities) > 4): ?>
@@ -323,10 +388,17 @@ $amenityIcons = [
     <?php else: ?>
     <div class="d-flex flex-column gap-2">
       <?php foreach ($hotels as $hotel):
-        $amenities = json_decode($hotel['amenities'] ?? '[]', true) ?: [];
+        $amenities = $hotel_amenities_map[$hotel['id']] ?? [];
       ?>
       <div class="spot-list-item">
+        <?php $cardImg = $hotel_main_photo_map[$hotel['id']] ?? $hotel['cover_url'] ?? ''; ?>
+        <?php if (!empty($cardImg)): ?>
+        <div class="spot-emoji-box" style="padding:0;overflow:hidden">
+          <img src="<?= e($cardImg) ?>" alt="<?= e($hotel['name']) ?>" style="width:100%;height:100%;object-fit:cover">
+        </div>
+        <?php else: ?>
         <div class="spot-emoji-box" style="font-size:1.6rem">🏨</div>
+        <?php endif; ?>
         <div class="flex-grow-1 min-w-0">
           <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
             <div>
@@ -358,11 +430,9 @@ $amenityIcons = [
           </div>
           <?php if ($amenities): ?>
           <div class="d-flex flex-wrap gap-1 mt-1">
-            <?php foreach (array_slice($amenities,0,5) as $a):
-              [$icon,$label] = $amenityIcons[$a] ?? ['bi-check',''];
-              if (!$label) continue; ?>
+            <?php foreach (array_slice($amenities,0,5) as $a): ?>
               <span style="font-size:.68rem;background:var(--green-pale);color:var(--green-dark);padding:.12rem .45rem;border-radius:20px">
-                <i class="bi <?= $icon ?> me-1"></i><?= $label ?>
+                <i class="bi <?= e($a['icon']) ?> me-1"></i><?= e($a['label']) ?>
               </span>
             <?php endforeach; ?>
           </div>

@@ -1,12 +1,13 @@
 <?php
 ob_start();
 require_once __DIR__ . '/../includes/helpers.php';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') { csrf_verify(); }
 // ============================================================
 // iEXPLORE LAGUNA — Admin: Manage Hotel Photos
 // pages/admin-hotel-photos.php
 // Upload multiple photos at once for any hotel
 // ============================================================
-$page_title  = 'Manage Hotel Photos';
+$page_title  = 'Manage Hotel Content';
 $active_page = '';
 
 
@@ -14,24 +15,10 @@ if (!is_logged_in()) { header('Location: ' . APP_URL . '/pages/login.php'); exit
 $u = current_user();
 if (($u['role'] ?? '') !== 'admin') { header('Location: ' . APP_URL); exit; }
 
-// Make sure the gallery table exists — this app ships without a bundled
-// SQL schema file, so create it on first use if it isn't there yet.
-db()->exec(
-    "CREATE TABLE IF NOT EXISTS hotel_photos (
-        id INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        hotel_id INT(10) UNSIGNED NOT NULL,
-        url VARCHAR(255) NOT NULL,
-        caption VARCHAR(200) DEFAULT NULL,
-        photo_type ENUM('main','gallery','room','amenity','exterior') DEFAULT 'gallery',
-        sort_order TINYINT(4) DEFAULT 0,
-        INDEX idx_hotel_photos_hotel (hotel_id),
-        CONSTRAINT fk_hotel_photos_hotel FOREIGN KEY (hotel_id) REFERENCES hotels(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
-);
-// Matches the exact column type/charset used by hotels.id and spot_photos in
-// this project's schema (int(10) UNSIGNED, utf8mb4_general_ci) — a mismatch
-// here is what causes MySQL errno 150 ("foreign key constraint incorrectly
-// formed") when creating the table.
+// Make sure the gallery tables exist — this app ships without a bundled
+// SQL schema file, so create them on first use if they aren't there yet.
+ensure_hotel_photos_table();
+ensure_hotel_amenities_table();
 
 $hotel_id = (int) input('hotel_id', 'get', 0);
 
@@ -110,6 +97,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'dele
     header('Location: ' . APP_URL . '/pages/admin-hotel-photos.php?hotel_id=' . $hid); exit;
 }
 
+// Curated common amenities so non-technical admins don't need to know
+// Bootstrap Icon class names — value format is "icon-class::Label"
+function hotel_amenity_presets(): array {
+    return [
+        'bi-wifi::Free WiFi',
+        'bi-p-circle::Parking',
+        'bi-droplet-fill::Swimming Pool',
+        'bi-cup-hot::Restaurant',
+        'bi-snow::Air Conditioning',
+        'bi-egg-fried::Breakfast Included',
+        'bi-heart-pulse::Gym & Fitness Center',
+        'bi-flower1::Spa & Wellness',
+        'bi-cup-straw::Bar / Lounge',
+        'bi-bell::24-Hour Room Service',
+        'bi-airplane::Airport Shuttle',
+        'bi-building::24-Hour Front Desk',
+        'bi-basket2::Laundry Service',
+        'bi-tv::Cable / Flat-screen TV',
+        'bi-safe2::In-room Safe',
+        'bi-emoji-smile::Pet Friendly',
+        'bi-badge-cc::Elevator',
+        'bi-person-arms-up::Kid-Friendly',
+    ];
+}
+
+// ── POST: add an amenity ─────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'add_amenity') {
+    $hid    = (int) input('hotel_id', 'post', 0);
+    $preset = input('preset', 'post', '');
+
+    if ($preset === 'custom') {
+        $icon  = trim(input('custom_icon', 'post', '')) ?: 'bi-check-circle';
+        $label = trim(input('custom_label', 'post', ''));
+    } else {
+        [$icon, $label] = array_pad(explode('::', $preset, 2), 2, '');
+    }
+
+    if ($hid && $label !== '') {
+        db_execute(
+            "INSERT INTO hotel_amenities (hotel_id, label, icon) VALUES (?, ?, ?)",
+            [$hid, $label, $icon ?: 'bi-check-circle']
+        );
+        $_SESSION['flash']['success'] = 'Amenity added.';
+    } else {
+        $_SESSION['flash']['danger'] = 'Please choose or enter an amenity.';
+    }
+    header('Location: ' . APP_URL . '/pages/admin-hotel-photos.php?hotel_id=' . $hid); exit;
+}
+
+// ── POST: delete an amenity ───────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'delete_amenity') {
+    $amenityId = (int) input('amenity_id', 'post', 0);
+    $hid       = (int) input('hotel_id', 'post', 0);
+    db_execute("DELETE FROM hotel_amenities WHERE id=? AND hotel_id=?", [$amenityId, $hid]);
+    $_SESSION['flash']['success'] = 'Amenity removed.';
+    header('Location: ' . APP_URL . '/pages/admin-hotel-photos.php?hotel_id=' . $hid); exit;
+}
+
 // ── Data ──────────────────────────────────────────────────────
 $hotels = db_fetch_all(
     "SELECT h.id, h.name, c.name AS city_name,
@@ -119,8 +164,9 @@ $hotels = db_fetch_all(
      ORDER BY c.name, h.name"
 );
 
-$selected_hotel = null;
-$hotel_photos   = [];
+$selected_hotel  = null;
+$hotel_photos    = [];
+$hotel_amenities = [];
 if ($hotel_id) {
     $selected_hotel = db_fetch_one(
         "SELECT h.*, c.name AS city_name FROM hotels h JOIN cities c ON h.city_id=c.id WHERE h.id=?",
@@ -128,6 +174,10 @@ if ($hotel_id) {
     );
     $hotel_photos = db_fetch_all(
         "SELECT * FROM hotel_photos WHERE hotel_id=? ORDER BY photo_type='main' DESC, sort_order",
+        [$hotel_id]
+    );
+    $hotel_amenities = db_fetch_all(
+        "SELECT * FROM hotel_amenities WHERE hotel_id=? ORDER BY id ASC",
         [$hotel_id]
     );
 }
@@ -149,8 +199,8 @@ require_once __DIR__ . '/../includes/header.php';
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-images fs-2" style="color:var(--sand-dark)"></i>
       <div>
-        <h1 class="mb-0 fs-3" style="font-family:'Playfair Display',serif">Manage Hotel Photos</h1>
-        <p class="mb-0 small opacity-75">Upload multiple photos at once for any hotel</p>
+        <h1 class="mb-0 fs-3" style="font-family:'Playfair Display',serif">Manage Hotel Photos & Amenities</h1>
+        <p class="mb-0 small opacity-75">Upload photos and highlight what each hotel offers</p>
       </div>
     </div>
   </div>
@@ -182,7 +232,7 @@ require_once __DIR__ . '/../includes/header.php';
       <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:#8e2434">
         <i class="bi bi-cloud-upload me-2"></i>Upload Photos
       </h6>
-      <form method="POST" enctype="multipart/form-data">
+      <form method="POST" enctype="multipart/form-data"><?= csrf_field() ?>
         <input type="hidden" name="action" value="upload_photos">
         <input type="hidden" name="hotel_id" value="<?= $selected_hotel['id'] ?>">
         <div class="mb-3">
@@ -205,6 +255,41 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
         <button type="submit" class="btn w-100" style="background:#8e2434;color:#fff;border-radius:var(--radius-sm)">
           <i class="bi bi-upload me-2"></i>Upload Photos
+        </button>
+      </form>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($selected_hotel): ?>
+    <div class="form-panel mt-3">
+      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:#8e2434">
+        <i class="bi bi-grid-3x3-gap-fill me-2"></i>Add Amenity
+      </h6>
+      <form method="POST" id="amenity-form"><?= csrf_field() ?>
+        <input type="hidden" name="action" value="add_amenity">
+        <input type="hidden" name="hotel_id" value="<?= $selected_hotel['id'] ?>">
+        <div class="mb-3">
+          <label class="form-label">Choose an amenity</label>
+          <select class="form-select" name="preset" id="amenity-preset" onchange="document.getElementById('amenity-custom-fields').classList.toggle('d-none', this.value !== 'custom')">
+            <?php foreach (hotel_amenity_presets() as $preset): [$pi, $pl] = explode('::', $preset, 2); ?>
+            <option value="<?= e($preset) ?>"><?= e($pl) ?></option>
+            <?php endforeach; ?>
+            <option value="custom">✏️ Custom amenity…</option>
+          </select>
+        </div>
+        <div id="amenity-custom-fields" class="d-none">
+          <div class="mb-2">
+            <label class="form-label">Custom Label</label>
+            <input type="text" class="form-control" name="custom_label" placeholder="e.g. Rooftop Bar">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Icon class <span class="text-muted">(optional)</span></label>
+            <input type="text" class="form-control" name="custom_icon" placeholder="e.g. bi-cup-straw">
+            <div class="form-text">Uses <a href="https://icons.getbootstrap.com/" target="_blank">Bootstrap Icons</a> class names. Leave blank for a default checkmark.</div>
+          </div>
+        </div>
+        <button type="submit" class="btn w-100" style="background:#8e2434;color:#fff;border-radius:var(--radius-sm)">
+          <i class="bi bi-plus-circle me-2"></i>Add Amenity
         </button>
       </form>
     </div>
@@ -241,14 +326,14 @@ require_once __DIR__ . '/../includes/header.php';
               <div class="small text-muted mb-2 text-capitalize"><?= e($ph['photo_type']) ?></div>
               <div class="d-flex gap-1">
                 <?php if ($ph['photo_type'] !== 'main'): ?>
-                <form method="POST" class="flex-grow-1">
+                <form method="POST" class="flex-grow-1"><?= csrf_field() ?>
                   <input type="hidden" name="action" value="set_main">
                   <input type="hidden" name="photo_id" value="<?= $ph['id'] ?>">
                   <input type="hidden" name="hotel_id" value="<?= $selected_hotel['id'] ?>">
                   <button class="btn btn-sm btn-outline-secondary w-100" style="font-size:.72rem">⭐ Set Main</button>
                 </form>
                 <?php endif; ?>
-                <form method="POST" onsubmit="return confirm('Delete this photo?')">
+                <form method="POST" onsubmit="return confirm('Delete this photo?')"><?= csrf_field() ?>
                   <input type="hidden" name="action" value="delete_photo">
                   <input type="hidden" name="photo_id" value="<?= $ph['id'] ?>">
                   <input type="hidden" name="hotel_id" value="<?= $selected_hotel['id'] ?>">
@@ -261,6 +346,30 @@ require_once __DIR__ . '/../includes/header.php';
         <?php endforeach; ?>
       </div>
       <?php endif; ?>
+
+      <h6 class="fw-bold mb-3 mt-4 pt-3" style="font-family:'Playfair Display',serif;color:#8e2434;border-top:1px solid var(--border)">
+        <i class="bi bi-grid-3x3-gap-fill me-2"></i>Amenities — <?= count($hotel_amenities) ?>
+      </h6>
+      <?php if (empty($hotel_amenities)): ?>
+        <p class="text-muted small">No amenities added yet — pick one on the left.</p>
+      <?php else: ?>
+      <div class="d-flex flex-wrap gap-2 mb-2">
+        <?php foreach ($hotel_amenities as $am): ?>
+        <form method="POST" onsubmit="return confirm('Remove this amenity?')"
+              style="display:flex;align-items:center;gap:.5rem;background:#f7dde1;border-radius:20px;padding:.35rem .5rem .35rem .9rem"><?= csrf_field() ?>
+          <input type="hidden" name="action" value="delete_amenity">
+          <input type="hidden" name="amenity_id" value="<?= $am['id'] ?>">
+          <input type="hidden" name="hotel_id" value="<?= $selected_hotel['id'] ?>">
+          <i class="bi <?= e($am['icon']) ?>" style="color:#8e2434"></i>
+          <span style="font-size:.85rem;color:#8e2434"><?= e($am['label']) ?></span>
+          <button type="submit" class="btn btn-sm p-0" style="line-height:1;color:#a61c1c" title="Remove">
+            <i class="bi bi-x-circle-fill"></i>
+          </button>
+        </form>
+        <?php endforeach; ?>
+      </div>
+      <?php endif; ?>
+
       <a href="<?= APP_URL ?>/pages/hotel.php?id=<?= $selected_hotel['id'] ?>" target="_blank" class="btn btn-outline-secondary btn-sm mt-3">
         <i class="bi bi-box-arrow-up-right me-1"></i>View Live Page
       </a>

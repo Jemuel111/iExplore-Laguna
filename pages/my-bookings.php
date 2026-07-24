@@ -155,6 +155,7 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="px-3 pb-3">
           <form method="POST" action="<?= APP_URL ?>/api/cancel-booking.php"
                 onsubmit="return confirm('Cancel this reservation?')">
+            <?= csrf_field() ?>
             <input type="hidden" name="booking_id" value="<?= $bk['id'] ?>">
             <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill)">
               <i class="bi bi-x-circle me-1"></i>Cancel Reservation

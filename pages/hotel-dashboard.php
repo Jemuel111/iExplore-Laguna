@@ -1,6 +1,7 @@
 <?php
 ob_start();
 require_once __DIR__ . '/../includes/helpers.php';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') { csrf_verify(); }
 // ============================================================
 // iEXPLORE LAGUNA — Hotel Owner Dashboard
 // pages/hotel-dashboard.php
@@ -327,7 +328,7 @@ require_once __DIR__ . '/../includes/header.php';
                   <!-- Status update buttons -->
                   <?php if ($bk['status'] === 'pending'): ?>
                   <div class="d-flex gap-2 mt-2">
-                    <form method="POST">
+                    <form method="POST"><?= csrf_field() ?>
                       <input type="hidden" name="action"     value="update_booking">
                       <input type="hidden" name="booking_id" value="<?= $bk['id'] ?>">
                       <input type="hidden" name="status"     value="confirmed">
@@ -335,7 +336,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <i class="bi bi-check me-1"></i>Accept
                       </button>
                     </form>
-                    <form method="POST">
+                    <form method="POST"><?= csrf_field() ?>
                       <input type="hidden" name="action"     value="update_booking">
                       <input type="hidden" name="booking_id" value="<?= $bk['id'] ?>">
                       <input type="hidden" name="status"     value="cancelled">
@@ -345,7 +346,7 @@ require_once __DIR__ . '/../includes/header.php';
                     </form>
                   </div>
                   <?php elseif ($bk['status'] === 'confirmed'): ?>
-                  <form method="POST" class="mt-2">
+                  <form method="POST" class="mt-2"><?= csrf_field() ?>
                     <input type="hidden" name="action"     value="update_booking">
                     <input type="hidden" name="booking_id" value="<?= $bk['id'] ?>">
                     <input type="hidden" name="status"     value="checked_in">
@@ -354,7 +355,7 @@ require_once __DIR__ . '/../includes/header.php';
                     </button>
                   </form>
                   <?php elseif ($bk['status'] === 'checked_in'): ?>
-                  <form method="POST" class="mt-2">
+                  <form method="POST" class="mt-2"><?= csrf_field() ?>
                     <input type="hidden" name="action"     value="update_booking">
                     <input type="hidden" name="booking_id" value="<?= $bk['id'] ?>">
                     <input type="hidden" name="status"     value="checked_out">
@@ -382,7 +383,7 @@ require_once __DIR__ . '/../includes/header.php';
             <h6 class="fw-bold mb-3" style="color:var(--green-dark);font-family:'Playfair Display',serif">
               <i class="bi bi-plus-circle me-2" style="color:#8e2434"></i>Add Room Type
             </h6>
-            <form method="POST">
+            <form method="POST"><?= csrf_field() ?>
               <input type="hidden" name="action" value="add_room">
               <div class="mb-3">
                 <label class="form-label">Room Type Name <span class="text-danger">*</span></label>
@@ -447,7 +448,7 @@ require_once __DIR__ . '/../includes/header.php';
               </div>
               <div class="d-flex gap-2 flex-shrink-0">
                 <!-- Toggle availability -->
-                <form method="POST">
+                <form method="POST"><?= csrf_field() ?>
                   <input type="hidden" name="action"   value="toggle_room">
                   <input type="hidden" name="room_id"  value="<?= $r['id'] ?>">
                   <button class="btn btn-sm <?= $r['is_available'] ? 'btn-outline-secondary' : 'btn-outline-success' ?>"
@@ -457,7 +458,7 @@ require_once __DIR__ . '/../includes/header.php';
                   </button>
                 </form>
                 <!-- Delete -->
-                <form method="POST" onsubmit="return confirm('Delete this room type?')">
+                <form method="POST" onsubmit="return confirm('Delete this room type?')"><?= csrf_field() ?>
                   <input type="hidden" name="action"  value="delete_room">
                   <input type="hidden" name="room_id" value="<?= $r['id'] ?>">
                   <button class="btn btn-sm btn-outline-danger"
@@ -482,7 +483,7 @@ require_once __DIR__ . '/../includes/header.php';
             <h6 class="fw-bold mb-3" style="color:var(--green-dark);font-family:'Playfair Display',serif">
               <i class="bi bi-pencil-square me-2"></i>Edit Hotel Info
             </h6>
-            <form method="POST" enctype="multipart/form-data">
+            <form method="POST" enctype="multipart/form-data"><?= csrf_field() ?>
               <input type="hidden" name="action" value="update_hotel">
 
               <div class="mb-3">

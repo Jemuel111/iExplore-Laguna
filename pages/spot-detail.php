@@ -46,7 +46,7 @@ $amenities = db_fetch_all(
 
 // Load reviews (first page)
 $reviews = db_fetch_all(
-    "SELECT r.rating, r.title, r.body, r.visited_on, r.created_at,
+    "SELECT r.id, r.user_id, r.rating, r.title, r.body, r.visited_on, r.created_at,
             u.name AS user_name
      FROM spot_reviews r
      JOIN users u ON r.user_id = u.id
@@ -54,6 +54,12 @@ $reviews = db_fetch_all(
      ORDER BY r.created_at DESC LIMIT 5",
     [$spot_id]
 );
+ensure_review_photos_table();
+$my_user_id = (int) (current_user()['id'] ?? 0);
+$my_existing_review = $my_user_id
+    ? db_fetch_one("SELECT id FROM spot_reviews WHERE spot_id = ? AND user_id = ?", [$spot_id, $my_user_id])
+    : null;
+$reviews = attach_review_photos($reviews, 'spot');
 $review_stats = db_fetch_one(
     "SELECT COUNT(*) AS total, AVG(rating) AS avg_rating
      FROM spot_reviews WHERE spot_id = ? AND is_approved = 1",
@@ -310,10 +316,12 @@ foreach ($photos as $idx => $p) {
             </span>
           <?php endif; ?>
         </h4>
-        <?php if (is_logged_in()): ?>
+        <?php if (is_logged_in() && !$my_existing_review): ?>
         <button class="btn btn-sm btn-primary-app" id="write-review-btn">
           <i class="bi bi-pencil me-1"></i>Write a Review
         </button>
+        <?php elseif (is_logged_in()): ?>
+        <span class="small text-muted"><i class="bi bi-check-circle me-1"></i>You've reviewed this spot — edit it below</span>
         <?php else: ?>
         <a href="<?= APP_URL ?>/pages/login.php" class="btn btn-sm btn-outline-app">
           <i class="bi bi-person me-1"></i>Log in to Review
@@ -377,6 +385,13 @@ foreach ($photos as $idx => $p) {
                  max="<?= date('Y-m-d') ?>">
         </div>
 
+        <div class="mb-3">
+          <label class="form-label">Add Photos <span class="text-muted">(optional, up to 3)</span></label>
+          <input type="file" class="form-control" id="review-photos" accept="image/jpeg,image/png,image/webp" multiple>
+          <div class="form-text">JPG, PNG, or WEBP — max 3MB each.</div>
+          <div id="review-photo-preview" class="d-flex flex-wrap gap-2 mt-2"></div>
+        </div>
+
         <div class="d-flex gap-2">
           <button class="btn btn-primary-app" id="submit-review-btn">
             <i class="bi bi-send me-1"></i>Submit Review
@@ -395,7 +410,7 @@ foreach ($photos as $idx => $p) {
           </div>
         <?php else: ?>
           <?php foreach ($reviews as $rv): ?>
-          <div class="review-card">
+          <div class="review-card" data-review-id="<?= $rv['id'] ?>">
             <div class="d-flex align-items-start gap-3 mb-2">
               <div class="review-avatar">
                 <?= strtoupper(substr($rv['user_name'], 0, 1)) ?>
@@ -419,10 +434,33 @@ foreach ($photos as $idx => $p) {
               </div>
             </div>
             <?php if ($rv['title']): ?>
-              <div class="fw-bold small mb-1"><?= e($rv['title']) ?></div>
+              <div class="fw-bold small mb-1" data-field="title"><?= e($rv['title']) ?></div>
             <?php endif; ?>
             <?php if ($rv['body']): ?>
-              <p class="mb-0 small" style="color:var(--charcoal);line-height:1.6"><?= nl2br(e($rv['body'])) ?></p>
+              <p class="mb-0 small" style="color:var(--charcoal);line-height:1.6" data-field="body"><?= nl2br(e($rv['body'])) ?></p>
+            <?php endif; ?>
+            <?php if (!empty($rv['photos'])): ?>
+              <div class="d-flex flex-wrap gap-2 mt-2">
+                <?php foreach ($rv['photos'] as $purl): ?>
+                <a href="<?= e($purl) ?>" target="_blank" rel="noopener">
+                  <img src="<?= e($purl) ?>" alt="Review photo" style="width:70px;height:70px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
+                </a>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
+            <?php if ((int)$rv['user_id'] === $my_user_id && $my_user_id): ?>
+            <div class="d-flex gap-3 mt-2">
+              <button class="btn btn-link btn-sm p-0 review-edit-btn" style="color:var(--green-mid);text-decoration:none;font-size:.8rem"
+                      data-review-id="<?= $rv['id'] ?>" data-rating="<?= $rv['rating'] ?>"
+                      data-title="<?= e($rv['title'] ?? '') ?>" data-body="<?= e($rv['body'] ?? '') ?>"
+                      data-visited="<?= e($rv['visited_on'] ?? '') ?>">
+                <i class="bi bi-pencil me-1"></i>Edit
+              </button>
+              <button class="btn btn-link btn-sm p-0 review-delete-btn" style="color:#c0392b;text-decoration:none;font-size:.8rem"
+                      data-review-id="<?= $rv['id'] ?>">
+                <i class="bi bi-trash me-1"></i>Delete
+              </button>
+            </div>
             <?php endif; ?>
           </div>
           <?php endforeach; ?>
@@ -625,6 +663,48 @@ setTimeout(() => miniMap.invalidateSize(), 200);
 const writeBtn  = document.getElementById('write-review-btn');
 const cancelBtn = document.getElementById('cancel-review-btn');
 const formWrap  = document.getElementById('review-form-wrap');
+let editingReviewId = null; // null = creating a new review; set = editing that review
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str ?? '';
+  return d.innerHTML;
+}
+
+function resetReviewForm() {
+  editingReviewId = null;
+  pickedRating = 0;
+  document.getElementById('review-rating').value = 0;
+  document.getElementById('review-title').value = '';
+  document.getElementById('review-body').value = '';
+  document.getElementById('review-visited').value = '';
+  document.getElementById('review-photos').value = '';
+  document.getElementById('review-photo-preview').innerHTML = '';
+  document.querySelectorAll('.star-pick').forEach((s, i) => {
+    s.className = 'bi star-pick bi-star';
+    s.style.color = '#ccc';
+  });
+  document.getElementById('submit-review-btn').innerHTML = '<i class="bi bi-send me-1"></i>Submit Review';
+  document.querySelector('#review-form-wrap h6').textContent = 'Share Your Experience';
+}
+
+const reviewPhotosInput = document.getElementById('review-photos');
+if (reviewPhotosInput) {
+  reviewPhotosInput.addEventListener('change', () => {
+    const preview = document.getElementById('review-photo-preview');
+    preview.innerHTML = '';
+    const files = Array.from(reviewPhotosInput.files).slice(0, 3);
+    files.forEach(file => {
+      const chip = document.createElement('span');
+      chip.style.cssText = 'font-size:.75rem;background:var(--green-pale);color:var(--green-dark);padding:.25rem .6rem;border-radius:20px';
+      chip.innerHTML = '<i class="bi bi-image me-1"></i>' + escapeHtml(file.name);
+      preview.appendChild(chip);
+    });
+    if (reviewPhotosInput.files.length > 3) {
+      IExploreApp.toast('Only the first 3 photos will be uploaded.', 'warning');
+    }
+  });
+}
 
 if (writeBtn) {
   writeBtn.addEventListener('click', () => {
@@ -635,7 +715,10 @@ if (writeBtn) {
   });
 }
 if (cancelBtn) {
-  cancelBtn.addEventListener('click', () => formWrap.classList.add('d-none'));
+  cancelBtn.addEventListener('click', () => {
+    formWrap.classList.add('d-none');
+    resetReviewForm();
+  });
 }
 
 // ── Star picker ─────────────────────────────────────────────
@@ -660,30 +743,86 @@ document.querySelectorAll('.star-pick').forEach(star => {
   });
 });
 
-// ── Submit review ───────────────────────────────────────────
+// ── Edit an existing review (event delegation — works for
+//    cards rendered by PHP and ones added via "Load More") ──
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.review-edit-btn');
+  if (!btn) return;
+
+  editingReviewId = btn.dataset.reviewId;
+  pickedRating = +btn.dataset.rating;
+  document.getElementById('review-rating').value = pickedRating;
+  document.querySelectorAll('.star-pick').forEach((s, i) => {
+    s.className = 'bi star-pick ' + (i < pickedRating ? 'bi-star-fill' : 'bi-star');
+    s.style.color = i < pickedRating ? 'var(--sand-dark)' : '#ccc';
+  });
+  document.getElementById('review-title').value   = btn.dataset.title || '';
+  document.getElementById('review-body').value    = btn.dataset.body  || '';
+  document.getElementById('review-visited').value = btn.dataset.visited || '';
+  document.getElementById('submit-review-btn').innerHTML = '<i class="bi bi-check2 me-1"></i>Update Review';
+  document.querySelector('#review-form-wrap h6').textContent = 'Edit Your Review';
+
+  formWrap.classList.remove('d-none');
+  formWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+// ── Delete a review ───────────────────────────────────────────
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.review-delete-btn');
+  if (!btn) return;
+  if (!confirm('Delete your review? This cannot be undone.')) return;
+
+  const res = await fetch(API_BASE + 'spots.php?action=delete_review', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ review_id: btn.dataset.reviewId })
+  }).then(r => r.json()).catch(() => null);
+
+  if (res && res.success) {
+    IExploreApp.toast('Review deleted.', 'success');
+    setTimeout(() => location.reload(), 900);
+  } else {
+    IExploreApp.toast((res && res.message) || 'Could not delete review.', 'error');
+  }
+});
+
+// ── Submit review (create or update) ─────────────────────────
 const submitBtn = document.getElementById('submit-review-btn');
 if (submitBtn) {
   submitBtn.addEventListener('click', async () => {
     const rating = +document.getElementById('review-rating').value;
     if (!rating) { IExploreApp.toast('Please select a star rating.', 'warning'); return; }
 
+    const isEditing = !!editingReviewId;
+    const endpoint  = isEditing ? 'update_review' : 'review';
+
+    const fd = new FormData();
+    fd.append('rating', rating);
+    fd.append('title', document.getElementById('review-title').value.trim());
+    fd.append('body', document.getElementById('review-body').value.trim());
+    fd.append('visited_on', document.getElementById('review-visited').value);
+    if (isEditing) fd.append('review_id', editingReviewId);
+    else fd.append('spot_id', SPOT_ID);
+
+    const photoFiles = document.getElementById('review-photos').files;
+    for (let i = 0; i < Math.min(photoFiles.length, 3); i++) {
+      fd.append('photos[]', photoFiles[i]);
+    }
+
     IExploreApp.setLoading(submitBtn, true);
-    const res = await fetch(API_BASE + 'spots.php?action=review', {
+    const res = await fetch(API_BASE + `spots.php?action=${endpoint}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        spot_id:    SPOT_ID,
-        rating,
-        title:      document.getElementById('review-title').value.trim(),
-        body:       document.getElementById('review-body').value.trim(),
-        visited_on: document.getElementById('review-visited').value,
-      })
+      body: fd
     }).then(r => r.json());
     IExploreApp.setLoading(submitBtn, false);
 
     if (res.success) {
-      IExploreApp.toast('Review submitted! Thank you.', 'success');
+      IExploreApp.toast(res.message || (isEditing ? 'Review updated!' : 'Review submitted! Thank you.'), 'success');
+      if (res.data && res.data.photo_errors && res.data.photo_errors.length) {
+        IExploreApp.toast('Some photos couldn\'t be uploaded: ' + res.data.photo_errors.join('; '), 'warning');
+      }
       formWrap.classList.add('d-none');
+      resetReviewForm();
       setTimeout(() => location.reload(), 1200);
     } else {
       IExploreApp.toast(res.message || 'Could not submit review.', 'error');
@@ -702,26 +841,49 @@ if (loadMoreBtn) {
 
     if (res.success) {
       const list = document.getElementById('reviews-list');
+      const myUserId = res.data.my_user_id || 0;
       res.data.reviews.forEach(rv => {
         const stars = Array.from({length:5}, (_,i) =>
           `<i class="bi ${i < rv.rating ? 'bi-star-fill' : 'bi-star'}"
               style="color:${i < rv.rating ? 'var(--sand-dark)' : '#ddd'}"></i>`
         ).join('');
+        const isMine = myUserId && rv.user_id === myUserId;
         const div = document.createElement('div');
         div.className = 'review-card';
+        div.dataset.reviewId = rv.id;
         div.innerHTML = `
           <div class="d-flex align-items-start gap-3 mb-2">
-            <div class="review-avatar">${rv.user_name.charAt(0).toUpperCase()}</div>
+            <div class="review-avatar">${escapeHtml(rv.user_name.charAt(0).toUpperCase())}</div>
             <div class="flex-grow-1">
-              <div class="fw-bold small">${rv.user_name}</div>
+              <div class="fw-bold small">${escapeHtml(rv.user_name)}</div>
               <div class="d-flex align-items-center gap-2" style="font-size:.8rem;color:var(--text-muted)">
                 <span>${stars}</span>
                 ${rv.visited_on ? `<span>· Visited ${new Date(rv.visited_on).toLocaleDateString('en-US',{month:'short',year:'numeric'})}</span>` : ''}
               </div>
             </div>
           </div>
-          ${rv.title ? `<div class="fw-bold small mb-1">${rv.title}</div>` : ''}
-          ${rv.body  ? `<p class="mb-0 small" style="color:var(--charcoal);line-height:1.6">${rv.body}</p>` : ''}
+          ${rv.title ? `<div class="fw-bold small mb-1">${escapeHtml(rv.title)}</div>` : ''}
+          ${rv.body  ? `<p class="mb-0 small" style="color:var(--charcoal);line-height:1.6">${escapeHtml(rv.body)}</p>` : ''}
+          ${(rv.photos && rv.photos.length) ? `
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            ${rv.photos.map(p => `
+              <a href="${p}" target="_blank" rel="noopener">
+                <img src="${p}" alt="Review photo" style="width:70px;height:70px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
+              </a>`).join('')}
+          </div>` : ''}
+          ${isMine ? `
+          <div class="d-flex gap-3 mt-2">
+            <button class="btn btn-link btn-sm p-0 review-edit-btn" style="color:var(--green-mid);text-decoration:none;font-size:.8rem"
+                    data-review-id="${rv.id}" data-rating="${rv.rating}"
+                    data-title="${escapeHtml(rv.title || '')}" data-body="${escapeHtml(rv.body || '')}"
+                    data-visited="${rv.stayed_on || rv.visited_on || ''}">
+              <i class="bi bi-pencil me-1"></i>Edit
+            </button>
+            <button class="btn btn-link btn-sm p-0 review-delete-btn" style="color:#c0392b;text-decoration:none;font-size:.8rem"
+                    data-review-id="${rv.id}">
+              <i class="bi bi-trash me-1"></i>Delete
+            </button>
+          </div>` : ''}
         `;
         list.insertBefore(div, loadMoreBtn.parentElement);
       });

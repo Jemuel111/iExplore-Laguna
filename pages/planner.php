@@ -173,25 +173,8 @@ $transport_labels = [
   <div class="col-lg-4 col-xl-4">
 
     <!-- Map -->
-    <div class="position-relative mb-3" id="map-wrapper">
+    <div class="position-relative mb-2" id="map-wrapper">
       <div id="trip-map"></div>
-
-      <!-- Map legend -->
-      <div class="position-absolute bottom-0 start-0 m-2 p-2 bg-white rounded shadow-sm"
-           style="font-size:.75rem;z-index:999;border:1px solid var(--border)">
-        <div class="d-flex align-items-center gap-2 mb-1">
-          <span style="width:14px;height:14px;background:#a61c1c;border-radius:50%;display:inline-block"></span>
-          <span>Start / End</span>
-        </div>
-        <div class="d-flex align-items-center gap-2 mb-1">
-          <span style="width:14px;height:14px;background:var(--terracotta);border-radius:50%;display:inline-block"></span>
-          <span>Tourist Spot</span>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-          <span style="width:18px;height:3px;background:#a61c1c;display:inline-block;border-radius:2px"></span>
-          <span>Road Route (OSRM)</span>
-        </div>
-      </div>
 
       <!-- Map spot count badge (top-right) -->
       <div id="map-spots-badge" class="position-absolute top-0 end-0 m-2 d-none"
@@ -246,6 +229,23 @@ $transport_labels = [
           <div class="spinner-app mb-2" style="width:2rem;height:2rem;border-width:3px"></div>
           <div class="small text-muted">Calculating road route…</div>
         </div>
+      </div>
+    </div>
+
+    <!-- Map legend — a plain caption strip under the map, not floating on top of it -->
+    <div class="d-flex align-items-center justify-content-center flex-wrap gap-3 mb-3"
+         style="font-size:.75rem;color:var(--text-muted);padding:.4rem 0">
+      <div class="d-flex align-items-center gap-2">
+        <span style="width:12px;height:12px;background:#a61c1c;border-radius:50%;display:inline-block;flex-shrink:0"></span>
+        <span>Start / End</span>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <span style="width:12px;height:12px;background:var(--terracotta);border-radius:50%;display:inline-block;flex-shrink:0"></span>
+        <span>Tourist Spot</span>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <span style="width:16px;height:3px;background:#a61c1c;display:inline-block;border-radius:2px;flex-shrink:0"></span>
+        <span>Road Route (OSRM)</span>
       </div>
     </div>
 

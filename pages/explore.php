@@ -729,6 +729,14 @@ function saveCart() {
   localStorage.setItem('iexplore_cart', JSON.stringify(cart));
 }
 
+function clearCart() {
+  if (cart.length === 0) return;
+  if (!confirm('Remove all ' + cart.length + ' item' + (cart.length !== 1 ? 's' : '') + ' from your list?')) return;
+  cart = [];
+  saveCart();
+  restoreCartUI();
+}
+
 function restoreCartUI() {
   // Update card states
   document.querySelectorAll('.explore-card').forEach(card => {

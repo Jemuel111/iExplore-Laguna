@@ -1,6 +1,7 @@
 <?php
 ob_start();
 require_once __DIR__ . '/../includes/helpers.php';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') { csrf_verify(); }
 // ============================================================
 // iEXPLORE LAGUNA — Admin: Manage Tourist Spots
 // pages/admin-spots.php
@@ -219,7 +220,7 @@ require_once __DIR__ . '/../includes/header.php';
       <div class="alert alert-danger small"><ul class="mb-0 ps-3"><?php foreach ($errors as $err): ?><li><?= e($err) ?></li><?php endforeach; ?></ul></div>
       <?php endif; ?>
 
-      <form method="POST">
+      <form method="POST"><?= csrf_field() ?>
         <input type="hidden" name="action" value="save_spot">
         <input type="hidden" name="spot_id" value="<?= $editing_spot['id'] ?? '' ?>">
 
@@ -402,12 +403,12 @@ require_once __DIR__ . '/../includes/header.php';
           <a href="?id=<?= $sp['id'] ?>" class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;padding:.25rem .6rem" title="Edit">
             <i class="bi bi-pencil"></i>
           </a>
-          <form method="POST"><input type="hidden" name="action" value="toggle_spot"><input type="hidden" name="spot_id" value="<?= $sp['id'] ?>">
+          <form method="POST"><?= csrf_field() ?><input type="hidden" name="action" value="toggle_spot"><input type="hidden" name="spot_id" value="<?= $sp['id'] ?>">
             <button class="btn btn-sm <?= $sp['is_active']?'btn-outline-secondary':'btn-outline-success' ?>" style="font-size:.72rem;padding:.25rem .6rem" title="<?= $sp['is_active']?'Hide':'Show' ?>">
               <?= $sp['is_active']?'🙈':'👁️' ?>
             </button>
           </form>
-          <form method="POST" onsubmit="return confirm('Delete this spot permanently? This also removes its photos and reviews.')">
+          <form method="POST" onsubmit="return confirm('Delete this spot permanently? This also removes its photos and reviews.')"><?= csrf_field() ?>
             <input type="hidden" name="action" value="delete_spot"><input type="hidden" name="spot_id" value="<?= $sp['id'] ?>">
             <button class="btn btn-sm btn-outline-danger" style="font-size:.72rem;padding:.25rem .6rem"><i class="bi bi-trash"></i></button>
           </form>

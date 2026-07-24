@@ -1,6 +1,7 @@
 <?php
 ob_start();
 require_once __DIR__ . '/../includes/helpers.php';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') { csrf_verify(); }
 // ============================================================
 // iEXPLORE LAGUNA — Admin: Manage Trip Packages
 // pages/admin-packages.php
@@ -166,7 +167,7 @@ require_once __DIR__ . '/../includes/header.php';
         <p class="text-muted small mb-3">
           "<?= e($editing_package['title']) ?>" · <?= $editing_package['days'] ?> day<?= $editing_package['days']!=1?'s':'' ?>
         </p>
-        <form method="POST">
+        <form method="POST"><?= csrf_field() ?>
           <input type="hidden" name="action" value="save_spots">
           <input type="hidden" name="package_id" value="<?= $edit_id ?>">
           <div style="max-height:520px;overflow-y:auto" class="mb-3">
@@ -200,7 +201,7 @@ require_once __DIR__ . '/../includes/header.php';
         <?php if ($errors): ?>
         <div class="alert alert-danger small"><ul class="mb-0 ps-3"><?php foreach ($errors as $err): ?><li><?= e($err) ?></li><?php endforeach; ?></ul></div>
         <?php endif; ?>
-        <form method="POST">
+        <form method="POST"><?= csrf_field() ?>
           <input type="hidden" name="action" value="create_package">
           <div class="mb-3">
             <label class="form-label">Package Title <span class="text-danger">*</span></label>
@@ -291,12 +292,12 @@ require_once __DIR__ . '/../includes/header.php';
           <a href="?step=2&id=<?= $p['id'] ?>" class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;padding:.25rem .6rem" title="Edit spots">
             <i class="bi bi-pencil"></i>
           </a>
-          <form method="POST"><input type="hidden" name="action" value="toggle_package"><input type="hidden" name="package_id" value="<?= $p['id'] ?>">
+          <form method="POST"><?= csrf_field() ?><input type="hidden" name="action" value="toggle_package"><input type="hidden" name="package_id" value="<?= $p['id'] ?>">
             <button class="btn btn-sm <?= $p['is_active']?'btn-outline-secondary':'btn-outline-success' ?>" style="font-size:.72rem;padding:.25rem .6rem">
               <?= $p['is_active']?'🙈':'👁️' ?>
             </button>
           </form>
-          <form method="POST" onsubmit="return confirm('Delete this package permanently?')">
+          <form method="POST" onsubmit="return confirm('Delete this package permanently?')"><?= csrf_field() ?>
             <input type="hidden" name="action" value="delete_package"><input type="hidden" name="package_id" value="<?= $p['id'] ?>">
             <button class="btn btn-sm btn-outline-danger" style="font-size:.72rem;padding:.25rem .6rem"><i class="bi bi-trash"></i></button>
           </form>

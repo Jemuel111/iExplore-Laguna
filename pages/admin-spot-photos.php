@@ -1,6 +1,7 @@
 <?php
 ob_start();
 require_once __DIR__ . '/../includes/helpers.php';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') { csrf_verify(); }
 // ============================================================
 // iEXPLORE LAGUNA — Admin: Manage Spot Photos
 // pages/admin-spot-photos.php
@@ -163,7 +164,7 @@ require_once __DIR__ . '/../includes/header.php';
       <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
         <i class="bi bi-cloud-upload me-2"></i>Upload Photos
       </h6>
-      <form method="POST" enctype="multipart/form-data">
+      <form method="POST" enctype="multipart/form-data"><?= csrf_field() ?>
         <input type="hidden" name="action" value="upload_photos">
         <input type="hidden" name="spot_id" value="<?= $selected_spot['id'] ?>">
         <div class="mb-3">
@@ -221,14 +222,14 @@ require_once __DIR__ . '/../includes/header.php';
               <div class="small text-muted mb-2 text-capitalize"><?= e($ph['photo_type']) ?></div>
               <div class="d-flex gap-1">
                 <?php if ($ph['photo_type'] !== 'main'): ?>
-                <form method="POST" class="flex-grow-1">
+                <form method="POST" class="flex-grow-1"><?= csrf_field() ?>
                   <input type="hidden" name="action" value="set_main">
                   <input type="hidden" name="photo_id" value="<?= $ph['id'] ?>">
                   <input type="hidden" name="spot_id" value="<?= $selected_spot['id'] ?>">
                   <button class="btn btn-sm btn-outline-secondary w-100" style="font-size:.72rem">⭐ Set Main</button>
                 </form>
                 <?php endif; ?>
-                <form method="POST" onsubmit="return confirm('Delete this photo?')">
+                <form method="POST" onsubmit="return confirm('Delete this photo?')"><?= csrf_field() ?>
                   <input type="hidden" name="action" value="delete_photo">
                   <input type="hidden" name="photo_id" value="<?= $ph['id'] ?>">
                   <input type="hidden" name="spot_id" value="<?= $selected_spot['id'] ?>">

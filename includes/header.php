@@ -7,6 +7,7 @@
 // ============================================================
 require_once __DIR__ . '/helpers.php';
 session_start_safe();
+send_security_headers();
 
 $page_title  = $page_title  ?? APP_NAME;
 $active_page = $active_page ?? '';

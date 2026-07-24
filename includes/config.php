@@ -23,12 +23,36 @@ define('BCRYPT_COST', 12);
 date_default_timezone_set('Asia/Manila');
 
 // ── Error display (set false in production) ───────────────────
-define('DEBUG_MODE', true);
+define('DEBUG_MODE', false);
 
 if (DEBUG_MODE) {
     ini_set('display_errors', 1);
     error_reporting(E_ALL);
 } else {
+    // Never show raw errors/stack traces to visitors — log them instead
+    // and show a friendly page. (Turning DEBUG_MODE off alone would just
+    // leave a blank white screen on a fatal error, which looks broken
+    // and isn't much better than leaking the trace.)
     ini_set('display_errors', 0);
-    error_reporting(0);
+    error_reporting(E_ALL); // still capture everything into the log
+
+    $logDir = __DIR__ . '/../logs';
+    if (!is_dir($logDir)) { @mkdir($logDir, 0755, true); }
+    ini_set('log_errors', 1);
+    ini_set('error_log', $logDir . '/php-error.log');
+
+    set_exception_handler(function (Throwable $e) {
+        error_log('[Uncaught] ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+        if (!headers_sent()) http_response_code(500);
+        require __DIR__ . '/error-page.php';
+        exit;
+    });
+
+    register_shutdown_function(function () {
+        $err = error_get_last();
+        if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+            if (!headers_sent()) http_response_code(500);
+            require __DIR__ . '/error-page.php';
+        }
+    });
 }

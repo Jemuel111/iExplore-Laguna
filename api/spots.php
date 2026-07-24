@@ -11,6 +11,7 @@
 // ============================================================
 require_once __DIR__ . '/../includes/helpers.php';
 set_api_headers();
+ensure_review_photos_table();
 
 $action  = input('action', 'get', 'detail');
 $spot_id = (int) input('id', 'get', 0);
@@ -86,7 +87,7 @@ switch ($action) {
         $offset   = ($page - 1) * $per_page;
 
         $reviews = db_fetch_all(
-            "SELECT r.id, r.rating, r.title, r.body, r.visited_on, r.created_at,
+            "SELECT r.id, r.user_id, r.rating, r.title, r.body, r.visited_on, r.created_at,
                     u.name AS user_name
              FROM spot_reviews r
              JOIN users u ON r.user_id = u.id
@@ -101,12 +102,16 @@ switch ($action) {
             [$spot_id]
         )['cnt'] ?? 0;
 
+        $reviews = attach_review_photos($reviews, 'spot');
+
+        session_start_safe();
         json_ok([
             'reviews'    => $reviews,
             'total'      => (int) $total,
             'page'       => $page,
             'per_page'   => $per_page,
             'has_more'   => ($offset + $per_page) < $total,
+            'my_user_id' => (int) (current_user()['id'] ?? 0),
         ]);
         break;
 
@@ -147,12 +152,11 @@ switch ($action) {
             json_error('You must be logged in to submit a review.', 401);
         }
 
-        $data    = json_decode(file_get_contents('php://input'), true);
-        $sid     = (int)    ($data['spot_id']    ?? 0);
-        $rating  = (int)    ($data['rating']     ?? 0);
-        $title   = trim(    ($data['title']      ?? ''));
-        $body    = trim(    ($data['body']        ?? ''));
-        $visited = trim(    ($data['visited_on']  ?? ''));
+        $sid     = (int)   input('spot_id',    'post', 0);
+        $rating  = (int)   input('rating',     'post', 0);
+        $title   = trim((string) input('title',      'post', ''));
+        $body    = trim((string) input('body',       'post', ''));
+        $visited = trim((string) input('visited_on', 'post', ''));
         $user_id = (int) (current_user()['id'] ?? 0);
 
         if (!$sid || $rating < 1 || $rating > 5) {
@@ -181,6 +185,7 @@ switch ($action) {
             [$sid, $user_id, $rating, $title ?: null, $body ?: null,
              ($visited ?: null)]
         );
+        $newReviewId = (int) db_last_id();
 
         // Update tourist_spots average rating
         db_execute(
@@ -190,12 +195,104 @@ switch ($action) {
             [$sid, $sid]
         );
 
+        $photoErrors = save_review_photos('spot', $newReviewId);
+
         json_ok(
-            ['was_censored' => $wasCensored],
+            ['was_censored' => $wasCensored, 'photo_errors' => $photoErrors],
             $wasCensored
                 ? 'Review submitted! Some words were censored for inappropriate language.'
                 : 'Review submitted successfully!'
         );
+        break;
+
+    // ── Update your own review (POST, auth required) ──────
+    case 'update_review':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            json_error('POST method required.', 405);
+        }
+
+        session_start_safe();
+        if (!is_logged_in()) {
+            json_error('You must be logged in to edit a review.', 401);
+        }
+
+        $reviewId = (int)   input('review_id',   'post', 0);
+        $rating   = (int)   input('rating',      'post', 0);
+        $title    = trim((string) input('title',      'post', ''));
+        $body     = trim((string) input('body',       'post', ''));
+        $visited  = trim((string) input('visited_on', 'post', ''));
+        $user_id  = (int) (current_user()['id'] ?? 0);
+
+        if (!$reviewId || $rating < 1 || $rating > 5) {
+            json_error('Invalid review ID or rating (1–5 required).', 400);
+        }
+
+        $existing = db_fetch_one("SELECT * FROM spot_reviews WHERE id = ?", [$reviewId]);
+        if (!$existing) json_error('Review not found.', 404);
+        if ((int)$existing['user_id'] !== $user_id) {
+            json_error('You can only edit your own review.', 403);
+        }
+
+        $titleCensor = censor_profanity($title);
+        $bodyCensor  = censor_profanity($body);
+        $title = $titleCensor['text'];
+        $body  = $bodyCensor['text'];
+        $wasCensored = $titleCensor['was_censored'] || $bodyCensor['was_censored'];
+
+        db_execute(
+            "UPDATE spot_reviews SET rating=?, title=?, body=?, visited_on=? WHERE id=? AND user_id=?",
+            [$rating, $title ?: null, $body ?: null, ($visited ?: null), $reviewId, $user_id]
+        );
+
+        db_execute(
+            "UPDATE tourist_spots
+             SET rating = (SELECT AVG(rating) FROM spot_reviews WHERE spot_id = ? AND is_approved = 1)
+             WHERE id = ?",
+            [$existing['spot_id'], $existing['spot_id']]
+        );
+
+        $photoErrors = save_review_photos('spot', $reviewId);
+
+        json_ok(
+            ['was_censored' => $wasCensored, 'photo_errors' => $photoErrors],
+            $wasCensored
+                ? 'Review updated! Some words were censored for inappropriate language.'
+                : 'Review updated successfully!'
+        );
+        break;
+
+    // ── Delete your own review (POST, auth required) ──────
+    case 'delete_review':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            json_error('POST method required.', 405);
+        }
+
+        session_start_safe();
+        if (!is_logged_in()) {
+            json_error('You must be logged in to delete a review.', 401);
+        }
+
+        $data     = json_decode(file_get_contents('php://input'), true);
+        $reviewId = (int) ($data['review_id'] ?? 0);
+        $user_id  = (int) (current_user()['id'] ?? 0);
+
+        $existing = db_fetch_one("SELECT * FROM spot_reviews WHERE id = ?", [$reviewId]);
+        if (!$existing) json_error('Review not found.', 404);
+        if ((int)$existing['user_id'] !== $user_id) {
+            json_error('You can only delete your own review.', 403);
+        }
+
+        db_execute("DELETE FROM spot_reviews WHERE id=? AND user_id=?", [$reviewId, $user_id]);
+        db_execute("DELETE FROM review_photos WHERE review_type='spot' AND review_id=?", [$reviewId]);
+
+        db_execute(
+            "UPDATE tourist_spots
+             SET rating = COALESCE((SELECT AVG(rating) FROM spot_reviews WHERE spot_id = ? AND is_approved = 1), 4.00)
+             WHERE id = ?",
+            [$existing['spot_id'], $existing['spot_id']]
+        );
+
+        json_ok(null, 'Review deleted.');
         break;
 
     default:

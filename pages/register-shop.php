@@ -1,6 +1,7 @@
 <?php
 ob_start();
 require_once __DIR__ . '/../includes/helpers.php';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') { csrf_verify(); }
 session_start_safe();
 // ============================================================
 // iEXPLORE LAGUNA — Shop Owner Registration
@@ -162,7 +163,7 @@ $categories = [
 
           <!-- ── STEP 1: Account form ── -->
           <?php if ($step === 1): ?>
-          <form method="POST" action="?step=1" novalidate>
+          <form method="POST" action="?step=1" novalidate><?= csrf_field() ?>
             <div class="mb-3">
               <label class="form-label">Full Name</label>
               <div class="input-icon-wrap">
@@ -213,7 +214,7 @@ $categories = [
 
           <!-- ── STEP 2: Shop profile form ── -->
           <?php else: ?>
-          <form method="POST" action="?step=2" novalidate>
+          <form method="POST" action="?step=2" novalidate><?= csrf_field() ?>
             <div class="mb-3">
               <label class="form-label fw-600">Shop Name <span class="text-danger">*</span></label>
               <div class="input-icon-wrap">

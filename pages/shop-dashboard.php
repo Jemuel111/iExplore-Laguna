@@ -1,6 +1,7 @@
 <?php
 ob_start();
 require_once __DIR__ . '/../includes/helpers.php';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') { csrf_verify(); }
 // ============================================================
 // iEXPLORE LAGUNA — Shop Owner Dashboard
 // pages/shop-dashboard.php
@@ -341,7 +342,7 @@ require_once __DIR__ . '/../includes/header.php';
                   <!-- Status update buttons -->
                   <?php if ($ord['status'] === 'pending'): ?>
                   <div class="d-flex gap-2 mt-2">
-                    <form method="POST">
+                    <form method="POST"><?= csrf_field() ?>
                       <input type="hidden" name="action"   value="update_order">
                       <input type="hidden" name="order_id" value="<?= $ord['id'] ?>">
                       <input type="hidden" name="status"   value="confirmed">
@@ -349,7 +350,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <i class="bi bi-check me-1"></i>Accept
                       </button>
                     </form>
-                    <form method="POST">
+                    <form method="POST"><?= csrf_field() ?>
                       <input type="hidden" name="action"   value="update_order">
                       <input type="hidden" name="order_id" value="<?= $ord['id'] ?>">
                       <input type="hidden" name="status"   value="cancelled">
@@ -359,7 +360,7 @@ require_once __DIR__ . '/../includes/header.php';
                     </form>
                   </div>
                   <?php elseif ($ord['status'] === 'confirmed'): ?>
-                  <form method="POST" class="mt-2">
+                  <form method="POST" class="mt-2"><?= csrf_field() ?>
                     <input type="hidden" name="action"   value="update_order">
                     <input type="hidden" name="order_id" value="<?= $ord['id'] ?>">
                     <input type="hidden" name="status"   value="preparing">
@@ -368,7 +369,7 @@ require_once __DIR__ . '/../includes/header.php';
                     </button>
                   </form>
                   <?php elseif ($ord['status'] === 'preparing'): ?>
-                  <form method="POST" class="mt-2">
+                  <form method="POST" class="mt-2"><?= csrf_field() ?>
                     <input type="hidden" name="action"   value="update_order">
                     <input type="hidden" name="order_id" value="<?= $ord['id'] ?>">
                     <input type="hidden" name="status"   value="ready">
@@ -377,7 +378,7 @@ require_once __DIR__ . '/../includes/header.php';
                     </button>
                   </form>
                   <?php elseif ($ord['status'] === 'ready'): ?>
-                  <form method="POST" class="mt-2">
+                  <form method="POST" class="mt-2"><?= csrf_field() ?>
                     <input type="hidden" name="action"   value="update_order">
                     <input type="hidden" name="order_id" value="<?= $ord['id'] ?>">
                     <input type="hidden" name="status"   value="picked_up">
@@ -405,7 +406,7 @@ require_once __DIR__ . '/../includes/header.php';
             <h6 class="fw-bold mb-3" style="color:var(--green-dark);font-family:'Playfair Display',serif">
               <i class="bi bi-plus-circle me-2" style="color:var(--terracotta)"></i>Add New Product
             </h6>
-            <form method="POST">
+            <form method="POST"><?= csrf_field() ?>
               <input type="hidden" name="action" value="add_product">
               <div class="mb-3">
                 <label class="form-label">Product Name <span class="text-danger">*</span></label>
@@ -465,7 +466,7 @@ require_once __DIR__ . '/../includes/header.php';
               </div>
               <div class="d-flex gap-2 flex-shrink-0">
                 <!-- Toggle availability -->
-                <form method="POST">
+                <form method="POST"><?= csrf_field() ?>
                   <input type="hidden" name="action"     value="toggle_product">
                   <input type="hidden" name="product_id" value="<?= $p['id'] ?>">
                   <button class="btn btn-sm <?= $p['is_available'] ? 'btn-outline-secondary' : 'btn-outline-success' ?>"
@@ -475,7 +476,7 @@ require_once __DIR__ . '/../includes/header.php';
                   </button>
                 </form>
                 <!-- Delete -->
-                <form method="POST" onsubmit="return confirm('Delete this product?')">
+                <form method="POST" onsubmit="return confirm('Delete this product?')"><?= csrf_field() ?>
                   <input type="hidden" name="action"     value="delete_product">
                   <input type="hidden" name="product_id" value="<?= $p['id'] ?>">
                   <button class="btn btn-sm btn-outline-danger"
@@ -500,7 +501,7 @@ require_once __DIR__ . '/../includes/header.php';
             <h6 class="fw-bold mb-3" style="color:var(--green-dark);font-family:'Playfair Display',serif">
               <i class="bi bi-pencil-square me-2"></i>Edit Shop Info
             </h6>
-            <form method="POST" enctype="multipart/form-data">
+            <form method="POST" enctype="multipart/form-data"><?= csrf_field() ?>
               <input type="hidden" name="action" value="update_shop">
 
               <div class="mb-3">
