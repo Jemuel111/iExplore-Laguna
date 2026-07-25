@@ -160,7 +160,7 @@ $base_qs = http_build_query(array_filter([
 <!-- Toolbar -->
 <div class="spots-toolbar sticky-top" style="top:56px;z-index:100">
   <div class="container">
-    <div class="d-flex align-items-center gap-2 flex-wrap py-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap py-2 toolbar-scroll-row">
 
       <!-- Star quick filters -->
       <div class="d-flex gap-1 flex-grow-1 flex-wrap">

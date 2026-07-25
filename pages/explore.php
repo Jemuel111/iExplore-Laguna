@@ -81,8 +81,8 @@ $catColors = [
           <p class="mb-0 small opacity-75">Pick spots, hotels &amp; shops, then generate your perfect itinerary</p>
         </div>
       </div>
-      <!-- Cart button (shown on mobile too) -->
-      <button class="btn d-flex align-items-center gap-2" id="open-cart-btn"
+      <!-- Cart button — only needed where the sidebar isn't visible (below lg) -->
+      <button class="btn d-flex align-items-center gap-2 d-lg-none" id="open-cart-btn"
               style="background:var(--sand-dark);color:var(--green-dark);font-weight:700;border-radius:var(--radius-pill);padding:.5rem 1.2rem">
         <i class="bi bi-basket3-fill"></i>
         My List
@@ -98,7 +98,7 @@ $catColors = [
 <!-- Tab + filter toolbar -->
 <div class="spots-toolbar sticky-top" style="top:56px;z-index:100">
   <div class="container">
-    <div class="d-flex align-items-center gap-2 flex-wrap py-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap py-2 toolbar-scroll-row">
 
       <!-- Tab pills -->
       <div class="d-flex gap-1" id="type-tabs">
@@ -118,7 +118,7 @@ $catColors = [
         <?php endforeach; ?>
       </div>
 
-      <div class="ms-auto d-flex gap-2 align-items-center">
+      <div class="ms-auto d-flex gap-2 align-items-center flex-wrap">
         <!-- City filter -->
         <select id="city-filter" class="form-select form-select-sm" style="width:auto;font-size:.8rem">
           <option value="">All Cities</option>
@@ -127,10 +127,10 @@ $catColors = [
           <?php endforeach; ?>
         </select>
         <!-- Search -->
-        <div class="position-relative">
+        <div class="position-relative" style="flex:1 1 120px;min-width:0">
           <i class="bi bi-search position-absolute" style="left:.65rem;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:.8rem;pointer-events:none"></i>
           <input type="text" id="explore-search" class="form-control form-control-sm"
-                 placeholder="Search…" style="padding-left:2rem;width:160px;font-size:.82rem">
+                 placeholder="Search…" style="padding-left:2rem;width:100%;max-width:160px;font-size:.82rem">
         </div>
       </div>
     </div>
@@ -210,7 +210,7 @@ $catColors = [
               </span>
               <button class="btn-add-list" onclick="toggleCart('spot',<?= $spot['id'] ?>,'<?= e(addslashes($spot['name'])) ?>','<?= e($spot['city_name']) ?>',<?= (float)$spot['entrance_fee'] ?>,'spot')"
                       data-key="spot-<?= $spot['id'] ?>">
-                <i class="bi bi-plus-lg me-1"></i>Add
+                <i class="bi bi-plus-lg me-1"></i><span class="btn-add-label">Add</span>
               </button>
             </div>
           </div>
@@ -250,7 +250,7 @@ $catColors = [
               </span>
               <button class="btn-add-list" onclick="toggleCart('hotel',<?= $hotel['id'] ?>,'<?= e(addslashes($hotel['name'])) ?>','<?= e($hotel['city_name']) ?>',<?= (float)$hotel['price_min'] ?>,'hotel')"
                       data-key="hotel-<?= $hotel['id'] ?>">
-                <i class="bi bi-plus-lg me-1"></i>Add
+                <i class="bi bi-plus-lg me-1"></i><span class="btn-add-label">Add</span>
               </button>
             </div>
           </div>
@@ -296,7 +296,7 @@ $catColors = [
               <span class="explore-price free">🛍️ Order there</span>
               <button class="btn-add-list" onclick="toggleCart('shop',<?= $shop['id'] ?>,'<?= e(addslashes($shop['name'])) ?>','<?= e($shop['city_name']) ?>',0,'shop')"
                       data-key="shop-<?= $shop['id'] ?>">
-                <i class="bi bi-plus-lg me-1"></i>Add
+                <i class="bi bi-plus-lg me-1"></i><span class="btn-add-label">Add</span>
               </button>
             </div>
           </div>
@@ -326,7 +326,7 @@ $catColors = [
 </div>
 
 <!-- ── Cart Offcanvas (mobile) ────────────────────────────── -->
-<div class="offcanvas offcanvas-end" tabindex="-1" id="cart-offcanvas" style="max-width:380px">
+<div class="offcanvas offcanvas-end" tabindex="-1" id="cart-offcanvas" style="width:100%;max-width:380px">
   <div class="offcanvas-header" style="background:var(--green-dark);color:#fff">
     <h5 class="offcanvas-title" style="font-family:'Playfair Display',serif">
       <i class="bi bi-basket3-fill me-2" style="color:var(--sand-dark)"></i>My List
@@ -478,7 +478,6 @@ $catColors = [
   color:#fff;
 }
 .explore-card.in-cart .btn-add-list i::before { content:"\F62B"; }
-.explore-card.in-cart .btn-add-list::after { content:' Added'; }
 .explore-card.in-cart .btn-add-list i { display:none; }
 
 /* Cart sidebar */
@@ -651,9 +650,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Category pills
-  document.querySelectorAll('[data-cat]').forEach(btn => {
+  document.querySelectorAll('.filter-pill[data-cat]').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('[data-cat]').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.filter-pill[data-cat]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       activeCat = btn.dataset.cat;
       filterItems();
@@ -741,7 +740,11 @@ function restoreCartUI() {
   // Update card states
   document.querySelectorAll('.explore-card').forEach(card => {
     const key = card.dataset.id;
-    card.classList.toggle('in-cart', cart.some(i => i.key === key));
+    const inCart = cart.some(i => i.key === key);
+    card.classList.toggle('in-cart', inCart);
+
+    const label = card.querySelector('.btn-add-label');
+    if (label) label.textContent = inCart ? 'Added' : 'Add';
   });
 
   // Update badge

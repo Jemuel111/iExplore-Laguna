@@ -2,12 +2,10 @@
 // ============================================================
 // iEXPLORE LAGUNA — Cart Panel Partial
 // includes/cart_panel.php
-// Included twice: once for desktop sidebar, once for offcanvas
-// The $panel_id variable distinguishes which instance.
+// Included twice: once for desktop sidebar, once for offcanvas —
+// a static counter tells the two instances apart so each gets a
+// unique id (JS then updates both together, see renderCartPanel()).
 // ============================================================
-$panel_id = $panel_id ?? ('cart-panel-' . (isset($cart_panel_count) ? ++$cart_panel_count : ($cart_panel_count = 1 ) * 1));
-// Simpler: just pass a static id via the include context
-// We use a static counter trick
 static $cart_include_count = 0;
 $cart_include_count++;
 $pid = $cart_include_count === 1 ? 'cart-panel-desktop' : 'cart-panel-offcanvas';
@@ -42,7 +40,7 @@ $pid = $cart_include_count === 1 ? 'cart-panel-desktop' : 'cart-panel-offcanvas'
   <div class="cart-footer">
     <div class="d-flex justify-content-between align-items-center mb-2">
       <span class="small text-muted">Estimated entrance/room cost:</span>
-      <span class="fw-bold" style="color:var(--green-dark)" class="cart-total-cost">—</span>
+      <span class="fw-bold cart-total-cost" style="color:var(--green-dark)">—</span>
     </div>
     <div class="d-grid gap-2">
       <button class="btn btn-sm w-100"

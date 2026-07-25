@@ -371,7 +371,7 @@ require_once __DIR__ . '/../includes/header.php';
         All Spots (<?= count($spots_list) ?>)
       </h6>
       <form method="GET" class="d-flex gap-1">
-        <input type="text" class="form-control form-control-sm" name="q" value="<?= e($search) ?>" placeholder="Search…" style="width:180px">
+        <input type="text" class="form-control form-control-sm" name="q" value="<?= e($search) ?>" placeholder="Search…" style="width:180px;max-width:100%">
         <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-search"></i></button>
       </form>
     </div>

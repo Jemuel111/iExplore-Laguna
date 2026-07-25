@@ -1056,13 +1056,26 @@ section .card-app:hover {
 
 /* ── Mobile toolbar scroll ───────────────────────────────── */
 @media (max-width: 767px) {
-  .spots-toolbar .d-flex {
+  /* Only the outer row scrolls — NOT every nested flex group inside it.
+     (Using a bare .d-flex selector here previously matched every nested
+     group too — tabs, categories, city+search — turning each into its
+     own tiny independent scroll box that clipped its own content, e.g.
+     the "Spots" tab getting squeezed down to just its icon.) */
+  .spots-toolbar .toolbar-scroll-row {
     overflow-x: auto;
     flex-wrap: nowrap !important;
     scrollbar-width: none;
     -ms-overflow-style: none;
   }
-  .spots-toolbar .d-flex::-webkit-scrollbar { display: none; }
+  .spots-toolbar .toolbar-scroll-row::-webkit-scrollbar { display: none; }
+  /* Direct children (tabs group / category group / sort+view group /
+     city+search group — naming differs per page) must not wrap or
+     shrink internally; they should all sit in one continuous line
+     that the outer row scrolls as a single unit. */
+  .spots-toolbar .toolbar-scroll-row > * {
+    flex-wrap: nowrap !important;
+    flex-shrink: 0;
+  }
   .spots-toolbar .filter-pill { flex-shrink: 0; }
   .spots-toolbar .ms-auto { margin-left: 0 !important; }
   .pagination-app .page-link { padding: .38rem .65rem; font-size: .82rem; }
