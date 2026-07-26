@@ -16,11 +16,8 @@ if (!is_logged_in()) { header('Location: ' . APP_URL . '/pages/login.php'); exit
 $u = current_user();
 if (($u['role'] ?? '') !== 'admin') { header('Location: ' . APP_URL); exit; }
 
-$catLabels = [
-    'nature'=>'🌿 Nature','heritage'=>'🏛️ Heritage','waterfall'=>'💧 Waterfall',
-    'hotspring'=>'♨️ Hot Spring','museum'=>'🏺 Museum','religious'=>'⛪ Religious',
-    'beach_lake'=>'🏞️ Lake/Beach','adventure'=>'🧗 Adventure','food'=>'🍜 Food',
-];
+// Category metadata now comes from the shared spot_categories() helper
+// in helpers.php instead of a locally duplicated emoji array.
 
 $edit_id = (int) input('id', 'get', 0);
 $errors  = [];
@@ -45,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'save
     $closureReason = trim(input('closure_reason', 'post', ''));
     $closedUntil   = trim(input('closed_until', 'post', ''));
 
-    $allowedCats = array_keys($catLabels);
+    $allowedCats = array_keys(spot_categories());
 
     if (strlen($name) < 2)                 $errors[] = 'Name is required.';
     if (!$cityId)                          $errors[] = 'Please select a city.';
@@ -243,8 +240,8 @@ require_once __DIR__ . '/../includes/header.php';
           <div class="col-6">
             <label class="form-label">Category <span class="text-danger">*</span></label>
             <select class="form-select" name="category" required>
-              <?php foreach ($catLabels as $key => $label): ?>
-              <option value="<?= $key ?>" <?= ($editing_spot['category'] ?? '')===$key?'selected':'' ?>><?= $label ?></option>
+              <?php foreach (spot_categories() as $key => $meta): ?>
+              <option value="<?= $key ?>" <?= ($editing_spot['category'] ?? '')===$key?'selected':'' ?>><?= $meta['label'] ?></option>
               <?php endforeach; ?>
             </select>
           </div>
@@ -320,7 +317,7 @@ require_once __DIR__ . '/../includes/header.php';
                    onchange="document.getElementById('closure-fields').classList.toggle('d-none', !this.checked)"
                    <?= !empty($editing_spot['is_closed']) ? 'checked' : '' ?>>
             <label class="form-check-label fw-bold" for="is_closed_check">
-              🚧 Temporarily closed
+              <i class="bi bi-cone-striped me-1"></i>Temporarily closed
             </label>
             <div class="form-text mb-0">
               Use this for renovations, weather, maintenance, etc. — the spot stays
@@ -388,12 +385,12 @@ require_once __DIR__ . '/../includes/header.php';
             <?php if (!empty($sp['is_closed'])): ?>
               <span class="badge rounded-pill" style="background:#fee2e2;color:#a61c1c;font-size:.65rem;font-weight:700"
                     title="<?= e($sp['closure_reason'] ?: 'Temporarily closed') ?>">
-                🚧 Closed<?= $sp['closed_until'] ? ' until '.date('M j', strtotime($sp['closed_until'])) : '' ?>
+                <i class="bi bi-cone-striped me-1"></i>Closed<?= $sp['closed_until'] ? ' until '.date('M j', strtotime($sp['closed_until'])) : '' ?>
               </span>
             <?php endif; ?>
           </div>
           <div class="text-muted small">
-            <?= $catLabels[$sp['category']] ?? $sp['category'] ?> · <?= e($sp['city_name']) ?> · ★ <?= number_format($sp['rating'],1) ?>
+            <?= spot_category_label($sp['category']) ?> · <?= e($sp['city_name']) ?> · <i class="bi bi-star-fill" style="color:var(--sand-dark)"></i> <?= number_format($sp['rating'],1) ?>
           </div>
         </div>
         <div class="fw-bold flex-shrink-0" style="color:var(--green-dark);white-space:nowrap">
@@ -405,7 +402,7 @@ require_once __DIR__ . '/../includes/header.php';
           </a>
           <form method="POST"><?= csrf_field() ?><input type="hidden" name="action" value="toggle_spot"><input type="hidden" name="spot_id" value="<?= $sp['id'] ?>">
             <button class="btn btn-sm <?= $sp['is_active']?'btn-outline-secondary':'btn-outline-success' ?>" style="font-size:.72rem;padding:.25rem .6rem" title="<?= $sp['is_active']?'Hide':'Show' ?>">
-              <?= $sp['is_active']?'🙈':'👁️' ?>
+              <i class="bi <?= $sp['is_active']?'bi-eye-slash':'bi-eye' ?>"></i>
             </button>
           </form>
           <form method="POST" onsubmit="return confirm('Delete this spot permanently? This also removes its photos and reviews.')"><?= csrf_field() ?>

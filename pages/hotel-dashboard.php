@@ -90,9 +90,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $booking = db_fetch_one("SELECT * FROM bookings WHERE id = ?", [$bid]);
             if ($booking) {
                 $msgs = [
-                    'confirmed'   => ['Booking Confirmed! 🎉', "Your booking #{$booking['booking_number']} has been confirmed by the hotel."],
-                    'checked_in'  => ['Checked In ✅', "You've been checked in for booking #{$booking['booking_number']}. Enjoy your stay!"],
-                    'checked_out' => ['Checked Out 👋', "Thanks for staying with us! Booking #{$booking['booking_number']} is now complete."],
+                    'confirmed'   => ['Booking Confirmed!', "Your booking #{$booking['booking_number']} has been confirmed by the hotel."],
+                    'checked_in'  => ['Checked In', "You've been checked in for booking #{$booking['booking_number']}. Enjoy your stay!"],
+                    'checked_out' => ['Checked Out', "Thanks for staying with us! Booking #{$booking['booking_number']} is now complete."],
                     'cancelled'   => ['Booking Cancelled', "Your booking #{$booking['booking_number']} was cancelled by the hotel."],
                 ];
                 if (isset($msgs[$status])) {
@@ -164,14 +164,8 @@ $pending_count   = db_fetch_one("SELECT COUNT(*) n FROM bookings WHERE hotel_id=
 $total_revenue   = db_fetch_one("SELECT COALESCE(SUM(total_amount),0) n FROM bookings WHERE hotel_id=? AND status='checked_out'", [$hid])['n'] ?? 0;
 $total_rooms     = count($rooms);
 
-$statusColors = [
-    'pending'     => ['#fff3cd','#856404','⏳'],
-    'confirmed'   => ['#d1ecf1','#0c5460','✅'],
-    'checked_in'  => ['#d4edda','#155724','🛎️'],
-    'checked_out' => ['#e2e3e5','#383d41','✔️'],
-    'cancelled'   => ['#f8d7da','#721c24','❌'],
-    'no_show'     => ['#f8d7da','#721c24','🚫'],
-];
+// Booking status colors/icons/labels now come from the shared
+// booking_status_meta() helper in helpers.php.
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
@@ -192,15 +186,15 @@ require_once __DIR__ . '/../includes/header.php';
   <div class="container">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
       <div class="d-flex align-items-center gap-3">
-        <div style="width:48px;height:48px;background:rgba(255,255,255,.2);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.6rem">🏨</div>
+        <div style="width:48px;height:48px;background:rgba(255,255,255,.2);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.6rem"><i class="bi bi-building"></i></div>
         <div>
           <h1 class="mb-0 fs-4" style="font-family:'Playfair Display',serif"><?= e($hotel['name']) ?></h1>
           <p class="mb-0 small opacity-75">
             <i class="bi bi-building me-1"></i>Hotel Dashboard
             <?php if (!$hotel['is_verified']): ?>
-              <span class="badge ms-2" style="background:rgba(255,255,255,.2);font-size:.7rem">⏳ Pending verification</span>
+              <span class="badge ms-2" style="background:rgba(255,255,255,.2);font-size:.7rem"><i class="bi bi-hourglass-split me-1"></i>Pending verification</span>
             <?php else: ?>
-              <span class="badge ms-2" style="background:rgba(255,255,255,.2);font-size:.7rem">✅ Verified</span>
+              <span class="badge ms-2" style="background:rgba(255,255,255,.2);font-size:.7rem"><i class="bi bi-check-circle-fill me-1"></i>Verified</span>
             <?php endif; ?>
           </p>
         </div>
@@ -221,15 +215,15 @@ require_once __DIR__ . '/../includes/header.php';
   <div class="row g-3 mb-4">
     <?php
     $stats = [
-      ['📅', 'Today\'s Bookings', $today_bookings, '#dbeafe','#1e40af'],
-      ['⏳', 'Pending Bookings', $pending_count,  '#fef3c7','#92400e'],
-      ['🛏️', 'Room Types',       $total_rooms,    '#f7dde1','#5c1620'],
-      ['💰', 'Total Revenue',    '₱'.number_format($total_revenue,2), '#f3e8ff','#6b21a8'],
+      ['bi-calendar-check', 'Today\'s Bookings', $today_bookings, '#dbeafe','#1e40af'],
+      ['bi-hourglass-split', 'Pending Bookings', $pending_count,  '#fef3c7','#92400e'],
+      ['bi-door-closed',    'Room Types',       $total_rooms,    '#f7dde1','#5c1620'],
+      ['bi-cash-stack',     'Total Revenue',    '₱'.number_format($total_revenue,2), '#f3e8ff','#6b21a8'],
     ];
     foreach ($stats as [$ico,$lbl,$val,$bg,$fg]): ?>
     <div class="col-6 col-lg-3">
       <div class="p-3 h-100" style="background:<?= $bg ?>;border-radius:var(--radius);border:1.5px solid <?= $fg ?>22">
-        <div style="font-size:1.6rem;margin-bottom:.3rem"><?= $ico ?></div>
+        <div style="font-size:1.6rem;margin-bottom:.3rem;color:<?= $fg ?>"><i class="bi <?= $ico ?>"></i></div>
         <div style="font-size:1.4rem;font-weight:800;color:<?= $fg ?>"><?= $val ?></div>
         <div style="font-size:.78rem;color:<?= $fg ?>;opacity:.8"><?= $lbl ?></div>
       </div>
@@ -272,7 +266,8 @@ require_once __DIR__ . '/../includes/header.php';
       <?php else: ?>
         <div class="d-flex flex-column gap-3">
           <?php foreach ($bookings as $bk):
-            [$bg,$fg,$ico] = $statusColors[$bk['status']] ?? ['#f1f5f9','#334155','📋'];
+            $st = booking_status_meta($bk['status']);
+            $bg = $st['bg']; $fg = $st['fg'];
           ?>
           <div class="p-0 rounded overflow-hidden" style="border:1.5px solid var(--border);background:#fff">
             <!-- Booking header -->
@@ -281,7 +276,7 @@ require_once __DIR__ . '/../includes/header.php';
               <div>
                 <span class="fw-bold" style="font-family:'Playfair Display',serif"><?= e($bk['booking_number']) ?></span>
                 <span class="ms-2" style="background:<?= $bg ?>;color:<?= $fg ?>;padding:.2rem .7rem;border-radius:20px;font-size:.75rem;font-weight:700">
-                  <?= $ico ?> <?= ucfirst(str_replace('_',' ',$bk['status'])) ?>
+                  <i class="bi <?= $st['icon'] ?> me-1"></i><?= ucfirst(str_replace('_',' ',$bk['status'])) ?>
                 </span>
               </div>
               <div class="text-muted small">
@@ -314,7 +309,7 @@ require_once __DIR__ . '/../includes/header.php';
                   </div>
                   <div class="small text-muted"><?= $bk['nights'] ?> night<?= $bk['nights']!=1?'s':'' ?></div>
                   <?php if ($bk['special_requests']): ?>
-                  <div class="small text-muted mt-1 fst-italic">📝 <?= e($bk['special_requests']) ?></div>
+                  <div class="small text-muted mt-1 fst-italic"><i class="bi bi-chat-left-text me-1"></i><?= e($bk['special_requests']) ?></div>
                   <?php endif; ?>
                 </div>
 
@@ -433,8 +428,8 @@ require_once __DIR__ . '/../includes/header.php';
             <div class="d-flex align-items-center gap-3 p-3"
                  style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);
                         opacity:<?= $r['is_available'] ? '1' : '.55' ?>">
-              <div style="width:44px;height:44px;background:#f7dde1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">
-                🛏️
+              <div style="width:44px;height:44px;background:#f7dde1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:#8e2434;flex-shrink:0">
+                <i class="bi bi-door-closed"></i>
               </div>
               <div class="flex-grow-1 min-w-0">
                 <div class="fw-bold" style="font-size:.93rem"><?= e($r['room_type']) ?></div>
@@ -454,7 +449,7 @@ require_once __DIR__ . '/../includes/header.php';
                   <button class="btn btn-sm <?= $r['is_available'] ? 'btn-outline-secondary' : 'btn-outline-success' ?>"
                           style="border-radius:var(--radius-pill);font-size:.75rem;padding:.28rem .75rem"
                           title="<?= $r['is_available'] ? 'Hide room type' : 'Show room type' ?>">
-                    <?= $r['is_available'] ? '🙈 Hide' : '👁️ Show' ?>
+                    <i class="bi <?= $r['is_available'] ? 'bi-eye-slash' : 'bi-eye' ?> me-1"></i><?= $r['is_available'] ? 'Hide' : 'Show' ?>
                   </button>
                 </form>
                 <!-- Delete -->

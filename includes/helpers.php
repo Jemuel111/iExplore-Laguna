@@ -36,7 +36,87 @@ function json_error(string $message, int $code = 400, $data = null): void {
     json_response(false, $data, $message, $code);
 }
 
-// ── Security ──────────────────────────────────────────────────
+/**
+ * Single source of truth for tourist spot category metadata (icon,
+ * label, badge colors). Every page previously re-declared its own copy
+ * of this map — some with emoji, some with slightly different labels —
+ * which is exactly how inconsistencies creep in. Use this everywhere
+ * instead of a local $emojis/$catEmojis array.
+ */
+function spot_categories(): array {
+    return [
+        'nature'     => ['icon' => 'bi-tree',           'label' => 'Nature',      'bg' => '#fbdede', 'fg' => '#6b0f14'],
+        'heritage'   => ['icon' => 'bi-bank',            'label' => 'Heritage',    'bg' => '#fef3c7', 'fg' => '#92400e'],
+        'waterfall'  => ['icon' => 'bi-droplet',         'label' => 'Waterfall',   'bg' => '#dbeafe', 'fg' => '#1e40af'],
+        'hotspring'  => ['icon' => 'bi-fire',            'label' => 'Hot Spring',  'bg' => '#ffe4e6', 'fg' => '#9f1239'],
+        'museum'     => ['icon' => 'bi-columns-gap',     'label' => 'Museum',      'bg' => '#f3e8ff', 'fg' => '#6b21a8'],
+        'religious'  => ['icon' => 'bi-building',        'label' => 'Religious',   'bg' => '#fff7ed', 'fg' => '#9a3412'],
+        'beach_lake' => ['icon' => 'bi-water',            'label' => 'Lake/Beach',  'bg' => '#e0f2fe', 'fg' => '#075985'],
+        'adventure'  => ['icon' => 'bi-compass',         'label' => 'Adventure',   'bg' => '#fef9c3', 'fg' => '#713f12'],
+        'food'       => ['icon' => 'bi-cup-hot',         'label' => 'Food',        'bg' => '#fce7f3', 'fg' => '#9d174d'],
+    ];
+}
+
+/** Icon class for a single category, with a safe fallback. */
+function spot_category_icon(?string $category): string {
+    return spot_categories()[$category]['icon'] ?? 'bi-geo-alt';
+}
+
+/** Display label for a single category, with a safe fallback. */
+function spot_category_label(?string $category): string {
+    return spot_categories()[$category]['label'] ?? ucfirst((string)$category);
+}
+
+/** Same idea as spot_categories() but for shop/stall types. */
+function shop_categories(): array {
+    return [
+        'milktea'     => ['icon' => 'bi-cup-straw',  'label' => 'Milk Tea'],
+        'cafe'        => ['icon' => 'bi-cup-hot',    'label' => 'Café'],
+        'restaurant'  => ['icon' => 'bi-egg-fried',  'label' => 'Restaurant'],
+        'bakery'      => ['icon' => 'bi-basket2',    'label' => 'Bakery'],
+        'street_food' => ['icon' => 'bi-fire',       'label' => 'Street Food'],
+        'souvenir'    => ['icon' => 'bi-gift',       'label' => 'Souvenir'],
+        'pasalubong'  => ['icon' => 'bi-box-seam',   'label' => 'Pasalubong'],
+        'grocery'     => ['icon' => 'bi-cart3',      'label' => 'Grocery'],
+        'other'       => ['icon' => 'bi-shop',       'label' => 'Other'],
+    ];
+}
+
+function shop_category_icon(?string $category): string {
+    return shop_categories()[$category]['icon'] ?? 'bi-shop';
+}
+
+function shop_category_label(?string $category): string {
+    return shop_categories()[$category]['label'] ?? ucfirst((string)$category);
+}
+
+/**
+ * Shop order status metadata — same idea as booking_status_meta() but
+ * for pickup orders (different status set: preparing/ready/picked_up
+ * instead of checked_in/checked_out).
+ */
+function order_status_meta(string $status): array {
+    $map = [
+        'pending'   => ['bg'=>'#fff3cd','fg'=>'#856404','icon'=>'bi-hourglass-split',  'label'=>'Pending'],
+        'confirmed' => ['bg'=>'#d1ecf1','fg'=>'#0c5460','icon'=>'bi-check-circle-fill','label'=>'Confirmed'],
+        'preparing' => ['bg'=>'#d4edda','fg'=>'#155724','icon'=>'bi-egg-fried',         'label'=>'Preparing'],
+        'ready'     => ['bg'=>'#d4edda','fg'=>'#155724','icon'=>'bi-bag-check-fill',    'label'=>'Ready for Pickup!'],
+        'picked_up' => ['bg'=>'#e2e3e5','fg'=>'#383d41','icon'=>'bi-check2-all',        'label'=>'Picked Up'],
+        'cancelled' => ['bg'=>'#f8d7da','fg'=>'#721c24','icon'=>'bi-x-circle-fill',     'label'=>'Cancelled'],
+    ];
+    return $map[$status] ?? ['bg'=>'#f1f5f9','fg'=>'#334155','icon'=>'bi-question-circle','label'=>'Unknown'];
+}
+function booking_status_meta(string $status): array {
+    $map = [
+        'pending'     => ['bg'=>'#fff3cd','fg'=>'#856404','icon'=>'bi-hourglass-split', 'label'=>'Pending'],
+        'confirmed'   => ['bg'=>'#d1ecf1','fg'=>'#0c5460','icon'=>'bi-check-circle-fill','label'=>'Confirmed'],
+        'checked_in'  => ['bg'=>'#d4edda','fg'=>'#155724','icon'=>'bi-door-open-fill',   'label'=>'Checked In'],
+        'checked_out' => ['bg'=>'#e2e3e5','fg'=>'#383d41','icon'=>'bi-check2-all',       'label'=>'Checked Out'],
+        'cancelled'   => ['bg'=>'#f8d7da','fg'=>'#721c24','icon'=>'bi-x-circle-fill',    'label'=>'Cancelled'],
+        'no_show'     => ['bg'=>'#f8d7da','fg'=>'#721c24','icon'=>'bi-slash-circle-fill','label'=>'No Show'],
+    ];
+    return $map[$status] ?? ['bg'=>'#f1f5f9','fg'=>'#334155','icon'=>'bi-question-circle','label'=>'Unknown'];
+}
 
 /**
  * Sanitize a string for HTML output.

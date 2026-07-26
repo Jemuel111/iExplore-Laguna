@@ -90,7 +90,7 @@ $reviews = attach_review_photos($reviews, 'hotel');
         <?php if (!empty($hotel['cover_url'])): ?>
         <img src="<?= e($hotel['cover_url']) ?>" alt="<?= e($hotel['name']) ?>" style="width:100%;height:100%;object-fit:cover">
         <?php else: ?>
-        🏨
+        <i class="bi bi-building"></i>
         <?php endif; ?>
       </div>
       <div class="flex-grow-1">
@@ -229,8 +229,8 @@ $reviews = attach_review_photos($reviews, 'hotel');
              data-room-name="<?= e($r['room_type']) ?>" data-room-price="<?= $r['price_per_night'] ?>"
              style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:border-color .2s">
           <div class="d-flex align-items-center gap-3">
-            <div style="width:52px;height:52px;background:#f7dde1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;flex-shrink:0">
-              🛏️
+            <div style="width:52px;height:52px;background:#f7dde1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:#8e2434;flex-shrink:0">
+              <i class="bi bi-door-closed"></i>
             </div>
             <div class="flex-grow-1 min-w-0">
               <div class="fw-bold" style="font-size:.95rem"><?= e($r['room_type']) ?></div>
@@ -490,7 +490,7 @@ $reviews = attach_review_photos($reviews, 'hotel');
           <div class="mb-3 p-2 d-flex align-items-center gap-2" style="background:#f7dde1;border-radius:var(--radius-sm);font-size:.78rem">
             <i class="bi bi-signpost-split-fill" style="color:#8e2434"></i>
             <span style="color:#8e2434">
-              📍 <strong><?= e($hotel['name']) ?></strong> is near <strong><?= e($nearby_spot['name']) ?></strong> —
+              <strong><?= e($hotel['name']) ?></strong> is near <strong><?= e($nearby_spot['name']) ?></strong> —
               we'll add it to your itinerary when you reserve!
             </span>
           </div>
@@ -500,9 +500,9 @@ $reviews = attach_review_photos($reviews, 'hotel');
           <div class="mb-3">
             <label class="form-label small fw-600">Payment Method</label>
             <select class="form-select form-select-sm" id="payment-method">
-              <option value="cash_on_checkin">💵 Cash on Check-in</option>
-              <option value="gcash">📱 GCash</option>
-              <option value="maya">📱 Maya</option>
+              <option value="cash_on_checkin">Cash on Check-in</option>
+              <option value="gcash">GCash</option>
+              <option value="maya">Maya</option>
             </select>
           </div>
 
@@ -1055,7 +1055,7 @@ document.addEventListener('DOMContentLoaded', function() {
     html: `<div style="width:32px;height:32px;border-radius:50% 50% 50% 0;
              background:#8e2434;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
              transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
-             <span style="transform:rotate(45deg);font-size:14px">🏨</span></div>`,
+             <i class="bi bi-building" style="transform:rotate(45deg);font-size:14px;color:#fff"></i></div>`,
     iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32],
   });
   L.marker([<?= $hotel['latitude'] ?>, <?= $hotel['longitude'] ?>], { icon: hotelIcon })

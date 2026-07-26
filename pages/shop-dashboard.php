@@ -89,10 +89,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $order = db_fetch_one("SELECT * FROM orders WHERE id = ?", [$oid]);
             if ($order) {
                 $msgs = [
-                    'confirmed' => ['Order Confirmed! 🎉', "Your order #{$order['order_number']} has been confirmed by the shop."],
-                    'preparing' => ['Order Being Prepared 🍳', "Your order #{$order['order_number']} is now being prepared!"],
-                    'ready'     => ['Ready for Pickup! ✅', "Your order #{$order['order_number']} is ready. Show your pickup code: {$order['pickup_code']}"],
-                    'picked_up' => ['Order Completed 🎉', "Your order #{$order['order_number']} has been picked up. Thanks for ordering!"],
+                    'confirmed' => ['Order Confirmed!', "Your order #{$order['order_number']} has been confirmed by the shop."],
+                    'preparing' => ['Order Being Prepared', "Your order #{$order['order_number']} is now being prepared!"],
+                    'ready'     => ['Ready for Pickup!', "Your order #{$order['order_number']} is ready. Show your pickup code: {$order['pickup_code']}"],
+                    'picked_up' => ['Order Completed', "Your order #{$order['order_number']} has been picked up. Thanks for ordering!"],
                     'cancelled' => ['Order Cancelled', "Your order #{$order['order_number']} was cancelled by the shop."],
                 ];
                 if (isset($msgs[$status])) {
@@ -164,14 +164,8 @@ $pending_count = db_fetch_one("SELECT COUNT(*) n FROM orders WHERE shop_id=? AND
 $total_revenue = db_fetch_one("SELECT COALESCE(SUM(total_amount),0) n FROM orders WHERE shop_id=? AND status='picked_up'", [$sid])['n'] ?? 0;
 $total_products = count($products);
 
-$statusColors = [
-    'pending'   => ['#fff3cd','#856404','⏳'],
-    'confirmed' => ['#d1ecf1','#0c5460','✅'],
-    'preparing' => ['#d4edda','#155724','🍳'],
-    'ready'     => ['#d4edda','#155724','📦'],
-    'picked_up' => ['#e2e3e5','#383d41','✔️'],
-    'cancelled' => ['#f8d7da','#721c24','❌'],
-];
+// Order status colors/icons/labels now come from the shared
+// order_status_meta() helper in helpers.php.
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
@@ -192,15 +186,15 @@ require_once __DIR__ . '/../includes/header.php';
   <div class="container">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
       <div class="d-flex align-items-center gap-3">
-        <div style="width:48px;height:48px;background:rgba(255,255,255,.2);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.6rem">🏪</div>
+        <div style="width:48px;height:48px;background:rgba(255,255,255,.2);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.6rem"><i class="bi bi-shop"></i></div>
         <div>
           <h1 class="mb-0 fs-4" style="font-family:'Playfair Display',serif"><?= e($shop['name']) ?></h1>
           <p class="mb-0 small opacity-75">
             <i class="bi bi-geo-alt me-1"></i>Shop Dashboard
             <?php if (!$shop['is_verified']): ?>
-              <span class="badge ms-2" style="background:rgba(255,255,255,.2);font-size:.7rem">⏳ Pending verification</span>
+              <span class="badge ms-2" style="background:rgba(255,255,255,.2);font-size:.7rem"><i class="bi bi-hourglass-split me-1"></i>Pending verification</span>
             <?php else: ?>
-              <span class="badge ms-2" style="background:rgba(255,255,255,.2);font-size:.7rem">✅ Verified</span>
+              <span class="badge ms-2" style="background:rgba(255,255,255,.2);font-size:.7rem"><i class="bi bi-check-circle-fill me-1"></i>Verified</span>
             <?php endif; ?>
           </p>
         </div>
@@ -221,15 +215,15 @@ require_once __DIR__ . '/../includes/header.php';
   <div class="row g-3 mb-4">
     <?php
     $stats = [
-      ['📦', 'Today\'s Orders',  $today_orders,   '#dbeafe','#1e40af'],
-      ['⏳', 'Pending Orders',   $pending_count,  '#fef3c7','#92400e'],
-      ['🛍️', 'Products Listed', $total_products, '#fbdede','#6b0f14'],
-      ['💰', 'Total Revenue',    '₱'.number_format($total_revenue,2), '#f3e8ff','#6b21a8'],
+      ['bi-box-seam',        'Today\'s Orders',  $today_orders,   '#dbeafe','#1e40af'],
+      ['bi-hourglass-split', 'Pending Orders',   $pending_count,  '#fef3c7','#92400e'],
+      ['bi-bag',             'Products Listed', $total_products, '#fbdede','#6b0f14'],
+      ['bi-cash-stack',      'Total Revenue',    '₱'.number_format($total_revenue,2), '#f3e8ff','#6b21a8'],
     ];
     foreach ($stats as [$ico,$lbl,$val,$bg,$fg]): ?>
     <div class="col-6 col-lg-3">
       <div class="p-3 h-100" style="background:<?= $bg ?>;border-radius:var(--radius);border:1.5px solid <?= $fg ?>22">
-        <div style="font-size:1.6rem;margin-bottom:.3rem"><?= $ico ?></div>
+        <div style="font-size:1.6rem;margin-bottom:.3rem;color:<?= $fg ?>"><i class="bi <?= $ico ?>"></i></div>
         <div style="font-size:1.4rem;font-weight:800;color:<?= $fg ?>"><?= $val ?></div>
         <div style="font-size:.78rem;color:<?= $fg ?>;opacity:.8"><?= $lbl ?></div>
       </div>
@@ -272,7 +266,8 @@ require_once __DIR__ . '/../includes/header.php';
       <?php else: ?>
         <div class="d-flex flex-column gap-3">
           <?php foreach ($orders as $ord):
-            [$bg,$fg,$ico] = $statusColors[$ord['status']] ?? ['#f1f5f9','#334155','📋'];
+            $st = order_status_meta($ord['status']);
+            $bg = $st['bg']; $fg = $st['fg'];
             // Get items
             $items = db_fetch_all(
                 "SELECT * FROM order_items WHERE order_id = ?",
@@ -286,7 +281,7 @@ require_once __DIR__ . '/../includes/header.php';
               <div>
                 <span class="fw-bold" style="font-family:'Playfair Display',serif"><?= e($ord['order_number']) ?></span>
                 <span class="ms-2" style="background:<?= $bg ?>;color:<?= $fg ?>;padding:.2rem .7rem;border-radius:20px;font-size:.75rem;font-weight:700">
-                  <?= $ico ?> <?= ucfirst($ord['status']) ?>
+                  <i class="bi <?= $st['icon'] ?> me-1"></i><?= ucfirst($ord['status']) ?>
                 </span>
               </div>
               <div class="text-muted small">
@@ -328,7 +323,7 @@ require_once __DIR__ . '/../includes/header.php';
                   </div>
                   <?php endforeach; ?>
                   <?php if ($ord['special_notes']): ?>
-                  <div class="small text-muted mt-1 fst-italic">📝 <?= e($ord['special_notes']) ?></div>
+                  <div class="small text-muted mt-1 fst-italic"><i class="bi bi-chat-left-text me-1"></i><?= e($ord['special_notes']) ?></div>
                   <?php endif; ?>
                 </div>
 
@@ -451,8 +446,8 @@ require_once __DIR__ . '/../includes/header.php';
             <div class="d-flex align-items-center gap-3 p-3"
                  style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);
                         opacity:<?= $p['is_available'] ? '1' : '.55' ?>">
-              <div style="width:44px;height:44px;background:var(--green-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">
-                🛍️
+              <div style="width:44px;height:44px;background:var(--green-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:var(--green-mid);flex-shrink:0">
+                <i class="bi bi-bag"></i>
               </div>
               <div class="flex-grow-1 min-w-0">
                 <div class="fw-bold" style="font-size:.93rem"><?= e($p['name']) ?></div>
@@ -472,7 +467,7 @@ require_once __DIR__ . '/../includes/header.php';
                   <button class="btn btn-sm <?= $p['is_available'] ? 'btn-outline-secondary' : 'btn-outline-success' ?>"
                           style="border-radius:var(--radius-pill);font-size:.75rem;padding:.28rem .75rem"
                           title="<?= $p['is_available'] ? 'Hide product' : 'Show product' ?>">
-                    <?= $p['is_available'] ? '🙈 Hide' : '👁️ Show' ?>
+                    <i class="bi <?= $p['is_available'] ? 'bi-eye-slash' : 'bi-eye' ?> me-1"></i><?= $p['is_available'] ? 'Hide' : 'Show' ?>
                   </button>
                 </form>
                 <!-- Delete -->

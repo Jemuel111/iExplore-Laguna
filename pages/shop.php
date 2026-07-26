@@ -47,11 +47,9 @@ foreach ($products as $p) {
     $grouped[$cat][] = $p;
 }
 
-$catEmojis = [
-    'milktea'=>'🧋','cafe'=>'☕','restaurant'=>'🍜','bakery'=>'🥐',
-    'street_food'=>'🍢','souvenir'=>'🛍️','pasalubong'=>'🎁','grocery'=>'🛒','other'=>'🏪'
-];
-$shopEmoji = $catEmojis[$shop['category']] ?? '🏪';
+// Category icon now comes from the shared shop_category_icon() helper
+// in helpers.php instead of a locally duplicated emoji array.
+$shopIconClass = shop_category_icon($shop['category']);
 
 // Reviews
 $reviews = db_fetch_all(
@@ -88,7 +86,7 @@ require_once __DIR__ . '/../includes/header.php';
         <?php if (!empty($shop['cover_url'])): ?>
         <img src="<?= e($shop['cover_url']) ?>" alt="<?= e($shop['name']) ?>" style="width:100%;height:100%;object-fit:cover">
         <?php else: ?>
-        <?= $shopEmoji ?>
+        <i class="bi <?= $shopIconClass ?>"></i>
         <?php endif; ?>
       </div>
       <div class="flex-grow-1">
@@ -143,8 +141,8 @@ require_once __DIR__ . '/../includes/header.php';
           <?php foreach ($items as $p): ?>
           <div class="d-flex align-items-center gap-3 p-3"
                style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);transition:border-color .2s">
-            <div style="width:52px;height:52px;background:var(--green-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;flex-shrink:0">
-              🛍️
+            <div style="width:52px;height:52px;background:var(--green-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:var(--green-mid);flex-shrink:0">
+              <i class="bi bi-bag"></i>
             </div>
             <div class="flex-grow-1 min-w-0">
               <div class="fw-bold" style="font-size:.95rem"><?= e($p['name']) ?></div>
@@ -152,7 +150,7 @@ require_once __DIR__ . '/../includes/header.php';
               <div class="text-muted small"><?= e(mb_strimwidth($p['description'],0,60,'…')) ?></div>
               <?php endif; ?>
               <?php if ($p['stock'] < 999 && $p['stock'] <= 10): ?>
-              <div class="small" style="color:var(--terracotta)">⚠️ Only <?= $p['stock'] ?> left</div>
+              <div class="small" style="color:var(--terracotta)"><i class="bi bi-exclamation-triangle-fill me-1"></i>Only <?= $p['stock'] ?> left</div>
               <?php endif; ?>
             </div>
             <div class="text-end flex-shrink-0">
@@ -265,7 +263,7 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="mx-3 mb-0 p-2 d-flex align-items-center gap-2" style="background:var(--green-pale);border-radius:var(--radius-sm);font-size:.78rem">
           <i class="bi bi-signpost-split-fill" style="color:var(--green-dark)"></i>
           <span style="color:var(--green-dark)">
-            📍 <strong><?= e($shop['name']) ?></strong> is near <strong><?= e($nearby_spot['name']) ?></strong> —
+            <strong><?= e($shop['name']) ?></strong> is near <strong><?= e($nearby_spot['name']) ?></strong> —
             we'll add it to your itinerary when you order!
           </span>
         </div>
@@ -294,9 +292,9 @@ require_once __DIR__ . '/../includes/header.php';
           <div class="mb-3">
             <label class="form-label small fw-600">Payment Method</label>
             <select class="form-select form-select-sm" id="payment-method">
-              <option value="cash_on_pickup">💵 Cash on Pickup</option>
-              <option value="gcash">📱 GCash</option>
-              <option value="maya">📱 Maya</option>
+              <option value="cash_on_pickup">Cash on Pickup</option>
+              <option value="gcash">GCash</option>
+              <option value="maya">Maya</option>
             </select>
           </div>
 
@@ -518,7 +516,7 @@ document.addEventListener('DOMContentLoaded', function() {
     html: `<div style="width:32px;height:32px;border-radius:50% 50% 50% 0;
              background:var(--terracotta);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
              transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
-             <span style="transform:rotate(45deg);font-size:14px"><?= $shopEmoji ?></span></div>`,
+             <i class="bi <?= $shopIconClass ?>" style="transform:rotate(45deg);font-size:14px;color:#fff"></i></div>`,
     iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32],
   });
   L.marker([<?= $map_lat ?>, <?= $map_lng ?>], { icon: shopIcon })

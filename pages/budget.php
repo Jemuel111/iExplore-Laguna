@@ -74,9 +74,9 @@ $budgetRanges = get_budget_level_ranges();
         <div class="col-4">
           <label class="form-label">Level</label>
           <select class="form-select" id="b-level">
-            <option value="budget">💰 ₱<?= number_format($budgetRanges['budget']['min']) ?>–<?= number_format($budgetRanges['budget']['max']) ?></option>
-            <option value="midrange" selected>💳 ₱<?= number_format($budgetRanges['midrange']['min']) ?>–<?= number_format($budgetRanges['midrange']['max']) ?></option>
-            <option value="upscale">💎 ₱<?= number_format($budgetRanges['upscale']['min']) ?>–<?= number_format($budgetRanges['upscale']['max']) ?></option>
+            <option value="budget">₱<?= number_format($budgetRanges['budget']['min']) ?>–<?= number_format($budgetRanges['budget']['max']) ?></option>
+            <option value="midrange" selected>₱<?= number_format($budgetRanges['midrange']['min']) ?>–<?= number_format($budgetRanges['midrange']['max']) ?></option>
+            <option value="upscale">₱<?= number_format($budgetRanges['upscale']['min']) ?>–<?= number_format($budgetRanges['upscale']['max']) ?></option>
           </select>
         </div>
       </div>
@@ -154,7 +154,7 @@ $budgetRanges = get_budget_level_ranges();
       <!-- Tips -->
       <div class="form-panel" id="budget-tips">
         <h6 class="fw-bold mb-2" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
-          💡 Money-Saving Tips
+          <i class="bi bi-lightbulb me-1"></i>Money-Saving Tips
         </h6>
         <ul class="small text-muted mb-0 ps-3" id="tips-list"></ul>
       </div>

@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'crea
     $price       = (float) input('estimated_price', 'post', 0);
     $hotel_id    = (int) input('hotel_id', 'post', 0);
     $room_id     = (int) input('room_id', 'post', 0);
-    $emoji       = trim(input('cover_emoji', 'post', '')) ?: '🎒';
+    $emoji       = trim(input('cover_emoji', 'post', ''));
 
     if (strlen($title) < 3)              $errors[] = 'Title is required.';
     if ($scope === 'single_city' && !$city_id) $errors[] = 'Select a city for a single-city package.';
@@ -215,8 +215,8 @@ require_once __DIR__ . '/../includes/header.php';
             <div class="col-6">
               <label class="form-label">Scope</label>
               <select class="form-select" name="scope" id="scope-select" onchange="toggleCityField()">
-                <option value="single_city">📍 Single City</option>
-                <option value="multi_city">🗺️ Multi-City</option>
+                <option value="single_city">Single City</option>
+                <option value="multi_city">Multi-City</option>
               </select>
             </div>
             <div class="col-6" id="city-field">
@@ -230,17 +230,13 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
           </div>
           <div class="row g-2 mb-3">
-            <div class="col-4">
+            <div class="col-6">
               <label class="form-label">Days</label>
               <input type="number" class="form-control" name="days" value="2" min="1" max="14">
             </div>
-            <div class="col-4">
+            <div class="col-6">
               <label class="form-label">Est. Price (₱)</label>
               <input type="number" class="form-control" name="estimated_price" min="1" step="50" placeholder="3000" required>
-            </div>
-            <div class="col-4">
-              <label class="form-label">Icon</label>
-              <input type="text" class="form-control" name="cover_emoji" value="🎒" maxlength="4">
             </div>
           </div>
           <div class="mb-3">
@@ -283,7 +279,7 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="flex-grow-1 min-w-0">
           <div class="fw-bold" style="font-size:.9rem"><?= e($p['title']) ?></div>
           <div class="text-muted small">
-            <?= $p['scope']==='single_city' ? '📍 '.e($p['city_name']) : '🗺️ Multi-City' ?>
+            <?php if ($p['scope']==='single_city'): ?><i class="bi bi-geo-alt"></i> <?= e($p['city_name']) ?><?php else: ?><i class="bi bi-map"></i> Multi-City<?php endif; ?>
             · <?= $p['days'] ?>d · <?= $p['spot_count'] ?> spots · <?= e($p['hotel_name'] ?? '—') ?>
           </div>
         </div>
@@ -294,7 +290,7 @@ require_once __DIR__ . '/../includes/header.php';
           </a>
           <form method="POST"><?= csrf_field() ?><input type="hidden" name="action" value="toggle_package"><input type="hidden" name="package_id" value="<?= $p['id'] ?>">
             <button class="btn btn-sm <?= $p['is_active']?'btn-outline-secondary':'btn-outline-success' ?>" style="font-size:.72rem;padding:.25rem .6rem">
-              <?= $p['is_active']?'🙈':'👁️' ?>
+              <i class="bi <?= $p['is_active']?'bi-eye-slash':'bi-eye' ?>"></i>
             </button>
           </form>
           <form method="POST" onsubmit="return confirm('Delete this package permanently?')"><?= csrf_field() ?>

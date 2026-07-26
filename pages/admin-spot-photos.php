@@ -175,9 +175,9 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="mb-3">
           <label class="form-label">Category</label>
           <select class="form-select" name="photo_type">
-            <option value="gallery">🖼️ Gallery (general)</option>
-            <option value="food">🍜 Food &amp; Dining</option>
-            <option value="activity">🏃 Activity</option>
+            <option value="gallery">Gallery (general)</option>
+            <option value="food">Food &amp; Dining</option>
+            <option value="activity">Activity</option>
           </select>
         </div>
         <div class="mb-3">

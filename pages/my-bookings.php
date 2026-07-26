@@ -28,14 +28,8 @@ $bookings = db_fetch_all(
     [$u['id']]
 );
 
-$statusColors = [
-    'pending'     => ['#fff3cd','#856404','⏳','Pending'],
-    'confirmed'   => ['#d1ecf1','#0c5460','✅','Confirmed'],
-    'checked_in'  => ['#d4edda','#155724','🛎️','Checked In'],
-    'checked_out' => ['#e2e3e5','#383d41','✔️','Checked Out'],
-    'cancelled'   => ['#f8d7da','#721c24','❌','Cancelled'],
-    'no_show'     => ['#f8d7da','#721c24','🚫','No Show'],
-];
+// Booking status colors/icons/labels now come from the shared
+// booking_status_meta() helper in helpers.php.
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
@@ -58,7 +52,7 @@ require_once __DIR__ . '/../includes/header.php';
   <div class="alert alert-success d-flex align-items-start gap-3 mb-4" style="border-radius:var(--radius)">
     <i class="bi bi-check-circle-fill fs-4 flex-shrink-0"></i>
     <div>
-      <div class="fw-bold mb-1"><?= $is_package ? 'Package Booked Successfully! 🎉' : 'Reservation Placed Successfully! 🎉' ?></div>
+      <div class="fw-bold mb-1"><?= $is_package ? 'Package Booked Successfully!' : 'Reservation Placed Successfully!' ?></div>
       <div>Your booking <strong><?= e($new_booking) ?></strong> has been sent to the hotel.
         You'll be notified once it's confirmed.</div>
       <?php if ($is_package): ?>
@@ -72,7 +66,7 @@ require_once __DIR__ . '/../includes/header.php';
        style="border-radius:var(--radius);background:#f7dde1;border:1px solid #c65a68;color:#8e2434">
     <i class="bi bi-signpost-split-fill fs-4 flex-shrink-0"></i>
     <div>
-      <div class="fw-bold mb-1">Added to your itinerary! 🗺️</div>
+      <div class="fw-bold mb-1">Added to your itinerary!</div>
       <div>This hotel is near <strong><?= e($new_spot) ?></strong> — we added it to your trip list.</div>
       <a href="explore.php" class="fw-bold" style="color:#8e2434">Open My Itinerary →</a>
     </div>
@@ -90,7 +84,7 @@ require_once __DIR__ . '/../includes/header.php';
   <?php else: ?>
     <div class="d-flex flex-column gap-3">
       <?php foreach ($bookings as $bk):
-        [$bg,$fg,$ico,$label] = $statusColors[$bk['status']] ?? ['#f1f5f9','#334155','📋','Unknown'];
+        $st = booking_status_meta($bk['status']); $bg = $st['bg']; $fg = $st['fg']; $ico = $st['icon']; $label = $st['label'];
       ?>
       <div style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden">
 
@@ -100,7 +94,7 @@ require_once __DIR__ . '/../includes/header.php';
           <div class="d-flex align-items-center gap-2 flex-wrap">
             <span class="fw-bold" style="font-family:'Playfair Display',serif"><?= e($bk['booking_number']) ?></span>
             <span style="background:<?= $bg ?>;color:<?= $fg ?>;padding:.22rem .75rem;border-radius:20px;font-size:.78rem;font-weight:700">
-              <?= $ico ?> <?= $label ?>
+              <i class="bi <?= $ico ?> me-1"></i><?= $label ?>
             </span>
           </div>
           <span class="text-muted small"><?= date('M d, Y g:i A', strtotime($bk['created_at'])) ?></span>
@@ -130,7 +124,7 @@ require_once __DIR__ . '/../includes/header.php';
               <div class="small text-muted"><?= $bk['nights'] ?> night<?= $bk['nights']!=1?'s':'' ?></div>
 
               <?php if ($bk['special_requests']): ?>
-              <div class="mt-2 small text-muted fst-italic">📝 <?= e($bk['special_requests']) ?></div>
+              <div class="mt-2 small text-muted fst-italic"><i class="bi bi-chat-left-text me-1"></i><?= e($bk['special_requests']) ?></div>
               <?php endif; ?>
             </div>
 
@@ -142,7 +136,7 @@ require_once __DIR__ . '/../includes/header.php';
               <?php if ($bk['status'] === 'checked_in'): ?>
               <div class="mt-2">
                 <span class="badge p-2" style="background:var(--green-mid);font-size:.82rem">
-                  🛎️ Enjoy your stay!
+                  <i class="bi bi-door-open-fill me-1"></i>Enjoy your stay!
                 </span>
               </div>
               <?php endif; ?>

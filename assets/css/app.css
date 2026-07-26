@@ -234,6 +234,7 @@ img { max-width: 100%; height: auto; display: block; }
   inset: 0;
   background: linear-gradient(180deg, transparent 40%, rgba(26,58,42,.08));
 }
+.card-img-placeholder i { color: var(--green-mid); opacity: .5; }
 
 .card-body-app { padding: 1.3rem; }
 .card-title-app {
@@ -553,87 +554,197 @@ img { max-width: 100%; height: auto; display: block; }
 .stat-lbl { font-size: .8rem; color: var(--text-muted); text-align: center; }
 
 /* ── How it works steps ────────────────────────────────────── */
-.step-card {
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 2rem 1.5rem;
-  text-align: center;
-  height: 100%;
-  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+.step-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
   position: relative;
-  overflow: hidden;
+  padding-bottom: 2.5rem;
 }
-.step-card::before {
-  content: '';
+.step-row:last-child { padding-bottom: 0; }
+.step-row-line {
   position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--green-light), var(--sand-dark));
-  transform: scaleX(0);
-  transition: transform var(--transition);
-  transform-origin: left;
+  left: 1.6rem;
+  top: 3.4rem;
+  bottom: .5rem;
+  width: 1px;
+  background: repeating-linear-gradient(to bottom, var(--border) 0 4px, transparent 4px 9px);
 }
-.step-card:hover {
-  transform: translateY(-5px);
-  box-shadow: var(--shadow-md);
-  border-color: rgba(82,183,136,.35);
-}
-.step-card:hover::before { transform: scaleX(1); }
+.step-row:last-child .step-row-line { display: none; }
 .step-num {
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.8rem;
-  height: 2.8rem;
-  background: var(--green-pale);
-  color: var(--green-dark);
+  width: 3.2rem;
+  height: 3.2rem;
+  border: 1.5px solid var(--green-mid);
+  color: var(--green-mid);
   border-radius: 50%;
-  font-size: .85rem;
+  font-family: 'Playfair Display', serif;
+  font-size: 1.2rem;
   font-weight: 700;
-  margin-bottom: 1rem;
+  background: var(--cream);
+  position: relative;
+  z-index: 1;
+}
+.step-row-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--charcoal);
+  margin-bottom: .35rem;
 }
 
 /* ── Hero section ──────────────────────────────────────────── */
 .hero-section {
-  background: linear-gradient(135deg, var(--green-dark) 0%, var(--green-mid) 60%, #8f1a1a 100%);
-  color: #fff;
-  padding: 4rem 0 3.5rem;
   position: relative;
   overflow: hidden;
+  padding: 6.5rem 0 6rem;
+  color: #fff;
+  isolation: isolate;
+}
+.hero-section .hero-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center 40%;
+  z-index: -2;
 }
 .hero-section::before {
+  /* Directional scrim for legibility — tinted maroon, not a flat
+     brand-color block sitting on top of the photo like a filter. */
   content: '';
   position: absolute;
   inset: 0;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpolygon points='0 0 40 0 0 40'/%3E%3Cpolygon points='80 80 40 80 80 40'/%3E%3C/g%3E%3C/svg%3E");
-  pointer-events: none;
+  background:
+    linear-gradient(100deg, rgba(46,7,9,.94) 0%, rgba(46,7,9,.82) 32%, rgba(107,15,20,.55) 62%, rgba(107,15,20,.28) 100%);
+  z-index: -1;
 }
-.hero-section::after {
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--sand-dark);
+}
+.hero-eyebrow::before {
   content: '';
-  position: absolute;
-  bottom: -2px; left: 0; right: 0;
-  height: 60px;
-  background: var(--cream);
-  clip-path: ellipse(55% 100% at 50% 100%);
+  width: 26px; height: 1.5px;
+  background: var(--sand-dark);
+  display: inline-block;
 }
 .hero-title {
   font-family: 'Playfair Display', serif;
-  font-size: clamp(2.4rem, 6vw, 4rem);
+  font-size: clamp(2.6rem, 6vw, 4.4rem);
   font-weight: 700;
-  line-height: 1.13;
+  line-height: 1.08;
   margin-bottom: 1.3rem;
+  letter-spacing: -.01em;
 }
 .hero-title em { color: var(--sand-dark); font-style: normal; }
 .hero-subtitle {
   font-size: 1.08rem;
   opacity: .88;
-  max-width: 520px;
+  max-width: 480px;
   margin-bottom: 2rem;
   line-height: 1.7;
 }
 
-/* Floating card in hero */
+/* Search bar that bridges the hero into the next section — Klook/Airbnb
+   pattern: an overlapping card, not a boxed form sitting beside the copy. */
+.hero-search-bar {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 1.1rem 1.25rem;
+  margin-top: -3.75rem;
+  position: relative;
+  z-index: 5;
+}
+.hero-search-bar .field-label {
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: .2rem;
+  display: block;
+}
+.hero-search-bar select,
+.hero-search-bar .form-select {
+  border: none;
+  padding-left: 0;
+  padding-right: 1.4rem;
+  font-weight: 600;
+  color: var(--charcoal);
+  background-position: right center;
+  background-size: 14px 11px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.hero-search-bar select:focus, .hero-search-bar .form-select:focus { box-shadow: none; }
+@media (min-width: 992px) {
+  .hero-search-field { border-left: 1px solid var(--border); padding-left: 1.5rem; }
+}
+/* Hover highlight on the whole field — the field having NO border/box
+   at rest (for a clean look) meant nothing signaled it was clickable.
+   A highlight on hover/focus-within is the fix real search bars use
+   (Airbnb, Booking.com) instead of a permanent border. */
+.hero-search-bar #quick-plan-form > .col-6 {
+  border-radius: var(--radius-sm);
+  padding-top: .5rem;
+  padding-bottom: .5rem;
+  padding-right: .75rem;
+  margin: -.5rem 0;
+  transition: background-color var(--transition);
+}
+.hero-search-bar #quick-plan-form > .col-6:hover,
+.hero-search-bar #quick-plan-form > .col-6:focus-within {
+  background-color: var(--sand);
+}
+.hero-search-bar #quick-plan-form > .col-6.field-error {
+  background-color: #fdeaea;
+  animation: field-error-shake .4s;
+}
+.hero-search-bar #quick-plan-form > .col-6.field-error .field-label {
+  color: #c0392b;
+}
+@keyframes field-error-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+.hero-search-bar .col-6:hover .field-label,
+.hero-search-bar .col-lg-2:hover .field-label,
+.hero-search-bar .col-lg-3:hover .field-label { color: var(--green-mid); }
+.hero-search-bar select.form-select {
+  cursor: pointer;
+  transition: color var(--transition);
+}
+@media (min-width: 992px) {
+  .hero-search-bar #quick-plan-form > .col-lg-1 {
+    display: flex;
+    align-items: flex-end;
+  }
+  .hero-search-bar .hero-search-submit {
+    aspect-ratio: 1;
+    border-radius: 50%;
+    padding: 0 !important;
+    width: 3rem !important;
+    height: 3rem !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05rem;
+    margin-left: auto;
+  }
+}
+
+/* Legacy floating card (still used by other sections) */
 .hero-form-card {
   background: rgba(255,255,255,.97);
   border-radius: var(--radius);
@@ -645,15 +756,23 @@ img { max-width: 100%; height: auto; display: block; }
 
 /* ── CTA section ───────────────────────────────────────────── */
 .cta-section {
-  background: linear-gradient(135deg, var(--green-dark) 0%, #3d0a0d 100%);
   position: relative;
   overflow: hidden;
+  isolation: isolate;
+}
+.cta-section .cta-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  z-index: -2;
 }
 .cta-section::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Ccircle cx='30' cy='30' r='1.5' fill='%23ffffff' fill-opacity='0.04'/%3E%3C/svg%3E");
+  background: linear-gradient(180deg, rgba(46,7,9,.88) 0%, rgba(107,15,20,.86) 100%);
+  z-index: -1;
 }
 
 /* ── Utility ───────────────────────────────────────────────── */
@@ -834,6 +953,7 @@ img { max-width: 100%; height: auto; display: block; }
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
+  color: var(--green-mid);
   flex-shrink: 0;
 }
 
@@ -903,8 +1023,8 @@ img { max-width: 100%; height: auto; display: block; }
   #trip-map, .leaflet-map { height: 300px; min-height: 300px; }
   .form-panel { padding: 1.3rem; }
   .budget-panel { padding: 1.3rem; }
-  .hero-section { padding: 4rem 0 3.5rem; }
-  .hero-section::after { height: 40px; }
+  .hero-section { padding: 3.5rem 0 5.5rem; }
+  .hero-search-bar { margin-top: 1.75rem; }
 }
 
 /* ── Leaflet routing panel hidden ──────────────────────────── */

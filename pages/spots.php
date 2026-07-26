@@ -94,20 +94,9 @@ $categories = [
     'food'      => '🍜 Food',
 ];
 
-$catLabels = [
-    'nature'=>'Nature','heritage'=>'Heritage','waterfall'=>'Waterfall',
-    'hotspring'=>'Hot Spring','museum'=>'Museum','religious'=>'Religious',
-    'beach_lake'=>'Lake/Beach','adventure'=>'Adventure','food'=>'Food',
-];
-$emojis = ['nature'=>'🌿','heritage'=>'🏛️','waterfall'=>'💧','hotspring'=>'♨️',
-           'museum'=>'🏺','religious'=>'⛪','beach_lake'=>'🏞️','adventure'=>'🧗','food'=>'🍜'];
-$badgeColors = [
-    'nature'=>['#fbdede','#6b0f14'],'heritage'=>['#fef3c7','#92400e'],
-    'waterfall'=>['#dbeafe','#1e40af'],'hotspring'=>['#ffe4e6','#9f1239'],
-    'museum'=>['#f3e8ff','#6b21a8'],'religious'=>['#fff7ed','#9a3412'],
-    'beach_lake'=>['#e0f2fe','#075985'],'adventure'=>['#fef9c3','#713f12'],
-    'food'=>['#fce7f3','#9d174d'],
-];
+// Category metadata (icon/label/colors) now comes from spot_categories()
+// in helpers.php — was previously duplicated here as three separate
+// local arrays that had to be kept in sync by hand.
 
 // Build base query string (no page param) for pagination links
 $base_qs = http_build_query(array_filter([
@@ -317,7 +306,7 @@ $base_qs = http_build_query(array_filter([
     <?php if ($view_mode !== 'list'): ?>
     <div class="row g-3">
       <?php foreach ($spots as $spot):
-        [$bg,$fg] = $badgeColors[$spot['category']] ?? ['#f1f5f9','#334155'];
+        $catMeta = spot_categories()[$spot['category']] ?? ['bg'=>'#f1f5f9','fg'=>'#334155','icon'=>'bi-geo-alt','label'=>$spot['category']];
       ?>
       <div class="col-sm-6 col-xl-4">
         <div class="card-app h-100">
@@ -328,14 +317,14 @@ $base_qs = http_build_query(array_filter([
           </div>
           <?php else: ?>
           <div class="card-img-placeholder" style="height:150px;font-size:2.5rem">
-            <?= $emojis[$spot['category']] ?? '📍' ?>
+            <i class="bi <?= $catMeta['icon'] ?>"></i>
           </div>
           <?php endif; ?>
           </a>
           <div class="card-body-app d-flex flex-column">
             <div class="mb-2">
-              <span style="background:<?= $bg ?>;color:<?= $fg ?>;padding:.2rem .7rem;border-radius:20px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em">
-                <?= $catLabels[$spot['category']] ?? $spot['category'] ?>
+              <span style="background:<?= $catMeta['bg'] ?>;color:<?= $catMeta['fg'] ?>;padding:.2rem .7rem;border-radius:20px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em">
+                <?= $catMeta['label'] ?>
               </span>
             </div>
             <a href="spot-detail.php?id=<?= $spot['id'] ?>" class="text-decoration-none">
@@ -374,7 +363,7 @@ $base_qs = http_build_query(array_filter([
     <?php else: ?>
     <div class="d-flex flex-column gap-2">
       <?php foreach ($spots as $spot):
-        [$bg,$fg] = $badgeColors[$spot['category']] ?? ['#f1f5f9','#334155'];
+        $catMeta = spot_categories()[$spot['category']] ?? ['bg'=>'#f1f5f9','fg'=>'#334155','icon'=>'bi-geo-alt','label'=>$spot['category']];
       ?>
       <div class="spot-list-item">
         <?php if (!empty($spot['main_photo_url'])): ?>
@@ -382,7 +371,7 @@ $base_qs = http_build_query(array_filter([
           <img src="<?= e($spot['main_photo_url']) ?>" alt="<?= e($spot['name']) ?>" style="width:100%;height:100%;object-fit:cover">
         </div>
         <?php else: ?>
-        <div class="spot-emoji-box"><?= $emojis[$spot['category']] ?? '📍' ?></div>
+        <div class="spot-emoji-box"><i class="bi <?= $catMeta['icon'] ?>"></i></div>
         <?php endif; ?>
         <div class="flex-grow-1 min-w-0">
           <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
@@ -405,8 +394,8 @@ $base_qs = http_build_query(array_filter([
               </div>
             </div>
             <div class="d-flex align-items-center gap-2 flex-shrink-0">
-              <span style="background:<?= $bg ?>;color:<?= $fg ?>;padding:.18rem .6rem;border-radius:20px;font-size:.7rem;font-weight:700;white-space:nowrap">
-                <?= $catLabels[$spot['category']] ?? $spot['category'] ?>
+              <span style="background:<?= $catMeta['bg'] ?>;color:<?= $catMeta['fg'] ?>;padding:.18rem .6rem;border-radius:20px;font-size:.7rem;font-weight:700;white-space:nowrap">
+                <?= $catMeta['label'] ?>
               </span>
               <span class="fw-bold" style="font-size:.85rem;<?= $spot['entrance_fee']>0 ? 'color:var(--terracotta)' : 'color:#16a34a' ?>">
                 <?= $spot['entrance_fee'] > 0 ? '₱'.number_format($spot['entrance_fee'],0) : 'Free' ?>
@@ -495,7 +484,7 @@ function applySort(val) {
 // order — so we must wait until everything has finished loading.
 document.addEventListener('DOMContentLoaded', function() {
   const spotPins = <?= json_encode($map_spots) ?>;
-  const spotCatEmojis = <?= json_encode($emojis) ?>;
+  const spotCatIcons = <?= json_encode(array_map(fn($c) => $c['icon'], spot_categories())) ?>;
   const spotsMap = L.map('spots-map', { zoomControl: true });
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap', maxZoom: 18
@@ -504,13 +493,13 @@ document.addEventListener('DOMContentLoaded', function() {
   const spotBounds = [];
   spotPins.forEach(s => {
     spotBounds.push([s.latitude, s.longitude]);
-    const emoji = spotCatEmojis[s.category] || '📍';
+    const iconClass = spotCatIcons[s.category] || 'bi-geo-alt';
     const icon = L.divIcon({
       className: '',
       html: `<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;
                background:var(--green-mid,#a61c1c);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
                transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
-               <span style="transform:rotate(45deg);font-size:14px">${emoji}</span></div>`,
+               <i class="bi ${iconClass}" style="transform:rotate(45deg);font-size:14px;color:#fff"></i></div>`,
       iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30],
     });
     const fee = s.entrance_fee > 0 ? '₱' + Number(s.entrance_fee).toLocaleString() : 'Free';

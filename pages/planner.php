@@ -123,9 +123,9 @@ $transport_labels = [
       <div class="mb-3">
         <label class="form-label">Budget Level</label>
         <select class="form-select" id="budget-select">
-          <option value="budget"   <?= $pre_budget==='budget'   ? 'selected':'' ?>>💰 Budget (₱<?= number_format($budgetRanges['budget']['min']) ?>–<?= number_format($budgetRanges['budget']['max']) ?>/day)</option>
-          <option value="midrange" <?= $pre_budget==='midrange' ? 'selected':'' ?>>💳 Mid-range (₱<?= number_format($budgetRanges['midrange']['min']) ?>–<?= number_format($budgetRanges['midrange']['max']) ?>/day)</option>
-          <option value="upscale"  <?= $pre_budget==='upscale'  ? 'selected':'' ?>>💎 Upscale (₱<?= number_format($budgetRanges['upscale']['min']) ?>–<?= number_format($budgetRanges['upscale']['max']) ?>/day)</option>
+          <option value="budget"   <?= $pre_budget==='budget'   ? 'selected':'' ?>>Budget (₱<?= number_format($budgetRanges['budget']['min']) ?>–<?= number_format($budgetRanges['budget']['max']) ?>/day)</option>
+          <option value="midrange" <?= $pre_budget==='midrange' ? 'selected':'' ?>>Mid-range (₱<?= number_format($budgetRanges['midrange']['min']) ?>–<?= number_format($budgetRanges['midrange']['max']) ?>/day)</option>
+          <option value="upscale"  <?= $pre_budget==='upscale'  ? 'selected':'' ?>>Upscale (₱<?= number_format($budgetRanges['upscale']['min']) ?>–<?= number_format($budgetRanges['upscale']['max']) ?>/day)</option>
         </select>
         <div class="form-text">Per person, per day (food + accommodation)</div>
       </div>
@@ -613,7 +613,7 @@ function drawSpotMarkers(spots) {
       closeButton: true,
     }).setContent(`
       <div class="popup-rich-header" style="background:var(--green-pale);padding:.75rem 1rem .5rem;margin:-.4rem -.4rem .5rem;border-radius:8px 8px 0 0;text-align:center;font-size:2rem;line-height:1">
-        ${catEmoji(spot.category)}
+        <i class="bi ${catIcon(spot.category)}" style="color:var(--green-mid)"></i>
       </div>
       <div style="padding:0 .25rem">
         <div class="popup-title" style="font-size:.95rem">${spot.name}</div>
@@ -754,7 +754,7 @@ function renderSpotsGrid(spots, filterCat = 'all') {
                    background:${cat===filterCat?'var(--green-mid)':'#fff'};
                    color:${cat===filterCat?'#fff':'var(--charcoal)'};
                    border:1.5px solid ${cat===filterCat?'var(--green-mid)':'var(--border)'}">
-      ${catEmoji(cat !== 'all' ? cat : '')} ${cat === 'all' ? 'All' : catLabel(cat)}
+      <i class="bi ${cat==='all'?'bi-grid':catIcon(cat)} me-1"></i>${cat === 'all' ? 'All' : catLabel(cat)}
     </button>
   `).join('');
 
@@ -789,7 +789,7 @@ function renderSpotsGrid(spots, filterCat = 'all') {
       <div style="background:${closure.reopensBeforeTravel ? '#fef3c7' : '#fee2e2'};
                   color:${closure.reopensBeforeTravel ? '#92400e' : '#a61c1c'};
                   font-size:.72rem;font-weight:700;padding:.3rem .6rem;border-radius:6px;margin-top:.45rem">
-        🚧 Temporarily Closed${closure.reason ? ' — ' + closure.reason : ''}
+        <i class="bi bi-cone-striped me-1"></i>Temporarily Closed${closure.reason ? ' — ' + closure.reason : ''}
         ${closure.closedUntil
           ? (closure.reopensBeforeTravel
               ? ` · expected to reopen ${formatDateNice(closure.closedUntil)}, before your trip`
@@ -810,7 +810,7 @@ function renderSpotsGrid(spots, filterCat = 'all') {
            onclick="flyToSpot(${spot.id})">
         <div style="width:52px;height:52px;border-radius:10px;background:var(--green-pale);
                     display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0">
-          ${catEmoji(spot.category)}
+          <i class="bi ${catIcon(spot.category)}" style="color:var(--green-mid)"></i>
         </div>
         <div class="flex-grow-1 min-width-0">
           <div class="fw-bold small mb-1" style="color:var(--charcoal)">${spot.name}</div>
@@ -924,7 +924,7 @@ function renderItinerary(routeData, spots, days) {
 
       // Distance/time to reach this spot from wherever the last stop was.
       const legKm = haversineKm(lastPoint.latitude, lastPoint.longitude, spot.latitude, spot.longitude);
-      const legLabel = `🚗 ${distanceTimeLabel(legKm)} from previous stop`;
+      const legLabel = `<i class="bi bi-car-front-fill me-1"></i>${distanceTimeLabel(legKm)} from previous stop`;
       lastPoint = spot;
 
       html += itineraryItem(timeStr, 'bi-geo-alt-fill', spot.name,
@@ -1006,14 +1006,14 @@ window.openSpotPanel = function(spotId) {
   const panel     = document.getElementById('map-spot-panel');
   const fee       = spot.entrance_fee > 0
     ? `₱ ${parseFloat(spot.entrance_fee).toFixed(2)}`
-    : '🎉 Free Entry';
+    : 'Free Entry';
   const fullStars = Math.round(spot.rating);
   const starsHtml = Array.from({length:5}, (_,i) =>
     `<i class="bi ${i < fullStars ? 'bi-star-fill' : 'bi-star'}"
         style="color:${i < fullStars ? 'var(--sand-dark)' : '#ccc'};font-size:.85rem"></i>`
   ).join('') + `<span style="font-size:.8rem;color:var(--text-muted);margin-left:.3rem">${parseFloat(spot.rating).toFixed(1)}</span>`;
 
-  document.getElementById('msp-emoji-header').textContent = catEmoji(spot.category);
+  document.getElementById('msp-emoji-header').innerHTML = `<i class="bi ${catIcon(spot.category)}"></i>`;
   document.getElementById('msp-emoji-header').style.background = catBg(spot.category);
   document.getElementById('msp-badge').innerHTML =
     `<span class="badge-category badge-${spot.category}">${catLabel(spot.category)}</span>`;
@@ -1158,12 +1158,13 @@ function catLabel(cat) {
   return m[cat] || cat;
 }
 
-function catEmoji(cat) {
+function catIcon(cat) {
   const m = {
-    nature:'🌿', heritage:'🏛️', waterfall:'💧', hotspring:'♨️',
-    museum:'🏺', religious:'⛪', beach_lake:'🏞️', adventure:'🧗', food:'🍜'
+    nature:'bi-tree', heritage:'bi-bank', waterfall:'bi-droplet', hotspring:'bi-fire',
+    museum:'bi-columns-gap', religious:'bi-building', beach_lake:'bi-water',
+    adventure:'bi-compass', food:'bi-cup-hot'
   };
-  return m[cat] || '📍';
+  return m[cat] || 'bi-geo-alt';
 }
 
 }); // end DOMContentLoaded

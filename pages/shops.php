@@ -79,17 +79,8 @@ if ($view_mode === 'map') {
 
 $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
 
-$categories = [
-    'milktea'     => '🧋 Milk Tea',
-    'cafe'        => '☕ Café',
-    'restaurant'  => '🍜 Restaurant',
-    'bakery'      => '🥐 Bakery',
-    'street_food' => '🍢 Street Food',
-    'souvenir'    => '🛍️ Souvenir',
-    'pasalubong'  => '🎁 Pasalubong',
-    'grocery'     => '🛒 Grocery',
-    'other'       => '🏪 Other',
-];
+// Category metadata now comes from the shared shop_categories() helper
+// in helpers.php instead of a locally duplicated emoji array.
 
 $base_qs = http_build_query(array_filter([
     'city' => $filter_city, 'category' => $filter_category,
@@ -121,19 +112,19 @@ $base_qs = http_build_query(array_filter([
       <div class="d-flex gap-1 flex-grow-1 flex-wrap">
         <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>"
            class="filter-pill <?= !$filter_category ? 'active' : '' ?>">All</a>
-        <?php foreach ($categories as $key => $label): ?>
+        <?php foreach (shop_categories() as $key => $meta): ?>
         <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'category'=>$key,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>"
            class="filter-pill <?= $filter_category===$key ? 'active' : '' ?>">
-          <?= $label ?>
+          <i class="bi <?= $meta['icon'] ?> me-1"></i><?= $meta['label'] ?>
         </a>
         <?php endforeach; ?>
       </div>
 
       <div class="d-flex gap-2 align-items-center ms-auto">
         <select class="form-select form-select-sm" style="width:auto;font-size:.8rem" onchange="applySort(this.value)">
-          <option value="name"     <?= $filter_sort==='name'?'selected':'' ?>>🔤 A–Z</option>
-          <option value="city"     <?= $filter_sort==='city'?'selected':'' ?>>📍 By City</option>
-          <option value="category" <?= $filter_sort==='category'?'selected':'' ?>>🏷️ By Category</option>
+          <option value="name"     <?= $filter_sort==='name'?'selected':'' ?>>Name: A–Z</option>
+          <option value="city"     <?= $filter_sort==='city'?'selected':'' ?>>By City</option>
+          <option value="category" <?= $filter_sort==='category'?'selected':'' ?>>By Category</option>
         </select>
         <div class="btn-group btn-group-sm" role="group">
           <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'category'=>$filter_category,'sort'=>$filter_sort!=='name'?$filter_sort:''])) ?>"
@@ -181,9 +172,9 @@ $base_qs = http_build_query(array_filter([
           <label class="form-label">Category</label>
           <select class="form-select form-select-sm" name="category">
             <option value="">All Categories</option>
-            <?php foreach ($categories as $key => $label): ?>
+            <?php foreach (shop_categories() as $key => $meta): ?>
             <option value="<?= e($key) ?>" <?= $filter_category===$key?'selected':'' ?>>
-              <?= $label ?>
+              <?= $meta['label'] ?>
             </option>
             <?php endforeach; ?>
           </select>
@@ -191,9 +182,9 @@ $base_qs = http_build_query(array_filter([
         <div class="mb-4">
           <label class="form-label">Sort By</label>
           <select class="form-select form-select-sm" name="sort">
-            <option value="name"     <?= $filter_sort==='name'?'selected':'' ?>>🔤 A–Z</option>
-            <option value="city"     <?= $filter_sort==='city'?'selected':'' ?>>📍 By City</option>
-            <option value="category" <?= $filter_sort==='category'?'selected':'' ?>>🏷️ By Category</option>
+            <option value="name"     <?= $filter_sort==='name'?'selected':'' ?>>Name: A–Z</option>
+            <option value="city"     <?= $filter_sort==='city'?'selected':'' ?>>By City</option>
+            <option value="category" <?= $filter_sort==='category'?'selected':'' ?>>By Category</option>
           </select>
         </div>
         <button type="submit" class="btn btn-primary-app w-100 mb-2">
@@ -257,13 +248,13 @@ $base_qs = http_build_query(array_filter([
           </div>
           <?php else: ?>
           <div class="card-img-placeholder" style="height:130px;font-size:2.2rem">
-            <?= explode(' ', $categories[$shop['category']] ?? '🏪')[0] ?>
+            <i class="bi <?= shop_category_icon($shop['category']) ?>"></i>
           </div>
           <?php endif; ?>
           <div class="card-body-app d-flex flex-column">
             <div class="mb-1">
               <span class="badge" style="background:var(--green-pale);color:var(--green-dark);font-size:.72rem">
-                <?= $categories[$shop['category']] ?? '🏪 Other' ?>
+                <i class="bi <?= shop_category_icon($shop['category']) ?> me-1"></i><?= shop_category_label($shop['category']) ?>
               </span>
             </div>
             <h5 class="card-title-app mb-1" style="font-size:.98rem"><?= e($shop['name']) ?></h5>
@@ -303,14 +294,14 @@ $base_qs = http_build_query(array_filter([
     <div class="d-flex flex-column gap-2">
       <?php foreach ($shops as $shop): ?>
       <div class="d-flex align-items-center gap-3 p-3" style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm)">
-        <div style="width:52px;height:52px;background:var(--green-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex-shrink:0">
-          <?= explode(' ', $categories[$shop['category']] ?? '🏪')[0] ?>
+        <div style="width:52px;height:52px;background:var(--green-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:var(--green-mid);flex-shrink:0">
+          <i class="bi <?= shop_category_icon($shop['category']) ?>"></i>
         </div>
         <div class="flex-grow-1 min-w-0">
           <div class="d-flex align-items-center gap-2 flex-wrap">
             <span class="fw-bold" style="font-size:.92rem"><?= e($shop['name']) ?></span>
             <span class="badge" style="background:var(--green-pale);color:var(--green-dark);font-size:.68rem">
-              <?= $categories[$shop['category']] ?? '🏪 Other' ?>
+              <i class="bi <?= shop_category_icon($shop['category']) ?> me-1"></i><?= shop_category_label($shop['category']) ?>
             </span>
           </div>
           <div class="small text-muted">
@@ -371,7 +362,7 @@ document.addEventListener('DOMContentLoaded', function() {
     html: `<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;
              background:var(--terracotta,#c77c48);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
              transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
-             <span style="transform:rotate(45deg);font-size:14px">🏪</span></div>`,
+             <i class="bi bi-shop" style="transform:rotate(45deg);font-size:14px;color:#fff"></i></div>`,
     iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30],
   });
 

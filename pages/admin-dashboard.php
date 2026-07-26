@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 db_execute(
                     "INSERT INTO notifications (user_id, type, title, message, link)
                      VALUES (?, 'shop_approved', ?, ?, ?)",
-                    [$shop['owner_id'], '🎉 Shop Approved!',
+                    [$shop['owner_id'], 'Shop Approved!',
                      "\"{$shop['name']}\" is now live on iExplore Laguna and visible to tourists.",
                      APP_URL . '/pages/shop-dashboard.php']
                 );
@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     db_execute(
                         "INSERT INTO notifications (user_id, type, title, message, link)
                          VALUES (?, 'hotel_approved', ?, ?, ?)",
-                        [$hotel['owner_id'], '🎉 Hotel Approved!',
+                        [$hotel['owner_id'], 'Hotel Approved!',
                          "\"{$hotel['name']}\" is now live on iExplore Laguna and visible to tourists.",
                          APP_URL . '/pages/hotel-dashboard.php']
                     );
@@ -190,16 +190,16 @@ require_once __DIR__ . '/../includes/header.php';
   <div class="row g-3 mb-4">
     <?php
     $stats = [
-      ['⏳', 'Pending Shops',  count($pending_shops),  '#fef3c7','#92400e'],
-      ['⏳', 'Pending Hotels', count($pending_hotels), '#fef3c7','#92400e'],
-      ['🏪', 'Verified Shops', $verified_shops_count,  '#d4edda','#155724'],
-      ['🏨', 'Verified Hotels',$verified_hotels_count, '#d4edda','#155724'],
-      ['👥', 'Total Users',    $total_users,            '#dbeafe','#1e40af'],
+      ['bi-hourglass-split', 'Pending Shops',  count($pending_shops),  '#fef3c7','#92400e'],
+      ['bi-hourglass-split', 'Pending Hotels', count($pending_hotels), '#fef3c7','#92400e'],
+      ['bi-shop',            'Verified Shops', $verified_shops_count,  '#d4edda','#155724'],
+      ['bi-building',        'Verified Hotels',$verified_hotels_count, '#d4edda','#155724'],
+      ['bi-people-fill',     'Total Users',    $total_users,            '#dbeafe','#1e40af'],
     ];
     foreach ($stats as [$ico,$lbl,$val,$bg,$fg]): ?>
     <div class="col-6 col-lg">
       <div class="p-3 h-100" style="background:<?= $bg ?>;border-radius:var(--radius);border:1.5px solid <?= $fg ?>22">
-        <div style="font-size:1.4rem;margin-bottom:.2rem"><?= $ico ?></div>
+        <div style="font-size:1.4rem;margin-bottom:.2rem;color:<?= $fg ?>"><i class="bi <?= $ico ?>"></i></div>
         <div style="font-size:1.3rem;font-weight:800;color:<?= $fg ?>"><?= $val ?></div>
         <div style="font-size:.75rem;color:<?= $fg ?>;opacity:.8"><?= $lbl ?></div>
       </div>

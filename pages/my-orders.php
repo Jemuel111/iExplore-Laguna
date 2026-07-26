@@ -26,14 +26,8 @@ $orders = db_fetch_all(
     [$u['id']]
 );
 
-$statusColors = [
-    'pending'   => ['#fff3cd','#856404','⏳','Pending'],
-    'confirmed' => ['#d1ecf1','#0c5460','✅','Confirmed'],
-    'preparing' => ['#d4edda','#155724','🍳','Preparing'],
-    'ready'     => ['#d4edda','#155724','📦','Ready for Pickup!'],
-    'picked_up' => ['#e2e3e5','#383d41','✔️','Picked Up'],
-    'cancelled' => ['#f8d7da','#721c24','❌','Cancelled'],
-];
+// Order status colors/icons/labels now come from the shared
+// order_status_meta() helper in helpers.php.
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
@@ -56,7 +50,7 @@ require_once __DIR__ . '/../includes/header.php';
   <div class="alert alert-success d-flex align-items-start gap-3 mb-4" style="border-radius:var(--radius)">
     <i class="bi bi-check-circle-fill fs-4 flex-shrink-0"></i>
     <div>
-      <div class="fw-bold mb-1">Order Placed Successfully! 🎉</div>
+      <div class="fw-bold mb-1">Order Placed Successfully!</div>
       <div>Your order <strong><?= e($new_order) ?></strong> has been sent to the shop.
         You'll be notified when it's confirmed and ready for pickup.</div>
     </div>
@@ -65,7 +59,7 @@ require_once __DIR__ . '/../includes/header.php';
        style="border-radius:var(--radius);background:var(--green-pale);border:1px solid var(--green-light);color:var(--green-dark)">
     <i class="bi bi-signpost-split-fill fs-4 flex-shrink-0"></i>
     <div>
-      <div class="fw-bold mb-1">Added to your itinerary! 🗺️</div>
+      <div class="fw-bold mb-1">Added to your itinerary!</div>
       <?php if ($new_spot): ?>
       <div>The shop you ordered from is near <strong><?= e($new_spot) ?></strong> — we added it to your trip list.</div>
       <?php endif; ?>
@@ -84,7 +78,7 @@ require_once __DIR__ . '/../includes/header.php';
   <?php else: ?>
     <div class="d-flex flex-column gap-3">
       <?php foreach ($orders as $ord):
-        [$bg,$fg,$ico,$label] = $statusColors[$ord['status']] ?? ['#f1f5f9','#334155','📋','Unknown'];
+        $st = order_status_meta($ord['status']); $bg = $st['bg']; $fg = $st['fg']; $ico = $st['icon']; $label = $st['label'];
         $items = db_fetch_all("SELECT * FROM order_items WHERE order_id = ?", [$ord['id']]);
       ?>
       <div style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden">
@@ -95,7 +89,7 @@ require_once __DIR__ . '/../includes/header.php';
           <div class="d-flex align-items-center gap-2 flex-wrap">
             <span class="fw-bold" style="font-family:'Playfair Display',serif"><?= e($ord['order_number']) ?></span>
             <span style="background:<?= $bg ?>;color:<?= $fg ?>;padding:.22rem .75rem;border-radius:20px;font-size:.78rem;font-weight:700">
-              <?= $ico ?> <?= $label ?>
+              <i class="bi <?= $ico ?> me-1"></i><?= $label ?>
             </span>
           </div>
           <span class="text-muted small"><?= date('M d, Y g:i A', strtotime($ord['created_at'])) ?></span>
@@ -137,7 +131,7 @@ require_once __DIR__ . '/../includes/header.php';
               <?php endif; ?>
 
               <?php if ($ord['special_notes']): ?>
-              <div class="mt-2 small text-muted fst-italic">📝 <?= e($ord['special_notes']) ?></div>
+              <div class="mt-2 small text-muted fst-italic"><i class="bi bi-chat-left-text me-1"></i><?= e($ord['special_notes']) ?></div>
               <?php endif; ?>
             </div>
 
@@ -159,7 +153,7 @@ require_once __DIR__ . '/../includes/header.php';
               <?php if ($ord['status'] === 'ready'): ?>
               <div class="mt-2">
                 <span class="badge p-2" style="background:var(--green-mid);font-size:.82rem">
-                  🎉 Ready! Go pick up your order
+                  <i class="bi bi-bag-check-fill me-1"></i>Ready! Go pick up your order
                 </span>
               </div>
               <?php endif; ?>

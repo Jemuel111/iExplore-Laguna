@@ -101,17 +101,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
 
 $cities = db_fetch_all("SELECT id, name FROM cities ORDER BY name");
 
-$categories = [
-    'milktea'    => '🧋 Milk Tea',
-    'cafe'       => '☕ Café',
-    'restaurant' => '🍜 Restaurant',
-    'bakery'     => '🥐 Bakery',
-    'street_food'=> '🍢 Street Food',
-    'souvenir'   => '🛍️ Souvenir',
-    'pasalubong' => '🎁 Pasalubong',
-    'grocery'    => '🛒 Grocery',
-    'other'      => '🏪 Other',
-];
+// Category metadata now comes from the shared shop_categories() helper
+// in helpers.php instead of a locally duplicated emoji array.
 ?>
 
 <section style="min-height:85vh;display:flex;align-items:center;background:linear-gradient(135deg,var(--green-pale) 0%,var(--sand) 100%)">
@@ -237,8 +228,8 @@ $categories = [
               <div class="col-sm-6">
                 <label class="form-label fw-600">Shop Category <span class="text-danger">*</span></label>
                 <select class="form-select" name="category">
-                  <?php foreach ($categories as $val => $label): ?>
-                    <option value="<?= $val ?>"><?= $label ?></option>
+                  <?php foreach (shop_categories() as $val => $meta): ?>
+                    <option value="<?= $val ?>"><?= $meta['label'] ?></option>
                   <?php endforeach; ?>
                 </select>
               </div>

@@ -76,25 +76,12 @@ $hotels = db_fetch_all(
     [$spot['city_id']]
 );
 
-// Category meta
-$cat_emojis = [
-    'nature'=>'🌿','heritage'=>'🏛️','waterfall'=>'💧','hotspring'=>'♨️',
-    'museum'=>'🏺','religious'=>'⛪','beach_lake'=>'🏞️','adventure'=>'🧗','food'=>'🍜'
-];
-$cat_labels = [
-    'nature'=>'Nature','heritage'=>'Heritage','waterfall'=>'Waterfall',
-    'hotspring'=>'Hot Spring','museum'=>'Museum','religious'=>'Religious',
-    'beach_lake'=>'Lake / Beach','adventure'=>'Adventure','food'=>'Food'
-];
-$cat_bgs = [
-    'nature'=>'#fbdede','heritage'=>'#fef3c7','waterfall'=>'#dbeafe',
-    'hotspring'=>'#ffe4e6','museum'=>'#f3e8ff','religious'=>'#fff7ed',
-    'beach_lake'=>'#e0f2fe','adventure'=>'#fef9c3','food'=>'#fce7f3'
-];
-
-$emoji    = $cat_emojis[$spot['category']] ?? '📍';
-$cat_bg   = $cat_bgs[$spot['category']]   ?? '#f1f5f9';
-$cat_name = $cat_labels[$spot['category']] ?? $spot['category'];
+// Category meta — now from the shared spot_categories() helper in
+// helpers.php instead of a locally duplicated emoji array.
+$cat_meta = spot_categories()[$spot['category']] ?? ['icon'=>'bi-geo-alt','label'=>$spot['category'],'bg'=>'#f1f5f9'];
+$cat_icon = $cat_meta['icon'];
+$cat_bg   = $cat_meta['bg'];
+$cat_name = $cat_meta['label'];
 
 $page_title  = e($spot['name']);
 $active_page = 'spots';
@@ -135,7 +122,7 @@ foreach ($photos as $idx => $p) {
 <?php else: ?>
   <!-- No photos: emoji placeholder -->
   <div class="spot-cover-placeholder" style="background:<?= e($cat_bg) ?>">
-    <span style="font-size:5rem"><?= $emoji ?></span>
+    <i class="bi <?= $cat_icon ?>" style="font-size:5rem;color:rgba(0,0,0,.35)"></i>
     <p class="mt-3 text-muted small mb-0">No photos yet — be the first to contribute!</p>
   </div>
 <?php endif; ?>
@@ -184,7 +171,7 @@ foreach ($photos as $idx => $p) {
         <span class="badge-category badge-<?= e($spot['category']) ?>"><?= e($cat_name) ?></span>
         <?php if ($spot['entrance_fee'] == 0): ?>
           <span style="background:#dcfce7;color:#15803d;padding:.2rem .7rem;border-radius:20px;font-size:.72rem;font-weight:700">
-            🎉 Free Entry
+            <i class="bi bi-check-circle-fill me-1"></i>Free Entry
           </span>
         <?php endif; ?>
       </div>
@@ -650,7 +637,7 @@ const spotIcon = L.divIcon({
   html: `<div style="width:32px;height:32px;border-radius:50% 50% 50% 0;
            background:#c77c48;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
            transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
-           <span style="transform:rotate(45deg);font-size:12px;color:#fff">★</span></div>`,
+           <i class="bi <?= $cat_icon ?>" style="transform:rotate(45deg);font-size:14px;color:#fff"></i></div>`,
   iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32],
 });
 L.marker([SPOT_LAT, SPOT_LNG], { icon: spotIcon })

@@ -177,9 +177,9 @@ $base_qs = http_build_query(array_filter([
       <div class="d-flex gap-2 align-items-center ms-auto">
         <select class="form-select form-select-sm" style="width:auto;font-size:.8rem" onchange="applySort(this.value)">
           <option value="stars"      <?= $filter_sort==='stars'?'selected':'' ?>>⭐ Top Rated</option>
-          <option value="price_asc"  <?= $filter_sort==='price_asc'?'selected':'' ?>>💰 Price ↑</option>
-          <option value="price_desc" <?= $filter_sort==='price_desc'?'selected':'' ?>>💰 Price ↓</option>
-          <option value="name"       <?= $filter_sort==='name'?'selected':'' ?>>🔤 A–Z</option>
+          <option value="price_asc"  <?= $filter_sort==='price_asc'?'selected':'' ?>>Price: Low to High</option>
+          <option value="price_desc" <?= $filter_sort==='price_desc'?'selected':'' ?>>Price: High to Low</option>
+          <option value="name"       <?= $filter_sort==='name'?'selected':'' ?>>Name: A–Z</option>
         </select>
         <div class="btn-group btn-group-sm" role="group">
           <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'stars'=>$filter_stars?:'','max_price'=>$filter_budget?:'','sort'=>$filter_sort!=='stars'?$filter_sort:'','amenities'=>$filter_amenities])) ?>"
@@ -265,9 +265,9 @@ $base_qs = http_build_query(array_filter([
           <label class="form-label">Sort By</label>
           <select class="form-select form-select-sm" name="sort">
             <option value="stars"      <?= $filter_sort==='stars'?'selected':'' ?>>⭐ Top Rated</option>
-            <option value="price_asc"  <?= $filter_sort==='price_asc'?'selected':'' ?>>💰 Price Low→High</option>
-            <option value="price_desc" <?= $filter_sort==='price_desc'?'selected':'' ?>>💰 Price High→Low</option>
-            <option value="name"       <?= $filter_sort==='name'?'selected':'' ?>>🔤 A–Z</option>
+            <option value="price_asc"  <?= $filter_sort==='price_asc'?'selected':'' ?>>Price: Low to High</option>
+            <option value="price_desc" <?= $filter_sort==='price_desc'?'selected':'' ?>>Price: High to Low</option>
+            <option value="name"       <?= $filter_sort==='name'?'selected':'' ?>>Name: A–Z</option>
           </select>
         </div>
         <button type="submit" class="btn btn-primary-app w-100 mb-2">
@@ -333,7 +333,7 @@ $base_qs = http_build_query(array_filter([
             <img src="<?= e($cardImg) ?>" alt="<?= e($hotel['name']) ?>" style="width:100%;height:100%;object-fit:cover">
           </div>
           <?php else: ?>
-          <div class="card-img-placeholder" style="height:130px;font-size:2.2rem">🏨</div>
+          <div class="card-img-placeholder" style="height:130px;font-size:2.2rem"><i class="bi bi-building"></i></div>
           <?php endif; ?>
           </a>
           <div class="card-body-app d-flex flex-column">
@@ -397,7 +397,7 @@ $base_qs = http_build_query(array_filter([
           <img src="<?= e($cardImg) ?>" alt="<?= e($hotel['name']) ?>" style="width:100%;height:100%;object-fit:cover">
         </div>
         <?php else: ?>
-        <div class="spot-emoji-box" style="font-size:1.6rem">🏨</div>
+        <div class="spot-emoji-box" style="font-size:1.6rem"><i class="bi bi-building"></i></div>
         <?php endif; ?>
         <div class="flex-grow-1 min-w-0">
           <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
@@ -506,7 +506,7 @@ document.addEventListener('DOMContentLoaded', function() {
     html: `<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;
              background:#8e2434;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
              transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
-             <span style="transform:rotate(45deg);font-size:14px">🏨</span></div>`,
+             <i class="bi bi-building" style="transform:rotate(45deg);font-size:14px;color:#fff"></i></div>`,
     iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30],
   });
 

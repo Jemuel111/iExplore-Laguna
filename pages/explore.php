@@ -42,32 +42,10 @@ $shops = db_fetch_all(
      ORDER BY s.name ASC"
 );
 
-$shopCatLabels = [
-    'milktea'=>'Milk Tea','cafe'=>'Café','restaurant'=>'Restaurant','bakery'=>'Bakery',
-    'street_food'=>'Street Food','souvenir'=>'Souvenir','pasalubong'=>'Pasalubong',
-    'grocery'=>'Grocery','other'=>'Other',
-];
-$shopCatEmojis = [
-    'milktea'=>'🧋','cafe'=>'☕','restaurant'=>'🍜','bakery'=>'🥐','street_food'=>'🍢',
-    'souvenir'=>'🛍️','pasalubong'=>'🎁','grocery'=>'🛒','other'=>'🏪',
-];
+// Shop category metadata now comes from shop_categories() in helpers.php.
 
-$catLabels = [
-    'nature'=>'Nature','heritage'=>'Heritage','waterfall'=>'Waterfall',
-    'hotspring'=>'Hot Spring','museum'=>'Museum','religious'=>'Religious',
-    'beach_lake'=>'Lake/Beach','adventure'=>'Adventure','food'=>'Food',
-];
-$catEmojis = [
-    'nature'=>'🌿','heritage'=>'🏛️','waterfall'=>'💧','hotspring'=>'♨️',
-    'museum'=>'🏺','religious'=>'⛪','beach_lake'=>'🏞️','adventure'=>'🧗','food'=>'🍜',
-];
-$catColors = [
-    'nature'=>['#fbdede','#6b0f14'],'heritage'=>['#fef3c7','#92400e'],
-    'waterfall'=>['#dbeafe','#1e40af'],'hotspring'=>['#ffe4e6','#9f1239'],
-    'museum'=>['#f3e8ff','#6b21a8'],'religious'=>['#fff7ed','#9a3412'],
-    'beach_lake'=>['#e0f2fe','#075985'],'adventure'=>['#fef9c3','#713f12'],
-    'food'=>['#fce7f3','#9d174d'],
-];
+// Category metadata now comes from the shared spot_categories() helper
+// in helpers.php instead of a locally duplicated array.
 ?>
 
 <!-- Page hero -->
@@ -102,10 +80,10 @@ $catColors = [
 
       <!-- Tab pills -->
       <div class="d-flex gap-1" id="type-tabs">
-        <button class="filter-pill active" data-tab="all">🗺️ All</button>
-        <button class="filter-pill" data-tab="spot">📍 Spots</button>
-        <button class="filter-pill" data-tab="hotel">🏨 Hotels</button>
-        <button class="filter-pill" data-tab="shop">🧋 Shops</button>
+        <button class="filter-pill active" data-tab="all"><i class="bi bi-grid me-1"></i>All</button>
+        <button class="filter-pill" data-tab="spot"><i class="bi bi-geo-alt me-1"></i>Spots</button>
+        <button class="filter-pill" data-tab="hotel"><i class="bi bi-building me-1"></i>Hotels</button>
+        <button class="filter-pill" data-tab="shop"><i class="bi bi-shop me-1"></i>Shops</button>
       </div>
 
       <div class="vr d-none d-md-block mx-1" style="opacity:.2"></div>
@@ -113,8 +91,8 @@ $catColors = [
       <!-- Category quick filter (spots only) -->
       <div class="d-flex gap-1 flex-wrap" id="cat-filters">
         <button class="filter-pill active" data-cat="">All Categories</button>
-        <?php foreach ($catLabels as $key => $label): ?>
-        <button class="filter-pill" data-cat="<?= $key ?>"><?= $catEmojis[$key] ?> <?= $label ?></button>
+        <?php foreach (spot_categories() as $key => $meta): ?>
+        <button class="filter-pill" data-cat="<?= $key ?>"><i class="bi <?= $meta['icon'] ?> me-1"></i><?= $meta['label'] ?></button>
         <?php endforeach; ?>
       </div>
 
@@ -161,7 +139,8 @@ $catColors = [
     <div class="row g-3" id="explore-grid">
 
       <?php foreach ($spots as $spot):
-        [$bg,$fg] = $catColors[$spot['category']] ?? ['#f1f5f9','#334155'];
+        $catMeta = spot_categories()[$spot['category']] ?? ['bg'=>'#f1f5f9','fg'=>'#334155','icon'=>'bi-geo-alt','label'=>$spot['category']];
+        $bg = $catMeta['bg']; $fg = $catMeta['fg'];
       ?>
       <div class="col-sm-6 col-xl-4 explore-item"
            data-type="spot"
@@ -175,7 +154,7 @@ $catColors = [
           <!-- Image placeholder -->
           <div class="explore-card-img" style="<?= !empty($spot['main_photo_url']) ? "background-image:url('".e($spot['main_photo_url'])."');background-size:cover;background-position:center;" : "background:{$bg}" ?>">
             <?php if (empty($spot['main_photo_url'])): ?>
-            <span class="explore-emoji"><?= $catEmojis[$spot['category']] ?? '📍' ?></span>
+            <span class="explore-emoji"><i class="bi <?= $catMeta['icon'] ?>"></i></span>
             <?php endif; ?>
             <!-- Add to cart btn -->
             <button class="add-to-cart-btn" onclick="toggleCart('spot',<?= $spot['id'] ?>,'<?= e(addslashes($spot['name'])) ?>','<?= e($spot['city_name']) ?>',<?= (float)$spot['entrance_fee'] ?>,'spot')"
@@ -186,7 +165,7 @@ $catColors = [
           <div class="explore-card-body">
             <div class="mb-1">
               <span class="cat-badge" style="background:<?= $bg ?>;color:<?= $fg ?>">
-                <?= $catLabels[$spot['category']] ?? $spot['category'] ?>
+                <?= $catMeta['label'] ?>
               </span>
             </div>
             <h6 class="explore-card-title">
@@ -206,7 +185,7 @@ $catColors = [
             <?php endif; ?>
             <div class="explore-card-footer">
               <span class="explore-price <?= $spot['entrance_fee'] > 0 ? 'paid' : 'free' ?>">
-                <?= $spot['entrance_fee'] > 0 ? '₱'.number_format($spot['entrance_fee'],0) : '🎉 Free' ?>
+                <?= $spot['entrance_fee'] > 0 ? '₱'.number_format($spot['entrance_fee'],0) : 'Free' ?>
               </span>
               <button class="btn-add-list" onclick="toggleCart('spot',<?= $spot['id'] ?>,'<?= e(addslashes($spot['name'])) ?>','<?= e($spot['city_name']) ?>',<?= (float)$spot['entrance_fee'] ?>,'spot')"
                       data-key="spot-<?= $spot['id'] ?>">
@@ -229,7 +208,7 @@ $catColors = [
            data-cityname="<?= e(strtolower($hotel['city_name'])) ?>">
         <div class="explore-card h-100" data-id="hotel-<?= $hotel['id'] ?>">
           <div class="explore-card-img" style="background:#e8f4f8">
-            <span class="explore-emoji">🏨</span>
+            <span class="explore-emoji"><i class="bi bi-building"></i></span>
             <button class="add-to-cart-btn" onclick="toggleCart('hotel',<?= $hotel['id'] ?>,'<?= e(addslashes($hotel['name'])) ?>','<?= e($hotel['city_name']) ?>',<?= (float)$hotel['price_min'] ?>,'hotel')"
                     data-key="hotel-<?= $hotel['id'] ?>" title="Add to My List">
               <i class="bi bi-plus-lg"></i>
@@ -269,7 +248,7 @@ $catColors = [
            data-cityname="<?= e(strtolower($shop['city_name'])) ?>">
         <div class="explore-card h-100" data-id="shop-<?= $shop['id'] ?>">
           <div class="explore-card-img" style="background:var(--sand)">
-            <span class="explore-emoji"><?= $shopCatEmojis[$shop['category']] ?? '🏪' ?></span>
+            <span class="explore-emoji"><i class="bi <?= shop_category_icon($shop['category']) ?>"></i></span>
             <button class="add-to-cart-btn" onclick="toggleCart('shop',<?= $shop['id'] ?>,'<?= e(addslashes($shop['name'])) ?>','<?= e($shop['city_name']) ?>',0,'shop')"
                     data-key="shop-<?= $shop['id'] ?>" title="Add to My List">
               <i class="bi bi-plus-lg"></i>
@@ -278,7 +257,7 @@ $catColors = [
           <div class="explore-card-body">
             <div class="mb-1">
               <span class="cat-badge" style="background:var(--green-pale);color:var(--green-dark)">
-                <?= $shopCatEmojis[$shop['category']] ?? '🏪' ?> <?= $shopCatLabels[$shop['category']] ?? ucfirst($shop['category']) ?>
+                <i class="bi <?= shop_category_icon($shop['category']) ?> me-1"></i><?= shop_category_label($shop['category']) ?>
               </span>
             </div>
             <h6 class="explore-card-title"><?= e($shop['name']) ?></h6>
@@ -293,7 +272,7 @@ $catColors = [
             </div>
             <?php endif; ?>
             <div class="explore-card-footer">
-              <span class="explore-price free">🛍️ Order there</span>
+              <span class="explore-price free"><i class="bi bi-shop me-1"></i>Order there</span>
               <button class="btn-add-list" onclick="toggleCart('shop',<?= $shop['id'] ?>,'<?= e(addslashes($shop['name'])) ?>','<?= e($shop['city_name']) ?>',0,'shop')"
                       data-key="shop-<?= $shop['id'] ?>">
                 <i class="bi bi-plus-lg me-1"></i><span class="btn-add-label">Add</span>
@@ -523,7 +502,8 @@ $catColors = [
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:1.2rem;
+  font-size:1.1rem;
+  color: var(--green-dark);
   flex-shrink:0;
 }
 .cart-item-info { flex:1; min-width:0; }
@@ -595,7 +575,8 @@ $catColors = [
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:1.3rem;
+  font-size:1.15rem;
+  color: var(--green-dark);
   flex-shrink:0;
 }
 .itinerary-info { flex:1; }
@@ -774,9 +755,9 @@ function renderCartPanel(panelId) {
       </div>`;
   } else {
     listEl.innerHTML = cart.map(item => {
-      const emoji = item.type === 'hotel' ? '🏨'
-        : item.type === 'shop'  ? '🧋'
-        : (item.icon || '📍');
+      const iconClass = item.type === 'hotel' ? 'bi-building'
+        : item.type === 'shop'  ? 'bi-shop'
+        : 'bi-geo-alt';
       const priceStr = item.type === 'hotel'
         ? (item.price > 0 ? '₱'+Number(item.price).toLocaleString()+'/night' : 'Price varies')
         : item.type === 'shop'
@@ -785,7 +766,7 @@ function renderCartPanel(panelId) {
       return `
         <div class="cart-item">
           <div class="cart-item-icon" style="background:${item.type==='hotel'?'#e8f4f8':item.type==='shop'?'var(--sand)':'var(--green-pale)'}">
-            ${emoji}
+            <i class="bi ${iconClass}"></i>
           </div>
           <div class="cart-item-info">
             <div class="cart-item-name">${item.name}</div>
@@ -869,14 +850,14 @@ function generateItinerary() {
   days.forEach(d => {
     html += `<div class="itinerary-day">
       <div class="itinerary-day-header">
-        📅 Day ${d.day} — ${d.city}
+        <i class="bi bi-calendar3 me-2"></i>Day ${d.day} — ${d.city}
       </div>`;
 
     // Depart
     html += `
       <div class="itinerary-row">
         <div class="itinerary-time">7:00 AM</div>
-        <div class="itinerary-icon" style="background:var(--green-pale)">🌅</div>
+        <div class="itinerary-icon" style="background:var(--green-pale)"><i class="bi bi-sunrise"></i></div>
         <div class="itinerary-info">
           <div class="itinerary-name">Depart for ${d.city}</div>
           <div class="itinerary-sub">Prepare your bags and head to the terminal early.</div>
@@ -890,7 +871,7 @@ function generateItinerary() {
       html += `
         <div class="itinerary-row">
           <div class="itinerary-time">${t}</div>
-          <div class="itinerary-icon" style="background:var(--green-pale)">📍</div>
+          <div class="itinerary-icon" style="background:var(--green-pale)"><i class="bi bi-geo-alt"></i></div>
           <div class="itinerary-info">
             <div class="itinerary-name">${s.name}</div>
             <div class="itinerary-sub">${s.city}</div>
@@ -904,7 +885,7 @@ function generateItinerary() {
       html += `
         <div class="itinerary-row">
           <div class="itinerary-time">${t}</div>
-          <div class="itinerary-icon" style="background:var(--sand)">🧋</div>
+          <div class="itinerary-icon" style="background:var(--sand)"><i class="bi bi-shop"></i></div>
           <div class="itinerary-info">
             <div class="itinerary-name">Stop by ${sh.name}</div>
             <div class="itinerary-sub">${sh.city} · order ahead for pickup</div>
@@ -917,7 +898,7 @@ function generateItinerary() {
       html += `
         <div class="itinerary-row" style="background:var(--sand)">
           <div class="itinerary-time">6:00 PM</div>
-          <div class="itinerary-icon" style="background:#e8f4f8">🏨</div>
+          <div class="itinerary-icon" style="background:#e8f4f8"><i class="bi bi-building"></i></div>
           <div class="itinerary-info">
             <div class="itinerary-name">Check-in: ${d.hotel.name}</div>
             <div class="itinerary-sub">${d.hotel.city}</div>
@@ -928,7 +909,7 @@ function generateItinerary() {
       html += `
         <div class="itinerary-row" style="background:var(--sand)">
           <div class="itinerary-time">6:00 PM</div>
-          <div class="itinerary-icon" style="background:#e8f4f8">🏠</div>
+          <div class="itinerary-icon" style="background:#e8f4f8"><i class="bi bi-house"></i></div>
           <div class="itinerary-info">
             <div class="itinerary-name">Head home or rest</div>
             <div class="itinerary-sub">End of Day ${d.day}</div>

@@ -45,12 +45,12 @@ ksort($byDay);
   <div class="container">
     <div class="d-flex align-items-start gap-3 flex-wrap">
       <div style="width:64px;height:64px;background:rgba(255,255,255,.15);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:2.2rem;flex-shrink:0">
-        <?= $pkg['cover_emoji'] ?>
+        <i class="bi bi-suitcase-lg-fill"></i>
       </div>
       <div class="flex-grow-1">
         <div class="mb-1">
           <span class="badge" style="background:rgba(255,255,255,.18)">
-            <?= $pkg['scope']==='single_city' ? '📍 '.e($pkg['city_name']) : '🗺️ Multi-City' ?>
+            <?php if ($pkg['scope']==='single_city'): ?><i class="bi bi-geo-alt me-1"></i><?= e($pkg['city_name']) ?><?php else: ?><i class="bi bi-map me-1"></i>Multi-City<?php endif; ?>
           </span>
           <span class="badge" style="background:rgba(255,255,255,.18)"><?= (int)$pkg['days'] ?> days</span>
         </div>
@@ -79,7 +79,7 @@ ksort($byDay);
 
     <!-- Hotel -->
     <div class="p-3 mb-3 d-flex align-items-center gap-3" style="background:#f7dde1;border-radius:var(--radius-sm)">
-      <div style="width:48px;height:48px;background:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex-shrink:0">🏨</div>
+      <div style="width:48px;height:48px;background:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:#8e2434;flex-shrink:0"><i class="bi bi-building"></i></div>
       <div class="flex-grow-1">
         <div class="fw-bold" style="font-size:.92rem"><?= e($pkg['hotel_name'] ?? 'Hotel') ?>
           <span style="color:var(--sand-dark);font-size:.75rem"><?= str_repeat('★',(int)$pkg['star_rating']) ?></span>
@@ -96,7 +96,7 @@ ksort($byDay);
         <div class="fw-bold mb-2" style="font-family:'Playfair Display',serif;color:var(--green-dark)">Day <?= $dayNum ?></div>
         <?php foreach ($spots as $sp): ?>
         <div class="d-flex align-items-center gap-3 p-2 mb-1" style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm)">
-          <div style="width:36px;height:36px;background:var(--green-pale);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">📍</div>
+          <div style="width:36px;height:36px;background:var(--green-pale);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:var(--green-mid);flex-shrink:0"><i class="bi bi-geo-alt"></i></div>
           <div class="flex-grow-1 min-w-0">
             <div class="fw-bold" style="font-size:.86rem"><?= e($sp['name']) ?></div>
             <div class="small text-muted"><?= e($sp['city_name']) ?></div>
@@ -146,9 +146,9 @@ ksort($byDay);
           <div class="mb-3">
             <label class="form-label small fw-600">Payment Method</label>
             <select class="form-select form-select-sm" id="payment-method">
-              <option value="cash_on_checkin">💵 Cash on Check-in</option>
-              <option value="gcash">📱 GCash</option>
-              <option value="maya">📱 Maya</option>
+              <option value="cash_on_checkin">Cash on Check-in</option>
+              <option value="gcash">GCash</option>
+              <option value="maya">Maya</option>
             </select>
           </div>
 
@@ -273,7 +273,7 @@ document.addEventListener('DOMContentLoaded', function() {
     pkgLatLngs.push([pt.lat, pt.lng]);
     const isHotel = pt.type === 'hotel';
     const bg = isHotel ? '#8e2434' : 'var(--green-mid)';
-    const label = isHotel ? '🏨' : String(pt.day);
+    const label = isHotel ? '<i class="bi bi-building"></i>' : String(pt.day);
     const icon = L.divIcon({
       className: '',
       html: `<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;

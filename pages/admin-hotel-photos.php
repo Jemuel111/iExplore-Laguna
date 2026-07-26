@@ -243,10 +243,10 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="mb-3">
           <label class="form-label">Category</label>
           <select class="form-select" name="photo_type">
-            <option value="gallery">🖼️ Gallery (general)</option>
-            <option value="room">🛏️ Room</option>
-            <option value="amenity">🏊 Amenity</option>
-            <option value="exterior">🏨 Exterior</option>
+            <option value="gallery">Gallery (general)</option>
+            <option value="room">Room</option>
+            <option value="amenity">Amenity</option>
+            <option value="exterior">Exterior</option>
           </select>
         </div>
         <div class="mb-3">
@@ -274,7 +274,7 @@ require_once __DIR__ . '/../includes/header.php';
             <?php foreach (hotel_amenity_presets() as $preset): [$pi, $pl] = explode('::', $preset, 2); ?>
             <option value="<?= e($preset) ?>"><?= e($pl) ?></option>
             <?php endforeach; ?>
-            <option value="custom">✏️ Custom amenity…</option>
+            <option value="custom">Custom amenity…</option>
           </select>
         </div>
         <div id="amenity-custom-fields" class="d-none">

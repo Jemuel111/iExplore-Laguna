@@ -19,6 +19,16 @@ $budgetRanges = get_budget_level_ranges();
 
 $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
 
+// Real photography for the hero/CTA backgrounds instead of a flat
+// gradient block — pulled from actual uploaded spot photos so the
+// homepage always reflects real content, not a stock placeholder.
+$hero_photo = db_fetch_one(
+  "SELECT url FROM spot_photos WHERE photo_type='main' ORDER BY id ASC LIMIT 1"
+)['url'] ?? null;
+$cta_photo = db_fetch_one(
+  "SELECT url FROM spot_photos WHERE photo_type='main' ORDER BY id DESC LIMIT 1"
+)['url'] ?? $hero_photo;
+
 // Stats from DB
 $stat_spots  = db_fetch_one("SELECT COUNT(*) as n FROM tourist_spots WHERE is_active=1")['n'] ?? '17+';
 $stat_hotels = db_fetch_one("SELECT COUNT(*) as n FROM hotels WHERE is_active=1")['n'] ?? '9';
@@ -39,15 +49,17 @@ function spot_badge(string $category): string {
 
 <!-- ── HERO ────────────────────────────────────────────────── -->
 <section class="hero-section">
+  <?php if ($hero_photo): ?>
+  <div class="hero-bg" style="background-image:url('<?= e($hero_photo) ?>')"></div>
+  <?php endif; ?>
   <div class="container position-relative" style="z-index:1">
-    <div class="row align-items-center g-5">
-
-      <div class="col-lg-6">
+    <div class="row">
+      <div class="col-lg-7 col-xl-6">
         <div class="fade-up">
-          <span class="section-label" style="color:var(--sand-dark);opacity:.9">Smart Travel Planner</span>
+          <span class="hero-eyebrow">Smart Travel Planner · Laguna, Philippines</span>
         </div>
         <h1 class="hero-title fade-up fade-up-1">
-          Discover the <em>Heart</em><br>of Laguna Province
+          Discover the <em>Heart</em> of Laguna Province
         </h1>
         <p class="hero-subtitle fade-up fade-up-2">
           <strong style="color:var(--sand-dark);font-style:italic">i</strong>Explore Laguna
@@ -80,72 +92,66 @@ function spot_badge(string $category): string {
           </div>
         </div>
       </div>
-
-      <!-- Quick planner card -->
-      <div class="col-lg-5 offset-lg-1 fade-up fade-up-2">
-        <div class="hero-form-card">
-          <div class="d-flex align-items-center gap-2 mb-1">
-            <span style="background:var(--green-pale);border-radius:8px;padding:.35rem .5rem;font-size:1.1rem">🗺️</span>
-            <h5 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
-              Quick Route Planner
-            </h5>
-          </div>
-          <p class="text-muted small mb-3">Select cities to see route &amp; budget instantly.</p>
-
-          <form id="quick-plan-form">
-            <div class="mb-3">
-              <label class="form-label">
-                <i class="bi bi-geo-alt text-green me-1"></i>Starting Point
-              </label>
-              <select class="form-select" id="qp-origin" name="origin" required>
-                <option value="">— Select city —</option>
-                <?php foreach ($cities as $c): ?>
-                  <option value="<?= $c['id'] ?>"><?= e($c['name']) ?></option>
-                <?php endforeach; ?>
-              </select>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">
-                <i class="bi bi-flag text-green me-1"></i>Destination
-              </label>
-              <select class="form-select" id="qp-dest" name="destination" required>
-                <option value="">— Select city —</option>
-                <?php foreach ($cities as $c): ?>
-                  <option value="<?= $c['id'] ?>"><?= e($c['name']) ?></option>
-                <?php endforeach; ?>
-              </select>
-            </div>
-            <div class="row g-2 mb-4">
-              <div class="col-6">
-                <label class="form-label"><i class="bi bi-calendar3 text-green me-1"></i>Days</label>
-                <select class="form-select" id="qp-days" name="days">
-                  <option value="1">1 day</option>
-                  <option value="2">2 days</option>
-                  <option value="3">3 days</option>
-                </select>
-              </div>
-              <div class="col-6">
-                <label class="form-label"><i class="bi bi-wallet2 text-green me-1"></i>Budget</label>
-                <select class="form-select" id="qp-budget" name="budget_level">
-                  <option value="budget">💰 ₱<?= number_format($budgetRanges['budget']['min']) ?>–<?= number_format($budgetRanges['budget']['max']) ?>/day</option>
-                  <option value="midrange" selected>💳 ₱<?= number_format($budgetRanges['midrange']['min']) ?>–<?= number_format($budgetRanges['midrange']['max']) ?>/day</option>
-                  <option value="upscale">💎 ₱<?= number_format($budgetRanges['upscale']['min']) ?>–<?= number_format($budgetRanges['upscale']['max']) ?>/day</option>
-                </select>
-              </div>
-            </div>
-            <button type="submit" class="btn btn-primary-app w-100 py-2">
-              <i class="bi bi-search me-2"></i>Find Route &amp; Budget
-            </button>
-          </form>
-        </div>
-      </div>
-
     </div>
   </div>
 </section>
 
+<!-- ── Search bar overlapping hero + stats ──────────────────── -->
+<div class="container position-relative">
+  <div class="hero-search-bar fade-up fade-up-2">
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <i class="bi bi-signpost-split text-green"></i>
+      <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--green-dark);font-size:.95rem">
+        Quick Route Planner
+      </h6>
+    </div>
+    <form id="quick-plan-form" class="row g-3 g-lg-0 align-items-end mt-1" novalidate>
+      <div class="col-6 col-lg-3">
+        <label class="field-label"><i class="bi bi-geo-alt me-1"></i>From</label>
+        <select class="form-select" id="qp-origin" name="origin" required>
+          <option value="">Select city</option>
+          <?php foreach ($cities as $c): ?>
+            <option value="<?= $c['id'] ?>"><?= e($c['name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="col-6 col-lg-3 hero-search-field">
+        <label class="field-label"><i class="bi bi-flag me-1"></i>To</label>
+        <select class="form-select" id="qp-dest" name="destination" required>
+          <option value="">Select city</option>
+          <?php foreach ($cities as $c): ?>
+            <option value="<?= $c['id'] ?>"><?= e($c['name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="col-6 col-lg-2 hero-search-field">
+        <label class="field-label"><i class="bi bi-calendar3 me-1"></i>Days</label>
+        <select class="form-select" id="qp-days" name="days">
+          <option value="1">1 day</option>
+          <option value="2">2 days</option>
+          <option value="3">3 days</option>
+        </select>
+      </div>
+      <div class="col-6 col-lg-3 hero-search-field">
+        <label class="field-label"><i class="bi bi-wallet2 me-1"></i>Budget</label>
+        <select class="form-select" id="qp-budget" name="budget_level">
+          <option value="budget">₱<?= number_format($budgetRanges['budget']['min']) ?>–<?= number_format($budgetRanges['budget']['max']) ?>/day</option>
+          <option value="midrange" selected>₱<?= number_format($budgetRanges['midrange']['min']) ?>–<?= number_format($budgetRanges['midrange']['max']) ?>/day</option>
+          <option value="upscale">₱<?= number_format($budgetRanges['upscale']['min']) ?>–<?= number_format($budgetRanges['upscale']['max']) ?>/day</option>
+        </select>
+      </div>
+      <div class="col-12 col-lg-1">
+        <button type="submit" class="btn btn-primary-app w-100 py-2 hero-search-submit" title="Find Route & Budget">
+          <i class="bi bi-search me-2 d-lg-none"></i><span class="d-lg-none">Find Route &amp; Budget</span>
+          <i class="bi bi-search d-none d-lg-inline"></i>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- ── STATS STRIP ──────────────────────────────────────────── -->
-<section class="stat-strip">
+<section class="stat-strip" style="margin-top:2.5rem">
   <div class="container">
     <div class="row g-0 text-center">
       <?php
@@ -181,8 +187,9 @@ function spot_badge(string $category): string {
 
     <div class="row g-4">
       <?php
-      $emojis = ['nature'=>'🌿','heritage'=>'🏛️','waterfall'=>'💧','hotspring'=>'♨️',
-                 'museum'=>'🏺','religious'=>'⛪','beach_lake'=>'🏞️','adventure'=>'🧗','food'=>'🍜'];
+      $catIcons = ['nature'=>'bi-tree','heritage'=>'bi-bank','waterfall'=>'bi-droplet',
+                   'hotspring'=>'bi-fire','museum'=>'bi-columns-gap','religious'=>'bi-building',
+                   'beach_lake'=>'bi-water','adventure'=>'bi-compass','food'=>'bi-cup-hot'];
       $i = 0;
       foreach ($featured_spots as $spot): $i++;
       ?>
@@ -195,7 +202,7 @@ function spot_badge(string $category): string {
           </div>
           <?php else: ?>
           <div class="card-img-placeholder">
-            <?= $emojis[$spot['category']] ?? '📍' ?>
+            <i class="bi <?= $catIcons[$spot['category']] ?? 'bi-geo-alt' ?>"></i>
           </div>
           <?php endif; ?>
           </a>
@@ -240,35 +247,45 @@ function spot_badge(string $category): string {
 <!-- ── HOW IT WORKS ─────────────────────────────────────────── -->
 <section class="py-4" style="background:var(--green-pale)">
   <div class="container">
-    <div class="text-center mb-4 reveal">
-      <span class="section-label">How it Works</span>
-      <h2 class="section-title">Plan Your Laguna Trip in 4 Easy Steps</h2>
-      <div class="divider-fancy mx-auto mt-3"></div>
-    </div>
-    <div class="row g-4">
-      <?php
-      $steps = [
-        ['bi-geo-alt-fill',    '1',  'Choose Your Route',   'Select your start and destination city from our list of Laguna municipalities.'],
-        ['bi-map-fill',        '2',  'Explore the Map',     'See your route on an interactive map with tourist spots highlighted along the way.'],
-        ['bi-calculator-fill', '3',  'Estimate Budget',     'Get a detailed breakdown: transport, entrance fees, food, and accommodation.'],
-        ['bi-journal-check',   '4',  'Get Your Itinerary',  'Receive an auto-generated day-by-day travel plan based on your preferences.'],
-      ];
-      foreach ($steps as [$icon, $num, $title, $desc]): ?>
-      <div class="col-sm-6 col-lg-3 reveal">
-        <div class="step-card">
-          <div class="step-num mx-auto"><?= $num ?></div>
-          <div class="mb-3 fs-2 text-green"><i class="bi <?= $icon ?>"></i></div>
-          <h5 class="fw-bold mb-2" style="font-family:'Playfair Display',serif;font-size:1.05rem"><?= $title ?></h5>
-          <p class="text-muted small mb-0"><?= $desc ?></p>
-        </div>
+    <div class="row g-5 align-items-center">
+      <div class="col-lg-5 reveal">
+        <span class="section-label">How it Works</span>
+        <h2 class="section-title">Plan Your Laguna Trip in 4 Easy Steps</h2>
+        <div class="divider-fancy mt-3 mb-3"></div>
+        <p class="text-muted">
+          From picking a route to getting a ready-made day-by-day plan —
+          the whole thing takes minutes, not hours of tab-switching between
+          maps, blogs, and spreadsheets.
+        </p>
       </div>
-      <?php endforeach; ?>
+      <div class="col-lg-7 reveal">
+        <?php
+        $steps = [
+          ['bi-geo-alt-fill',    '1',  'Choose Your Route',   'Select your start and destination city from our list of Laguna municipalities.'],
+          ['bi-map-fill',        '2',  'Explore the Map',     'See your route on an interactive map with tourist spots highlighted along the way.'],
+          ['bi-calculator-fill', '3',  'Estimate Budget',     'Get a detailed breakdown: transport, entrance fees, food, and accommodation.'],
+          ['bi-journal-check',   '4',  'Get Your Itinerary',  'Receive an auto-generated day-by-day travel plan based on your preferences.'],
+        ];
+        foreach ($steps as [$icon, $num, $title, $desc]): ?>
+        <div class="step-row">
+          <div class="step-row-line"></div>
+          <div class="step-num"><?= $num ?></div>
+          <div class="pt-1">
+            <div class="step-row-title"><i class="bi <?= $icon ?> text-green me-2"></i><?= $title ?></div>
+            <p class="text-muted small mb-0"><?= $desc ?></p>
+          </div>
+        </div>
+        <?php endforeach; ?>
+      </div>
     </div>
   </div>
 </section>
 
 <!-- ── CTA ──────────────────────────────────────────────────── -->
 <section class="py-4 cta-section">
+  <?php if ($cta_photo): ?>
+  <div class="cta-bg" style="background-image:url('<?= e($cta_photo) ?>')"></div>
+  <?php endif; ?>
   <div class="container text-center position-relative" style="z-index:1">
     <div class="reveal">
       <span class="section-label" style="color:var(--sand-dark)">Start Now</span>
@@ -291,20 +308,36 @@ function spot_badge(string $category): string {
 <script>
 document.getElementById('quick-plan-form').addEventListener('submit', function(e) {
   e.preventDefault();
-  const origin = document.getElementById('qp-origin').value;
-  const dest   = document.getElementById('qp-dest').value;
+  const originField = document.getElementById('qp-origin');
+  const destField    = document.getElementById('qp-dest');
+  const origin = originField.value;
+  const dest   = destField.value;
   const days   = document.getElementById('qp-days').value;
   const budget = document.getElementById('qp-budget').value;
+
+  // Clear any previous error highlight before re-checking
+  [originField, destField].forEach(f => f.closest('.col-6').classList.remove('field-error'));
+
   if (!origin || !dest) {
+    if (!origin) originField.closest('.col-6').classList.add('field-error');
+    if (!dest)   destField.closest('.col-6').classList.add('field-error');
     IExploreApp.toast('Please select both origin and destination.', 'warning');
     return;
   }
   if (origin === dest) {
+    originField.closest('.col-6').classList.add('field-error');
+    destField.closest('.col-6').classList.add('field-error');
     IExploreApp.toast('Origin and destination must be different cities.', 'warning');
     return;
   }
   const params = new URLSearchParams({ origin, destination: dest, days, budget_level: budget });
   window.location.href = `pages/planner.php?${params}`;
+});
+
+['qp-origin', 'qp-dest'].forEach(id => {
+  document.getElementById(id).addEventListener('change', function() {
+    this.closest('.col-6').classList.remove('field-error');
+  });
 });
 </script>
 
