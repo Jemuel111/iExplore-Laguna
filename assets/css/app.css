@@ -1292,3 +1292,10 @@ section .card-app:hover {
   .auth-split-content h2 { font-size: 1.5rem; }
   .auth-split-form { padding: 2.5rem 1.5rem; }
 }
+
+/* Wider form column for the owner-registration pages — step 2 has
+   denser 2-column rows (city+category, phone+email, hours) that feel
+   cramped at the standard 400px form width. */
+.auth-split-wide .auth-split-photo { flex: 1 1 38%; }
+.auth-split-wide .auth-split-form  { flex: 1 1 62%; }
+.auth-split-wide .auth-form-inner  { max-width: 460px; }

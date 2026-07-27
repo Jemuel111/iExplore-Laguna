@@ -100,192 +100,197 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
 }
 
 $cities = db_fetch_all("SELECT id, name FROM cities ORDER BY name");
+
+// Real photo for the split-screen panel
+$auth_photo = db_fetch_one(
+    "SELECT url FROM spot_photos WHERE photo_type='main' ORDER BY RAND() LIMIT 1"
+)['url'] ?? null;
 ?>
 
-<section style="min-height:85vh;display:flex;align-items:center;background:linear-gradient(135deg,var(--green-pale) 0%,var(--sand) 100%)">
-  <div class="container py-5">
-    <div class="row justify-content-center">
-      <div class="col-md-8 col-lg-6">
+<section class="auth-split auth-split-wide auth-split-reverse">
+  <div class="auth-split-form">
+    <div class="auth-form-inner fade-up">
 
-        <!-- Progress steps -->
-        <div class="d-flex align-items-center justify-content-center gap-0 mb-4 fade-up">
-          <div class="d-flex align-items-center gap-2">
-            <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;
-                 background:<?= $step>=1?'var(--green-mid)':'#ddd' ?>;color:#fff">1</div>
-            <span style="font-size:.82rem;font-weight:600;color:<?= $step>=1?'var(--green-dark)':'#999' ?>">Account</span>
-          </div>
-          <div style="width:48px;height:2px;background:<?= $step>=2?'var(--green-mid)':'#ddd' ?>;margin:0 .5rem"></div>
-          <div class="d-flex align-items-center gap-2">
-            <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;
-                 background:<?= $step>=2?'var(--green-mid)':'#ddd' ?>;color:<?= $step>=2?'#fff':'#999' ?>">2</div>
-            <span style="font-size:.82rem;font-weight:600;color:<?= $step>=2?'var(--green-dark)':'#999' ?>">Hotel Profile</span>
-          </div>
+      <!-- Progress steps -->
+      <div class="d-flex align-items-center gap-0 mb-4">
+        <div class="d-flex align-items-center gap-2">
+          <div style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.8rem;
+               background:<?= $step>=1?'var(--green-mid)':'#ddd' ?>;color:#fff">1</div>
+          <span style="font-size:.8rem;font-weight:600;color:<?= $step>=1?'var(--green-dark)':'#999' ?>">Account</span>
         </div>
-
-        <!-- Header -->
-        <div class="text-center mb-4 fade-up">
-          <div style="width:64px;height:64px;background:linear-gradient(135deg,#8e2434,#c65a68);border-radius:18px;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(83,74,183,.3);margin-bottom:.75rem">
-            <i class="bi bi-building fs-3" style="color:#fff"></i>
-          </div>
-          <h2 class="mt-2 mb-1" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
-            <?= $step === 1 ? 'Register as Hotel Owner' : 'Set Up Your Hotel' ?>
-          </h2>
-          <p class="text-muted small">
-            <?= $step === 1
-              ? 'Create your account to start listing your hotel on iExplore Laguna'
-              : 'Tell tourists about your hotel — location, rating, and price range' ?>
-          </p>
-        </div>
-
-        <div class="form-panel fade-up fade-up-1">
-
-          <?php if ($errors): ?>
-            <div class="alert alert-danger small mb-3">
-              <ul class="mb-0 ps-3">
-                <?php foreach ($errors as $err): ?>
-                  <li><?= e($err) ?></li>
-                <?php endforeach; ?>
-              </ul>
-            </div>
-          <?php endif; ?>
-
-          <!-- ── STEP 1: Account form ── -->
-          <?php if ($step === 1): ?>
-          <form method="POST" action="?step=1" novalidate><?= csrf_field() ?>
-            <div class="mb-3">
-              <label class="form-label">Full Name</label>
-              <div class="input-icon-wrap">
-                <i class="bi bi-person"></i>
-                <input type="text" class="form-control" name="name" placeholder="Your full name" required>
-              </div>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Email Address</label>
-              <div class="input-icon-wrap">
-                <i class="bi bi-envelope"></i>
-                <input type="email" class="form-control" name="email" placeholder="hotel@email.com" required>
-              </div>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Mobile Number</label>
-              <div class="input-icon-wrap">
-                <i class="bi bi-phone"></i>
-                <input type="text" class="form-control" name="phone" placeholder="09XXXXXXXXX">
-              </div>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Password</label>
-              <div class="input-group">
-                <div class="input-icon-wrap flex-grow-1">
-                  <i class="bi bi-lock"></i>
-                  <input type="password" class="form-control" name="password" id="pw-field"
-                         placeholder="Min. 8 characters" required
-                         style="border-radius:var(--radius-sm) 0 0 var(--radius-sm)">
-                </div>
-                <button type="button" class="btn btn-outline-secondary" id="pw-toggle"
-                        style="border-color:var(--border);border-left:none">
-                  <i class="bi bi-eye" id="pw-icon"></i>
-                </button>
-              </div>
-            </div>
-            <div class="mb-4">
-              <label class="form-label">Confirm Password</label>
-              <div class="input-icon-wrap">
-                <i class="bi bi-lock-fill"></i>
-                <input type="password" class="form-control" name="confirm" placeholder="Repeat password" required>
-              </div>
-            </div>
-            <button type="submit" class="btn btn-primary-app w-100 py-2">
-              <i class="bi bi-arrow-right-circle me-2"></i>Continue to Hotel Setup
-            </button>
-          </form>
-
-          <!-- ── STEP 2: Hotel profile form ── -->
-          <?php else: ?>
-          <form method="POST" action="?step=2" novalidate><?= csrf_field() ?>
-            <div class="mb-3">
-              <label class="form-label fw-600">Hotel Name <span class="text-danger">*</span></label>
-              <div class="input-icon-wrap">
-                <i class="bi bi-building"></i>
-                <input type="text" class="form-control" name="hotel_name"
-                       placeholder="e.g. Lakeview Hot Springs Resort" required>
-              </div>
-            </div>
-
-            <div class="row g-3 mb-3">
-              <div class="col-sm-6">
-                <label class="form-label fw-600">City / Municipality <span class="text-danger">*</span></label>
-                <select class="form-select" name="city_id" required>
-                  <option value="">Select city…</option>
-                  <?php foreach ($cities as $c): ?>
-                    <option value="<?= $c['id'] ?>"><?= e($c['name']) ?></option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
-              <div class="col-sm-6">
-                <label class="form-label fw-600">Star Rating</label>
-                <select class="form-select" name="star_rating">
-                  <?php for ($s = 5; $s >= 1; $s--): ?>
-                    <option value="<?= $s ?>" <?= $s===3?'selected':'' ?>><?= str_repeat('★',$s).str_repeat('☆',5-$s) ?></option>
-                  <?php endfor; ?>
-                </select>
-              </div>
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label">Street Address</label>
-              <div class="input-icon-wrap">
-                <i class="bi bi-pin-map"></i>
-                <input type="text" class="form-control" name="address"
-                       placeholder="e.g. Pansol, Calamba">
-              </div>
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label">Description</label>
-              <textarea class="form-control" name="description" rows="3"
-                        placeholder="Tell tourists what makes your hotel special…"
-                        style="resize:none"></textarea>
-            </div>
-
-            <div class="row g-3 mb-3">
-              <div class="col-sm-6">
-                <label class="form-label">Hotel Phone</label>
-                <div class="input-icon-wrap">
-                  <i class="bi bi-telephone"></i>
-                  <input type="text" class="form-control" name="phone" placeholder="09XXXXXXXXX">
-                </div>
-              </div>
-            </div>
-
-            <div class="row g-3 mb-3">
-              <div class="col-sm-6">
-                <label class="form-label">Lowest Nightly Rate (₱)</label>
-                <input type="number" class="form-control" name="price_min" min="0" step="50" placeholder="e.g. 1500">
-              </div>
-              <div class="col-sm-6">
-                <label class="form-label">Highest Nightly Rate (₱)</label>
-                <input type="number" class="form-control" name="price_max" min="0" step="50" placeholder="e.g. 5000">
-              </div>
-            </div>
-            <p class="text-muted small mb-3">You'll add specific room types with exact prices in your dashboard after this step.</p>
-
-            <button type="submit" class="btn btn-primary-app w-100 py-2 mt-2">
-              <i class="bi bi-check-circle me-2"></i>Register My Hotel
-            </button>
-          </form>
-          <?php endif; ?>
-
-          <hr class="my-3" style="border-color:var(--border)">
-          <p class="text-center text-muted small mb-0">
-            Already have an account?
-            <a href="login.php" class="fw-bold text-green">Log in here</a>
-            &nbsp;·&nbsp;
-            <a href="register.php" class="fw-bold text-green">Tourist account</a>
-          </p>
-
+        <div style="width:36px;height:2px;background:<?= $step>=2?'var(--green-mid)':'#ddd' ?>;margin:0 .5rem"></div>
+        <div class="d-flex align-items-center gap-2">
+          <div style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.8rem;
+               background:<?= $step>=2?'var(--green-mid)':'#ddd' ?>;color:<?= $step>=2?'#fff':'#999' ?>">2</div>
+          <span style="font-size:.8rem;font-weight:600;color:<?= $step>=2?'var(--green-dark)':'#999' ?>">Hotel Profile</span>
         </div>
       </div>
+
+      <h2 class="auth-heading"><?= $step === 1 ? 'Register as Hotel Owner' : 'Set Up Your Hotel' ?></h2>
+      <p class="auth-subheading">
+        <?= $step === 1
+          ? 'Create your account to start listing your hotel on iExplore Laguna'
+          : 'Tell tourists about your hotel — location, rating, and price range' ?>
+      </p>
+
+      <?php if ($errors): ?>
+        <div class="alert alert-danger small mb-3">
+          <ul class="mb-0 ps-3">
+            <?php foreach ($errors as $err): ?>
+              <li><?= e($err) ?></li>
+            <?php endforeach; ?>
+          </ul>
+        </div>
+      <?php endif; ?>
+
+      <!-- ── STEP 1: Account form ── -->
+      <?php if ($step === 1): ?>
+      <form method="POST" action="?step=1" novalidate><?= csrf_field() ?>
+        <div class="mb-3">
+          <label class="form-label">Full Name</label>
+          <div class="input-icon-wrap">
+            <i class="bi bi-person"></i>
+            <input type="text" class="form-control" name="name" placeholder="Your full name" required>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email Address</label>
+          <div class="input-icon-wrap">
+            <i class="bi bi-envelope"></i>
+            <input type="email" class="form-control" name="email" placeholder="hotel@email.com" required>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Mobile Number</label>
+          <div class="input-icon-wrap">
+            <i class="bi bi-phone"></i>
+            <input type="text" class="form-control" name="phone" placeholder="09XXXXXXXXX">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Password</label>
+          <div class="input-group">
+            <div class="input-icon-wrap flex-grow-1">
+              <i class="bi bi-lock"></i>
+              <input type="password" class="form-control" name="password" id="pw-field"
+                     placeholder="Min. 8 characters" required
+                     style="border-radius:var(--radius-sm) 0 0 var(--radius-sm)">
+            </div>
+            <button type="button" class="btn btn-outline-secondary" id="pw-toggle"
+                    style="border-color:var(--border);border-left:none">
+              <i class="bi bi-eye" id="pw-icon"></i>
+            </button>
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="form-label">Confirm Password</label>
+          <div class="input-icon-wrap">
+            <i class="bi bi-lock-fill"></i>
+            <input type="password" class="form-control" name="confirm" placeholder="Repeat password" required>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary-app w-100 py-2">
+          <i class="bi bi-arrow-right-circle me-2"></i>Continue to Hotel Setup
+        </button>
+      </form>
+
+      <!-- ── STEP 2: Hotel profile form ── -->
+      <?php else: ?>
+      <form method="POST" action="?step=2" novalidate><?= csrf_field() ?>
+        <div class="mb-3">
+          <label class="form-label fw-600">Hotel Name <span class="text-danger">*</span></label>
+          <div class="input-icon-wrap">
+            <i class="bi bi-building"></i>
+            <input type="text" class="form-control" name="hotel_name"
+                   placeholder="e.g. Lakeview Hot Springs Resort" required>
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label fw-600">City / Municipality <span class="text-danger">*</span></label>
+            <select class="form-select" name="city_id" required>
+              <option value="">Select city…</option>
+              <?php foreach ($cities as $c): ?>
+                <option value="<?= $c['id'] ?>"><?= e($c['name']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label fw-600">Star Rating</label>
+            <select class="form-select" name="star_rating">
+              <?php for ($s = 5; $s >= 1; $s--): ?>
+                <option value="<?= $s ?>" <?= $s===3?'selected':'' ?>><?= str_repeat('★',$s).str_repeat('☆',5-$s) ?></option>
+              <?php endfor; ?>
+            </select>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Street Address</label>
+          <div class="input-icon-wrap">
+            <i class="bi bi-pin-map"></i>
+            <input type="text" class="form-control" name="address"
+                   placeholder="e.g. Pansol, Calamba">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Description</label>
+          <textarea class="form-control" name="description" rows="3"
+                    placeholder="Tell tourists what makes your hotel special…"
+                    style="resize:none"></textarea>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label">Hotel Phone</label>
+            <div class="input-icon-wrap">
+              <i class="bi bi-telephone"></i>
+              <input type="text" class="form-control" name="phone" placeholder="09XXXXXXXXX">
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label">Lowest Nightly Rate (₱)</label>
+            <input type="number" class="form-control" name="price_min" min="0" step="50" placeholder="e.g. 1500">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">Highest Nightly Rate (₱)</label>
+            <input type="number" class="form-control" name="price_max" min="0" step="50" placeholder="e.g. 5000">
+          </div>
+        </div>
+        <p class="text-muted small mb-3">You'll add specific room types with exact prices in your dashboard after this step.</p>
+
+        <button type="submit" class="btn btn-primary-app w-100 py-2 mt-2">
+          <i class="bi bi-check-circle me-2"></i>Register My Hotel
+        </button>
+      </form>
+      <?php endif; ?>
+
+      <hr class="my-3" style="border-color:var(--border)">
+      <p class="text-center text-muted small mb-0">
+        Already have an account?
+        <a href="login.php" class="fw-bold text-green">Log in here</a>
+        &nbsp;·&nbsp;
+        <a href="register.php" class="fw-bold text-green">Tourist account</a>
+      </p>
+
+    </div>
+  </div>
+
+  <div class="auth-split-photo">
+    <?php if ($auth_photo): ?>
+    <div class="auth-split-bg" style="background-image:url('<?= e($auth_photo) ?>')"></div>
+    <?php endif; ?>
+    <div class="auth-split-content">
+      <a href="<?= APP_URL ?>" class="auth-wordmark">
+        <i class="bi bi-map-fill me-2"></i><em>i</em>Explore <span>Laguna</span>
+      </a>
+      <h2>Host travelers<br>discovering Laguna.</h2>
+      <p>List your hotel or resort and connect with tourists already planning their stay through iExplore Laguna.</p>
     </div>
   </div>
 </section>
