@@ -1203,3 +1203,92 @@ section .card-app:hover {
 
 /* ── Scroll-to-top (moved to avoid overlap with pagination) ── */
 #scroll-top { bottom: 4.5rem; }
+
+/* ── Auth pages (login/register) — split screen ─────────────
+   Real photo + editorial copy on one side, clean form on the
+   other. Replaces the old centered-card-on-gradient pattern that
+   every SaaS starter template uses. */
+.auth-split {
+  min-height: calc(100vh - 56px);
+  display: flex;
+}
+.auth-split-photo {
+  flex: 1 1 46%;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  isolation: isolate;
+  color: #fff;
+}
+.auth-split-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  z-index: -2;
+}
+.auth-split-photo::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(190deg, rgba(46,7,9,.55) 0%, rgba(46,7,9,.88) 100%);
+  z-index: -1;
+}
+.auth-split-content {
+  padding: 3rem 3.25rem;
+  max-width: 480px;
+}
+.auth-wordmark {
+  display: inline-flex;
+  align-items: center;
+  color: #fff;
+  text-decoration: none;
+  font-family: 'Playfair Display', serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 2.5rem;
+}
+.auth-wordmark em { font-style: italic; color: var(--sand-dark); }
+.auth-wordmark span { color: var(--sand-dark); margin-left: .3rem; }
+.auth-split-content h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: 1rem;
+}
+.auth-split-content p {
+  opacity: .85;
+  line-height: 1.7;
+  font-size: .98rem;
+}
+.auth-split-form {
+  flex: 1 1 54%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  background: var(--cream);
+}
+.auth-form-inner { width: 100%; max-width: 400px; }
+.auth-heading {
+  font-family: 'Playfair Display', serif;
+  color: var(--green-dark);
+  font-size: 1.7rem;
+  margin-bottom: .3rem;
+}
+.auth-subheading {
+  color: var(--text-muted);
+  font-size: .92rem;
+  margin-bottom: 1.75rem;
+}
+
+@media (max-width: 991px) {
+  .auth-split { flex-direction: column; }
+  .auth-split-reverse .auth-split-photo { order: -1; }
+  .auth-split-photo { flex: 0 0 auto; min-height: 260px; align-items: center; text-align: center; }
+  .auth-split-content { padding: 2rem 1.5rem; max-width: none; }
+  .auth-split-content h2 { font-size: 1.5rem; }
+  .auth-split-form { padding: 2.5rem 1.5rem; }
+}

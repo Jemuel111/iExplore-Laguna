@@ -318,7 +318,7 @@ require_once __DIR__ . '/../includes/header.php';
               <img src="<?= e($ph['url']) ?>" alt="" style="width:100%;height:100%;object-fit:cover">
               <?php if ($ph['photo_type'] === 'main'): ?>
               <span class="badge" style="position:absolute;top:6px;left:6px;background:var(--sand-dark);color:#8e2434;font-size:.68rem">
-                ⭐ Main Photo
+                <i class="bi bi-star-fill me-1"></i>Main Photo
               </span>
               <?php endif; ?>
             </div>
@@ -330,7 +330,7 @@ require_once __DIR__ . '/../includes/header.php';
                   <input type="hidden" name="action" value="set_main">
                   <input type="hidden" name="photo_id" value="<?= $ph['id'] ?>">
                   <input type="hidden" name="hotel_id" value="<?= $selected_hotel['id'] ?>">
-                  <button class="btn btn-sm btn-outline-secondary w-100" style="font-size:.72rem">⭐ Set Main</button>
+                  <button class="btn btn-sm btn-outline-secondary w-100" style="font-size:.72rem"><i class="bi bi-star-fill me-1"></i>Set Main</button>
                 </form>
                 <?php endif; ?>
                 <form method="POST" onsubmit="return confirm('Delete this photo?')"><?= csrf_field() ?>

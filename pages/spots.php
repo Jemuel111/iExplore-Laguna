@@ -82,17 +82,9 @@ if ($view_mode === 'map') {
 
 $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
 
-$categories = [
-    'nature'    => '🌿 Nature',
-    'heritage'  => '🏛️ Heritage',
-    'waterfall' => '💧 Waterfall',
-    'hotspring' => '♨️ Hot Spring',
-    'museum'    => '🏺 Museum',
-    'religious' => '⛪ Religious',
-    'beach_lake'=> '🏞️ Lake/Beach',
-    'adventure' => '🧗 Adventure',
-    'food'      => '🍜 Food',
-];
+// Category metadata now comes from the shared spot_categories() helper
+// in helpers.php instead of a locally duplicated array (this one still
+// had emoji baked directly into the label strings).
 
 // Category metadata (icon/label/colors) now comes from spot_categories()
 // in helpers.php — was previously duplicated here as three separate
@@ -130,10 +122,10 @@ $base_qs = http_build_query(array_filter([
       <div class="d-flex gap-1 flex-wrap flex-grow-1">
         <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'free'=>$filter_free,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>"
            class="filter-pill <?= !$filter_cat ? 'active' : '' ?>">All</a>
-        <?php foreach ($categories as $val => $label): ?>
+        <?php foreach (spot_categories() as $val => $meta): ?>
         <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'category'=>$val,'free'=>$filter_free,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>"
            class="filter-pill <?= $filter_cat === $val ? 'active' : '' ?>">
-          <?= $label ?>
+          <i class="bi <?= $meta['icon'] ?> me-1"></i><?= $meta['label'] ?>
         </a>
         <?php endforeach; ?>
       </div>
@@ -142,9 +134,9 @@ $base_qs = http_build_query(array_filter([
       <div class="d-flex gap-2 align-items-center ms-auto">
         <!-- Sort -->
         <select class="form-select form-select-sm" style="width:auto;font-size:.8rem" onchange="applySort(this.value)">
-          <option value="rating"  <?= $filter_sort==='rating'?'selected':'' ?>>⭐ Top Rated</option>
-          <option value="name"    <?= $filter_sort==='name'?'selected':'' ?>>🔤 A–Z</option>
-          <option value="fee"     <?= $filter_sort==='fee'?'selected':'' ?>>💰 Price ↑</option>
+          <option value="rating"  <?= $filter_sort==='rating'?'selected':'' ?>>Top Rated</option>
+          <option value="name"    <?= $filter_sort==='name'?'selected':'' ?>>Name: A–Z</option>
+          <option value="fee"     <?= $filter_sort==='fee'?'selected':'' ?>>Price: Low to High</option>
         </select>
 
         <!-- View toggle -->
@@ -200,9 +192,9 @@ $base_qs = http_build_query(array_filter([
           <label class="form-label">Category</label>
           <select class="form-select form-select-sm" name="category">
             <option value="">All Categories</option>
-            <?php foreach ($categories as $val => $label): ?>
+            <?php foreach (spot_categories() as $val => $meta): ?>
               <option value="<?= $val ?>" <?= $filter_cat === $val ? 'selected' : '' ?>>
-                <?= $label ?>
+                <?= $meta['label'] ?>
               </option>
             <?php endforeach; ?>
           </select>
@@ -212,9 +204,9 @@ $base_qs = http_build_query(array_filter([
         <div class="mb-3">
           <label class="form-label">Sort By</label>
           <select class="form-select form-select-sm" name="sort">
-            <option value="rating" <?= $filter_sort==='rating'?'selected':'' ?>>⭐ Top Rated</option>
-            <option value="name"   <?= $filter_sort==='name'?'selected':'' ?>>🔤 A–Z</option>
-            <option value="fee"    <?= $filter_sort==='fee'?'selected':'' ?>>💰 Price ↑</option>
+            <option value="rating" <?= $filter_sort==='rating'?'selected':'' ?>>Top Rated</option>
+            <option value="name"   <?= $filter_sort==='name'?'selected':'' ?>>Name: A–Z</option>
+            <option value="fee"    <?= $filter_sort==='fee'?'selected':'' ?>>Price: Low to High</option>
           </select>
         </div>
 
@@ -286,17 +278,17 @@ $base_qs = http_build_query(array_filter([
       <span class="text-muted small">Active:</span>
       <?php if ($filter_city): ?>
         <span class="badge rounded-pill" style="background:var(--green-pale);color:var(--green-dark);padding:.35rem .85rem">
-          📍 <?= e($filter_city) ?> <a href="?<?= http_build_query(array_filter(['category'=>$filter_cat,'free'=>$filter_free,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>" class="text-decoration-none ms-1" style="color:var(--green-dark)">×</a>
+          <i class="bi bi-geo-alt-fill me-1"></i><?= e($filter_city) ?> <a href="?<?= http_build_query(array_filter(['category'=>$filter_cat,'free'=>$filter_free,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>" class="text-decoration-none ms-1" style="color:var(--green-dark)">×</a>
         </span>
       <?php endif; ?>
       <?php if ($filter_cat): ?>
         <span class="badge rounded-pill" style="background:var(--green-pale);color:var(--green-dark);padding:.35rem .85rem">
-          <?= e($categories[$filter_cat] ?? $filter_cat) ?> <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'free'=>$filter_free,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>" class="text-decoration-none ms-1" style="color:var(--green-dark)">×</a>
+          <i class="bi <?= spot_category_icon($filter_cat) ?> me-1"></i><?= e(spot_category_label($filter_cat)) ?> <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'free'=>$filter_free,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>" class="text-decoration-none ms-1" style="color:var(--green-dark)">×</a>
         </span>
       <?php endif; ?>
       <?php if ($filter_free): ?>
         <span class="badge rounded-pill" style="background:var(--green-pale);color:var(--green-dark);padding:.35rem .85rem">
-          🎉 Free Entry <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'category'=>$filter_cat,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>" class="text-decoration-none ms-1" style="color:var(--green-dark)">×</a>
+          <i class="bi bi-check-circle-fill me-1"></i>Free Entry <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'category'=>$filter_cat,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>" class="text-decoration-none ms-1" style="color:var(--green-dark)">×</a>
         </span>
       <?php endif; ?>
     </div>
@@ -346,7 +338,7 @@ $base_qs = http_build_query(array_filter([
               <span class="fw-bold">
                 <?= $spot['entrance_fee'] > 0
                     ? '<span style="color:var(--terracotta)">₱ ' . number_format($spot['entrance_fee'], 0) . '</span>'
-                    : '<span style="color:#16a34a;font-size:.82rem">🎉 Free</span>' ?>
+                    : '<span style="color:#16a34a;font-size:.82rem"><i class="bi bi-check-circle-fill me-1"></i>Free</span>' ?>
               </span>
               <a href="spot-detail.php?id=<?= $spot['id'] ?>"
                  class="btn btn-sm btn-primary-app">

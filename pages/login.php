@@ -63,70 +63,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// Real photo for the split-screen panel, same source as the homepage hero
+$auth_photo = db_fetch_one(
+    "SELECT url FROM spot_photos WHERE photo_type='main' ORDER BY RAND() LIMIT 1"
+)['url'] ?? null;
+
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
-<section style="min-height:80vh;display:flex;align-items:center;background:linear-gradient(135deg,var(--green-pale) 0%,var(--sand) 100%)">
-  <div class="container py-5">
-    <div class="row justify-content-center">
-      <div class="col-md-6 col-lg-4">
+<section class="auth-split">
+  <div class="auth-split-photo">
+    <?php if ($auth_photo): ?>
+    <div class="auth-split-bg" style="background-image:url('<?= e($auth_photo) ?>')"></div>
+    <?php endif; ?>
+    <div class="auth-split-content">
+      <a href="<?= APP_URL ?>" class="auth-wordmark">
+        <i class="bi bi-map-fill me-2"></i><em>i</em>Explore <span>Laguna</span>
+      </a>
+      <h2>Pick up right where<br>you left off.</h2>
+      <p>Your saved spots, hotels, and itineraries are waiting — log back in to keep planning your Laguna trip.</p>
+    </div>
+  </div>
 
-        <div class="text-center mb-4 fade-up">
-          <div style="width:64px;height:64px;background:linear-gradient(135deg,var(--green-mid),var(--green-dark));border-radius:18px;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(45,106,79,.3);margin-bottom:.75rem">
-            <i class="bi bi-map-fill fs-3" style="color:#fff"></i>
+  <div class="auth-split-form">
+    <div class="auth-form-inner fade-up">
+      <h2 class="auth-heading">Welcome Back</h2>
+      <p class="auth-subheading">Log in to access your saved itineraries</p>
+
+      <?php if ($error): ?>
+        <div class="alert alert-danger small mb-3 d-flex align-items-center gap-2">
+          <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+          <span><?= e($error) ?></span>
+        </div>
+      <?php endif; ?>
+
+      <form method="POST" novalidate>
+        <?= csrf_field() ?>
+        <div class="mb-3">
+          <label class="form-label">Email Address</label>
+          <div class="input-icon-wrap">
+            <i class="bi bi-envelope"></i>
+            <input type="email" class="form-control" name="email"
+                   value="<?= e($email) ?>" placeholder="juan@email.com" autofocus required>
           </div>
-          <h2 class="mt-2 mb-1" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
-            Welcome Back
-          </h2>
-          <p class="text-muted small">Log in to access your saved itineraries</p>
         </div>
-
-        <div class="form-panel fade-up fade-up-1">
-          <?php if ($error): ?>
-            <div class="alert alert-danger small mb-3 d-flex align-items-center gap-2">
-              <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
-              <span><?= e($error) ?></span>
+        <div class="mb-4">
+          <label class="form-label">Password</label>
+          <div class="input-group">
+            <div class="input-icon-wrap flex-grow-1">
+              <i class="bi bi-lock"></i>
+              <input type="password" class="form-control" name="password"
+                     id="pw-field" placeholder="Your password" required
+                     style="border-radius:var(--radius-sm) 0 0 var(--radius-sm)">
             </div>
-          <?php endif; ?>
-
-          <form method="POST" novalidate>
-            <?= csrf_field() ?>
-            <div class="mb-3">
-              <label class="form-label">Email Address</label>
-              <div class="input-icon-wrap">
-                <i class="bi bi-envelope"></i>
-                <input type="email" class="form-control" name="email"
-                       value="<?= e($email) ?>" placeholder="juan@email.com" autofocus required>
-              </div>
-            </div>
-            <div class="mb-4">
-              <label class="form-label">Password</label>
-              <div class="input-group">
-                <div class="input-icon-wrap flex-grow-1">
-                  <i class="bi bi-lock"></i>
-                  <input type="password" class="form-control" name="password"
-                         id="pw-field" placeholder="Your password" required
-                         style="border-radius:var(--radius-sm) 0 0 var(--radius-sm)">
-                </div>
-                <button type="button" class="btn btn-outline-secondary" id="pw-toggle"
-                        style="border-color:var(--border);border-left:none">
-                  <i class="bi bi-eye" id="pw-icon"></i>
-                </button>
-              </div>
-            </div>
-            <button type="submit" class="btn btn-primary-app w-100 py-2">
-              <i class="bi bi-box-arrow-in-right me-2"></i>Log In
+            <button type="button" class="btn btn-outline-secondary" id="pw-toggle"
+                    style="border-color:var(--border);border-left:none">
+              <i class="bi bi-eye" id="pw-icon"></i>
             </button>
-          </form>
-
-          <hr class="my-3" style="border-color:var(--border)">
-          <p class="text-center text-muted small mb-0">
-            Don't have an account?
-            <a href="register.php" class="fw-bold text-green">Sign up free</a>
-          </p>
+          </div>
         </div>
+        <button type="submit" class="btn btn-primary-app w-100 py-2">
+          <i class="bi bi-box-arrow-in-right me-2"></i>Log In
+        </button>
+      </form>
 
-      </div>
+      <hr class="my-3" style="border-color:var(--border)">
+      <p class="text-center text-muted small mb-0">
+        Don't have an account?
+        <a href="register.php" class="fw-bold text-green">Sign up free</a>
+      </p>
     </div>
   </div>
 </section>

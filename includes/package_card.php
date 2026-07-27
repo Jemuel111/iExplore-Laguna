@@ -9,12 +9,12 @@ function render_package_card(array $p): void {
 ?>
 <div class="card-app h-100">
   <div class="card-img-placeholder" style="height:120px;font-size:2.4rem;background:var(--green-pale)">
-    <?= $p['cover_emoji'] ?>
+    <i class="bi bi-suitcase-lg-fill"></i>
   </div>
   <div class="card-body-app d-flex flex-column">
     <div class="mb-1">
       <span class="badge" style="background:var(--sand);color:var(--green-dark);font-size:.72rem">
-        <?= $p['scope'] === 'single_city' ? '📍 '.e($p['city_name']) : '🗺️ Multiple Cities' ?>
+        <?php if ($p['scope'] === 'single_city'): ?><i class="bi bi-geo-alt me-1"></i><?= e($p['city_name']) ?><?php else: ?><i class="bi bi-map me-1"></i>Multiple Cities<?php endif; ?>
       </span>
       <span class="badge" style="background:var(--green-pale);color:var(--green-dark);font-size:.72rem">
         <?= (int)$p['days'] ?> day<?= $p['days']!=1?'s':'' ?>

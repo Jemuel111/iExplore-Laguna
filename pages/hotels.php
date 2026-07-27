@@ -176,7 +176,7 @@ $base_qs = http_build_query(array_filter([
 
       <div class="d-flex gap-2 align-items-center ms-auto">
         <select class="form-select form-select-sm" style="width:auto;font-size:.8rem" onchange="applySort(this.value)">
-          <option value="stars"      <?= $filter_sort==='stars'?'selected':'' ?>>⭐ Top Rated</option>
+          <option value="stars"      <?= $filter_sort==='stars'?'selected':'' ?>>Top Rated</option>
           <option value="price_asc"  <?= $filter_sort==='price_asc'?'selected':'' ?>>Price: Low to High</option>
           <option value="price_desc" <?= $filter_sort==='price_desc'?'selected':'' ?>>Price: High to Low</option>
           <option value="name"       <?= $filter_sort==='name'?'selected':'' ?>>Name: A–Z</option>
@@ -264,7 +264,7 @@ $base_qs = http_build_query(array_filter([
         <div class="mb-4">
           <label class="form-label">Sort By</label>
           <select class="form-select form-select-sm" name="sort">
-            <option value="stars"      <?= $filter_sort==='stars'?'selected':'' ?>>⭐ Top Rated</option>
+            <option value="stars"      <?= $filter_sort==='stars'?'selected':'' ?>>Top Rated</option>
             <option value="price_asc"  <?= $filter_sort==='price_asc'?'selected':'' ?>>Price: Low to High</option>
             <option value="price_desc" <?= $filter_sort==='price_desc'?'selected':'' ?>>Price: High to Low</option>
             <option value="name"       <?= $filter_sort==='name'?'selected':'' ?>>Name: A–Z</option>
