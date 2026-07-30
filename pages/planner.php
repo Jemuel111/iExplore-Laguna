@@ -245,7 +245,7 @@ $transport_labels = [
       </div>
       <div class="d-flex align-items-center gap-2">
         <span style="width:16px;height:3px;background:#a61c1c;display:inline-block;border-radius:2px;flex-shrink:0"></span>
-        <span>Road Route (OSRM)</span>
+        <span>Road Route (ORS)</span>
       </div>
     </div>
 
@@ -317,7 +317,6 @@ $transport_labels = [
 
 <!-- ── Hide LRM default turn-by-turn panel ─────────────────── -->
 <style>
-  .leaflet-routing-container { display: none !important; }
 </style>
 
 <!-- ── JS ──────────────────────────────────────────────────── -->
@@ -343,7 +342,6 @@ setTimeout(() => { map.invalidateSize(); }, 800);
 window.addEventListener('resize', () => map.invalidateSize());
 
 // State
-let routeControl  = null;   // LRM routing control (replaces routeLayer)
 let markerLayer   = L.layerGroup().addTo(map);
 let allSpots      = [];
 let routeData     = null;
@@ -509,81 +507,69 @@ async function planRoute() {
   }
 }
 
-// ── Draw road-following route via OSRM ──────────────────────
-function drawRoute(data) {
+// ── Draw road-following route via OpenRouteService ──────────
+// Calls our own server-side proxy (api/routes.php?action=directions)
+// so the ORS API key never reaches the browser, then draws the
+// returned line as a plain Leaflet polyline — no external routing
+// library needed.
+let routeLayerGroup = null;
+
+async function drawRoute(data) {
   const { origin, destination } = data;
 
-  // Remove previous routing control
-  if (routeControl) {
-    routeControl.remove();
-    routeControl = null;
+  // Remove previous route layer
+  if (routeLayerGroup) {
+    map.removeLayer(routeLayerGroup);
+    routeLayerGroup = null;
   }
 
   const startLatLng = L.latLng(parseFloat(origin.latitude),      parseFloat(origin.longitude));
   const endLatLng   = L.latLng(parseFloat(destination.latitude), parseFloat(destination.longitude));
 
-  routeControl = L.Routing.control({
-    waypoints: [startLatLng, endLatLng],
-    router: L.Routing.osrmv1({
-      serviceUrl: 'https://router.project-osrm.org/route/v1',
-      profile: 'driving',
-      useHints: false,
-    }),
-    lineOptions: {
-      styles: [{ color: '#a61c1c', weight: 5, opacity: 0.85 }],
-      extendToWaypoints: true,
-      missingRouteTolerance: 0,
-    },
-    // Override default markers with our custom icons
-    createMarker: function(i, waypoint) {
-      const icon  = i === 0 ? iconStart : iconEnd;
-      const name  = i === 0 ? origin.name : destination.name;
-      const label = i === 0 ? 'Starting Point' : 'Destination';
-      return L.marker(waypoint.latLng, { icon })
-        .bindPopup(`<div class="popup-title">${name}</div>
-                    <div class="popup-meta"><i class="bi bi-geo-alt"></i> ${label}</div>`);
-    },
-    show: false,              // hide turn-by-turn instructions panel
-    addWaypoints: false,      // disable drag-to-add waypoints
-    routeWhileDragging: false,
-    fitSelectedRoutes: true,
-    collapsible: false,
-  }).addTo(map);
-
-  // Fit map bounds once route is calculated
-  routeControl.on('routesfound', function(e) {
-    const coords = e.routes[0].coordinates;
-    const bounds = L.latLngBounds(coords.map(c => [c.lat, c.lng]));
-    map.fitBounds(bounds, { padding: [40, 40] });
-  });
-
-  // Fallback: draw straight dashed line if OSRM fails
-  routeControl.on('routingerror', function(e) {
-    console.warn('OSRM routing error, falling back to straight line:', e);
-    const fallback = L.polyline([startLatLng, endLatLng], {
-      color: '#a61c1c',
-      weight: 4,
-      opacity: 0.6,
-      dashArray: '10 6',
-    }).addTo(map);
-
-    // Add fallback markers manually since LRM failed
+  function addEndpointMarkers(group) {
     L.marker(startLatLng, { icon: iconStart })
-      .addTo(markerLayer)
+      .addTo(group)
       .bindPopup(`<div class="popup-title">${origin.name}</div>
-                  <div class="popup-meta">Starting Point</div>`);
+                  <div class="popup-meta"><i class="bi bi-geo-alt"></i> Starting Point</div>`);
     L.marker(endLatLng, { icon: iconEnd })
-      .addTo(markerLayer)
+      .addTo(group)
       .bindPopup(`<div class="popup-title">${destination.name}</div>
-                  <div class="popup-meta">Destination</div>`);
+                  <div class="popup-meta"><i class="bi bi-geo-alt"></i> Destination</div>`);
+  }
 
+  function drawFallback(reason) {
+    routeLayerGroup = L.layerGroup().addTo(map);
+    L.polyline([startLatLng, endLatLng], {
+      color: '#a61c1c', weight: 4, opacity: 0.6, dashArray: '10 6',
+    }).addTo(routeLayerGroup);
+    addEndpointMarkers(routeLayerGroup);
     map.fitBounds([startLatLng, endLatLng], { padding: [40, 40] });
-
-    // Replace routeControl with a removable stub
-    routeControl = { remove: () => map.removeLayer(fallback) };
-
+    if (reason) console.warn('ORS routing unavailable, falling back to straight line:', reason);
     IExploreApp.toast('Using approximate route (road data unavailable).', 'info');
-  });
+  }
+
+  try {
+    const res = await fetch(
+      API_BASE + `routes.php?action=directions` +
+      `&origin_lat=${origin.latitude}&origin_lng=${origin.longitude}` +
+      `&dest_lat=${destination.latitude}&dest_lng=${destination.longitude}`
+    ).then(r => r.json());
+
+    if (!res.success || !res.data.coordinates || !res.data.coordinates.length) {
+      drawFallback(res.message || 'no coordinates returned');
+      return;
+    }
+
+    routeLayerGroup = L.layerGroup().addTo(map);
+    const latlngs = res.data.coordinates; // already [lat, lng] pairs
+    L.polyline(latlngs, {
+      color: '#a61c1c', weight: 5, opacity: 0.85,
+    }).addTo(routeLayerGroup);
+    addEndpointMarkers(routeLayerGroup);
+    map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40] });
+  } catch (err) {
+    drawFallback(err);
+  }
 }
 
 // ── Spot marker registry (id → marker) ─────────────────────

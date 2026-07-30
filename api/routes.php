@@ -83,8 +83,11 @@ switch ($action) {
             unset($t);
         }
 
-        // Build waypoints for map (straight line via coordinates)
-        // In production you'd call OSRM; for now we return city coords for Leaflet polyline
+        // Straight-line origin/destination coords. Note: the frontend
+        // doesn't actually use this field — it draws the real
+        // road-following route via the 'directions' action below
+        // (OpenRouteService), using origin/destination coords directly.
+        // Kept here for API completeness / potential future use.
         $waypoints = [
             ['lat' => (float)$origin_city['latitude'],  'lng' => (float)$origin_city['longitude'],  'name' => $origin_city['name']],
             ['lat' => (float)$dest_city['latitude'],    'lng' => (float)$dest_city['longitude'],    'name' => $dest_city['name']],
@@ -160,6 +163,61 @@ switch ($action) {
         unset($s);
 
         json_ok($spots);
+        break;
+
+    // ── Live road-following route via OpenRouteService ─────
+    // Server-side proxy so the ORS API key never reaches the browser.
+    // Returns GeoJSON line coordinates for Leaflet to draw directly —
+    // no client-side routing library needed.
+    case 'directions':
+        $oLat = (float) input('origin_lat', 'get');
+        $oLng = (float) input('origin_lng', 'get');
+        $dLat = (float) input('dest_lat',   'get');
+        $dLng = (float) input('dest_lng',   'get');
+
+        if (!$oLat || !$oLng || !$dLat || !$dLng) {
+            json_error('Origin and destination coordinates are required.', 400);
+        }
+        if (!ORS_API_KEY) {
+            json_error('ORS API key not configured.', 501);
+        }
+
+        $url = 'https://api.openrouteservice.org/v2/directions/driving-car'
+             . '?api_key=' . urlencode(ORS_API_KEY)
+             . '&start=' . $oLng . ',' . $oLat
+             . '&end='   . $dLng . ',' . $dLat;
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 8,
+            CURLOPT_HTTPHEADER     => ['Accept: application/json, application/geo+json'],
+        ]);
+        $raw     = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr  = curl_error($ch);
+        curl_close($ch);
+
+        if ($raw === false || $httpCode !== 200) {
+            json_error('Could not reach routing service' . ($curlErr ? ": {$curlErr}" : '.'), 502);
+        }
+
+        $data = json_decode($raw, true);
+        $coords = $data['features'][0]['geometry']['coordinates'] ?? null;
+        $summary = $data['features'][0]['properties']['summary'] ?? null;
+
+        if (!$coords) {
+            json_error('No route found between these points.', 404);
+        }
+
+        // ORS returns [lng, lat] pairs — flip to [lat, lng] for Leaflet
+        $latlngs = array_map(fn($c) => [(float)$c[1], (float)$c[0]], $coords);
+
+        json_ok([
+            'coordinates'  => $latlngs,
+            'distance_km'  => isset($summary['distance']) ? round($summary['distance'] / 1000, 1) : null,
+            'duration_min' => isset($summary['duration']) ? round($summary['duration'] / 60) : null,
+        ]);
         break;
 
     default:

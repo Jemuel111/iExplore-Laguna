@@ -726,7 +726,8 @@ function profanity_wordlist(): array {
         'putangina', 'putang ina', 'puta', 'putanginamo', 'gago', 'gaga',
         'tangina', 'tang ina', 'tanginamo', 'ulol', 'bobo', 'tarantado',
         'leche', 'lintik', 'hayop', 'hayop ka', 'kupal', 'peste', 'pakyu',
-        'punyeta', 'bwisit', 'yawa', 'inutil', 'buwisit', 'siraulo',
+        'punyeta', 'bwisit', 'yawa', 'inutil', 'buwisit', 'siraulo', 'titi',
+        'tite',
     ];
 }
 
