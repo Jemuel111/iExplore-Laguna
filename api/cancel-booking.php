@@ -36,7 +36,7 @@ if ($booking && in_array($booking['status'], ['pending', 'confirmed'])) {
              VALUES (?, 'booking_cancelled', ?, ?, ?)",
             [
                 $hotel['owner_id'],
-                '❌ Booking Cancelled: ' . $booking['booking_number'],
+                'Booking Cancelled: ' . $booking['booking_number'],
                 "{$u['name']} cancelled booking #{$booking['booking_number']}.",
                 APP_URL . '/pages/hotel-dashboard.php#bookings'
             ]

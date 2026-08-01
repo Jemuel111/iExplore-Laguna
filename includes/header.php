@@ -147,6 +147,7 @@ if ($user && ($user['role'] ?? '') === 'admin') {
         <!-- Auth links -->
         <?php if ($user):
           $__role = $user['role'] ?? 'tourist'; ?>
+          <?php require __DIR__ . '/notification_bell.php'; ?>
           <li class="nav-item dropdown ms-lg-2">
             <a class="nav-link dropdown-toggle btn btn-sm btn-outline-light px-3" href="#"
                data-bs-toggle="dropdown">
@@ -156,7 +157,7 @@ if ($user && ($user['role'] ?? '') === 'admin') {
               <?php elseif ($__role === 'hotel_owner'): ?>
                 <span class="badge ms-1" style="background:#8e2434;font-size:.65rem">Hotel</span>
               <?php elseif ($__role === 'admin'): ?>
-                <span class="badge ms-1" style="background:var(--red-dark);font-size:.65rem">Admin</span>
+                <span class="badge ms-1" style="background:var(--green-dark);font-size:.65rem">Admin</span>
               <?php endif; ?>
             </a>
             <ul class="dropdown-menu dropdown-menu-end shadow">
@@ -183,7 +184,7 @@ if ($user && ($user['role'] ?? '') === 'admin') {
 
               <?php elseif ($__role === 'admin'): ?>
                 <li><a class="dropdown-item fw-bold" href="<?= APP_URL ?>/pages/admin-dashboard.php">
-                  <i class="bi bi-shield-check me-2" style="color:var(--red-dark)"></i>Admin Dashboard</a></li>
+                  <i class="bi bi-shield-check me-2" style="color:var(--green-dark)"></i>Admin Dashboard</a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-dashboard.php#shops">
                   <i class="bi bi-shop me-2"></i>Approve Shops</a></li>

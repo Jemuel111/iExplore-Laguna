@@ -66,7 +66,7 @@ switch ($action) {
                  VALUES (?, 'shop_reviewed', ?, ?, ?)",
                 [
                     $shop['owner_id'],
-                    '⭐ New Review for ' . $shop['name'],
+                    'New Review for ' . $shop['name'],
                     "{$u['name']} left a {$rating}-star review.",
                     APP_URL . '/pages/shop.php?id=' . $shop_id
                 ]

@@ -123,7 +123,7 @@ db_execute(
      VALUES (?, 'order_placed', ?, ?, ?)",
     [
         $shop['owner_id'],
-        '🛍️ New Order: ' . $order_number,
+        'New Order: ' . $order_number,
         "You have a new order from {$u['name']} — ₱" . number_format($subtotal, 2),
         APP_URL . '/pages/shop-dashboard.php#orders'
     ]
@@ -135,7 +135,7 @@ db_execute(
      VALUES (?, 'order_placed', ?, ?, ?)",
     [
         $u['id'],
-        '✅ Order Placed! ' . $order_number,
+        'Order Placed! ' . $order_number,
         "Your order at {$shop['name']} has been placed. Pickup code: {$pickup_code}",
         APP_URL . '/pages/my-orders.php'
     ]

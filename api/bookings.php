@@ -141,7 +141,7 @@ if ($hotel['owner_id']) {
          VALUES (?, 'booking_placed', ?, ?, ?)",
         [
             $hotel['owner_id'],
-            '🏨 New Booking: ' . $booking_number,
+            'New Booking: ' . $booking_number,
             "You have a new booking from {$guest_name} — ₱" . number_format($total_amount, 2),
             APP_URL . '/pages/hotel-dashboard.php#bookings'
         ]
@@ -154,7 +154,7 @@ db_execute(
      VALUES (?, 'booking_placed', ?, ?, ?)",
     [
         $u['id'],
-        '✅ Reservation Placed! ' . $booking_number,
+        'Reservation Placed! ' . $booking_number,
         "Your reservation at {$hotel['name']} has been placed. We'll notify you once it's confirmed.",
         APP_URL . '/pages/my-bookings.php'
     ]

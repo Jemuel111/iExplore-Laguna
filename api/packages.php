@@ -182,7 +182,7 @@ if ($hotel && $hotel['owner_id']) {
          VALUES (?, 'booking_placed', ?, ?, ?)",
         [
             $hotel['owner_id'],
-            '📦 New Package Booking: ' . $booking_number,
+            'New Package Booking: ' . $booking_number,
             "{$guest_name} booked the \"{$pkg['title']}\" package — check-in {$check_in}, check-out {$check_out}.",
             APP_URL . '/pages/hotel-dashboard.php#bookings'
         ]
@@ -193,7 +193,7 @@ db_execute(
      VALUES (?, 'package_booked', ?, ?, ?)",
     [
         $u['id'],
-        '🎉 Package Booked! ' . $pkg['title'],
+        'Package Booked! ' . $pkg['title'],
         "Your hotel is reserved ({$check_in} to {$check_out}) and your itinerary is ready.",
         APP_URL . '/pages/my-bookings.php'
     ]

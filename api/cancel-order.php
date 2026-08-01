@@ -36,7 +36,7 @@ if ($order && $order['status'] === 'pending') {
              VALUES (?, 'order_cancelled', ?, ?, ?)",
             [
                 $shop['owner_id'],
-                '❌ Order Cancelled: ' . $order['order_number'],
+                'Order Cancelled: ' . $order['order_number'],
                 "{$u['name']} cancelled order #{$order['order_number']}.",
                 APP_URL . '/pages/shop-dashboard.php#orders'
             ]
