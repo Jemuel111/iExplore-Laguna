@@ -31,6 +31,14 @@ if (!$spot) {
 
 $closure = spot_closure_status($spot);
 
+// Log an "interest view" — automatic, lightweight, NOT the same as a
+// confirmed visit (see the GPS check-in feature further down this page).
+ensure_spot_views_table();
+db_execute(
+    "INSERT INTO spot_views (spot_id, user_id) VALUES (?, ?)",
+    [$spot_id, is_logged_in() ? (current_user()['id'] ?? null) : null]
+);
+
 // Load photos
 $photos = db_fetch_all(
     "SELECT url, caption, photo_type, sort_order
@@ -60,6 +68,14 @@ $my_existing_review = $my_user_id
     ? db_fetch_one("SELECT id FROM spot_reviews WHERE spot_id = ? AND user_id = ?", [$spot_id, $my_user_id])
     : null;
 $reviews = attach_review_photos($reviews, 'spot');
+
+// Check-in stats (confirmed visits — see haversine_meters() usage in
+// api/spot-checkin.php for how a check-in is verified)
+ensure_spot_checkins_table();
+$my_checkin_count = $my_user_id
+    ? (int) (db_fetch_one("SELECT COUNT(*) AS c FROM spot_checkins WHERE spot_id=? AND user_id=?", [$spot_id, $my_user_id])['c'] ?? 0)
+    : 0;
+$total_checkin_count = (int) (db_fetch_one("SELECT COUNT(*) AS c FROM spot_checkins WHERE spot_id=?", [$spot_id])['c'] ?? 0);
 $review_stats = db_fetch_one(
     "SELECT COUNT(*) AS total, AVG(rating) AS avg_rating
      FROM spot_reviews WHERE spot_id = ? AND is_approved = 1",
@@ -290,6 +306,36 @@ foreach ($photos as $idx => $p) {
       </div>
     </div>
     <?php endif; ?>
+
+    <!-- ── Check In ──────────────────────────────────────────── -->
+    <div class="detail-section" id="checkin-section">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 p-3"
+           style="background:var(--green-pale);border-radius:var(--radius-sm)">
+        <div>
+          <h6 class="fw-bold mb-1" style="color:var(--green-dark)">
+            <i class="bi bi-geo-alt-fill me-1"></i>Been here in person?
+          </h6>
+          <p class="small text-muted mb-0">
+            Check in with your location to confirm your visit.
+            <?php if ($total_checkin_count > 0): ?>
+              <strong><?= $total_checkin_count ?></strong> traveler<?= $total_checkin_count!=1?'s':'' ?> confirmed visiting so far.
+            <?php endif; ?>
+          </p>
+        </div>
+        <?php if (!is_logged_in()): ?>
+        <a href="<?= APP_URL ?>/pages/login.php?redirect=<?= urlencode(APP_URL.'/pages/spot-detail.php?id='.$spot_id) ?>"
+           class="btn btn-sm btn-outline-secondary flex-shrink-0">
+          <i class="bi bi-box-arrow-in-right me-1"></i>Log in to Check In
+        </a>
+        <?php else: ?>
+        <button class="btn btn-sm btn-primary-app flex-shrink-0" id="checkin-btn"
+                data-lat="<?= $spot['latitude'] ?>" data-lng="<?= $spot['longitude'] ?>">
+          <i class="bi bi-geo-alt me-1"></i>
+          <?= $my_checkin_count > 0 ? "Check In Again (visited {$my_checkin_count}x)" : 'Check In Here' ?>
+        </button>
+        <?php endif; ?>
+      </div>
+    </div>
 
     <!-- ── Reviews ─────────────────────────────────────────── -->
     <div class="detail-section" id="reviews-section">
@@ -647,6 +693,58 @@ L.marker([SPOT_LAT, SPOT_LNG], { icon: spotIcon })
 setTimeout(() => miniMap.invalidateSize(), 200);
 
 // ── Review form toggle ──────────────────────────────────────
+// ── GPS check-in ──────────────────────────────────────────────
+const checkinBtn = document.getElementById('checkin-btn');
+if (checkinBtn) {
+  checkinBtn.addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      IExploreApp.toast("Your browser doesn't support location — can't check in.", 'error');
+      return;
+    }
+    checkinBtn.disabled = true;
+    const originalHtml = checkinBtn.innerHTML;
+    checkinBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Getting your location…';
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const res = await fetch(API_BASE + 'spot-checkin.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              spot_id: SPOT_ID,
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+            })
+          }).then(r => r.json());
+
+          if (res.success) {
+            IExploreApp.toast(res.message || "You're checked in!", 'success');
+            setTimeout(() => location.reload(), 1200);
+          } else {
+            IExploreApp.toast(res.message || 'Check-in failed.', 'error');
+            checkinBtn.disabled = false;
+            checkinBtn.innerHTML = originalHtml;
+          }
+        } catch (err) {
+          IExploreApp.toast('Could not reach the server. Try again.', 'error');
+          checkinBtn.disabled = false;
+          checkinBtn.innerHTML = originalHtml;
+        }
+      },
+      (err) => {
+        let msg = 'Could not get your location.';
+        if (err.code === err.PERMISSION_DENIED) msg = 'Location permission denied — enable it to check in.';
+        if (err.code === err.TIMEOUT) msg = 'Location request timed out. Try again.';
+        IExploreApp.toast(msg, 'error');
+        checkinBtn.disabled = false;
+        checkinBtn.innerHTML = originalHtml;
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  });
+}
+
 const writeBtn  = document.getElementById('write-review-btn');
 const cancelBtn = document.getElementById('cancel-review-btn');
 const formWrap  = document.getElementById('review-form-wrap');

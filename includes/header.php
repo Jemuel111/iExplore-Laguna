@@ -16,7 +16,7 @@ $user        = current_user();
 // Admins are restricted to the admin area — bounce them off every
 // tourist-facing page (browsing, planner, ordering, booking, etc.)
 if ($user && ($user['role'] ?? '') === 'admin') {
-    $__admin_allowed = ['admin-dashboard.php', 'admin-packages.php', 'admin-spot-photos.php', 'admin-spots.php', 'admin-hotel-photos.php', 'logout.php'];
+    $__admin_allowed = ['admin-dashboard.php', 'admin-packages.php', 'admin-spot-photos.php', 'admin-spots.php', 'admin-hotel-photos.php', 'admin-analytics.php', 'logout.php'];
     $__current_page  = basename($_SERVER['SCRIPT_NAME'] ?? '');
     if (!in_array($__current_page, $__admin_allowed, true)) {
         header('Location: ' . APP_URL . '/pages/admin-dashboard.php');
@@ -88,6 +88,11 @@ if ($user && ($user['role'] ?? '') === 'admin') {
             <i class="bi bi-images me-1"></i>Hotel Photos
           </a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link" href="<?= APP_URL ?>/pages/admin-analytics.php">
+            <i class="bi bi-bar-chart-line me-1"></i>Analytics
+          </a>
+        </li>
         <?php else: ?>
         <li class="nav-item">
           <a class="nav-link <?= $active_page === 'home'      ? 'active' : '' ?>"
@@ -151,7 +156,7 @@ if ($user && ($user['role'] ?? '') === 'admin') {
               <?php elseif ($__role === 'hotel_owner'): ?>
                 <span class="badge ms-1" style="background:#8e2434;font-size:.65rem">Hotel</span>
               <?php elseif ($__role === 'admin'): ?>
-                <span class="badge ms-1" style="background:var(--green-dark);font-size:.65rem">Admin</span>
+                <span class="badge ms-1" style="background:var(--red-dark);font-size:.65rem">Admin</span>
               <?php endif; ?>
             </a>
             <ul class="dropdown-menu dropdown-menu-end shadow">
@@ -178,7 +183,7 @@ if ($user && ($user['role'] ?? '') === 'admin') {
 
               <?php elseif ($__role === 'admin'): ?>
                 <li><a class="dropdown-item fw-bold" href="<?= APP_URL ?>/pages/admin-dashboard.php">
-                  <i class="bi bi-shield-check me-2" style="color:var(--green-dark)"></i>Admin Dashboard</a></li>
+                  <i class="bi bi-shield-check me-2" style="color:var(--red-dark)"></i>Admin Dashboard</a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-dashboard.php#shops">
                   <i class="bi bi-shop me-2"></i>Approve Shops</a></li>
@@ -192,6 +197,8 @@ if ($user && ($user['role'] ?? '') === 'admin') {
                   <i class="bi bi-images me-2"></i>Manage Spot Photos</a></li>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-hotel-photos.php">
                   <i class="bi bi-images me-2"></i>Manage Hotel Photos</a></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-analytics.php">
+                  <i class="bi bi-bar-chart-line me-2"></i>Analytics</a></li>
 
               <?php else: ?>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/itineraries.php">

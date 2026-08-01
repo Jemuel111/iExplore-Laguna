@@ -91,6 +91,83 @@ function shop_category_label(?string $category): string {
 }
 
 /**
+ * Add the tourist demographic columns to `users` if they don't already
+ * exist yet. Nullable — existing accounts (and hotel/shop/admin roles)
+ * won't have this data, only new tourist signups going forward.
+ */
+function ensure_user_demographic_columns(): void {
+    $existing = array_column(
+        db_fetch_all("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'"),
+        'COLUMN_NAME'
+    );
+    $wanted = [
+        'birthdate'    => "DATE NULL",
+        'gender'       => "VARCHAR(20) NULL",
+        'tourist_type' => "VARCHAR(20) NULL COMMENT 'local or international'",
+        'nationality'  => "VARCHAR(100) NULL",
+        'province'     => "VARCHAR(100) NULL",
+        'city'         => "VARCHAR(100) NULL",
+    ];
+    foreach ($wanted as $col => $def) {
+        if (!in_array($col, $existing, true)) {
+            db()->exec("ALTER TABLE users ADD COLUMN {$col} {$def}");
+        }
+    }
+}
+
+/**
+ * "Interest views" — a lightweight, automatic counter of how many times
+ * a spot's page was opened. NOT the same as a confirmed visit (browsing
+ * behavior alone can't prove someone physically went there) — kept as
+ * a clearly separate, honestly-labeled metric from spot_checkins below.
+ */
+function ensure_spot_views_table(): void {
+    db()->exec(
+        "CREATE TABLE IF NOT EXISTS spot_views (
+            id INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            spot_id INT(10) UNSIGNED NOT NULL,
+            user_id INT(10) UNSIGNED NULL,
+            viewed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_spot_views_spot (spot_id),
+            INDEX idx_spot_views_date (viewed_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+}
+
+/**
+ * "Confirmed visits" — GPS-verified check-ins. Only recorded when the
+ * tourist's actual device location is within range of the spot's real
+ * coordinates at the moment they check in. This is the metric that
+ * should be trusted as "people who really went there."
+ */
+function ensure_spot_checkins_table(): void {
+    db()->exec(
+        "CREATE TABLE IF NOT EXISTS spot_checkins (
+            id INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            spot_id INT(10) UNSIGNED NOT NULL,
+            user_id INT(10) UNSIGNED NOT NULL,
+            latitude DECIMAL(10,7) NOT NULL,
+            longitude DECIMAL(10,7) NOT NULL,
+            distance_meters INT UNSIGNED NOT NULL,
+            checked_in_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_spot_checkins_spot (spot_id),
+            INDEX idx_spot_checkins_user (user_id),
+            INDEX idx_spot_checkins_date (checked_in_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+}
+
+/** Haversine distance between two coordinates, in meters. */
+function haversine_meters(float $lat1, float $lon1, float $lat2, float $lon2): float {
+    $earthRadius = 6371000;
+    $dLat = deg2rad($lat2 - $lat1);
+    $dLon = deg2rad($lon2 - $lon1);
+    $a = sin($dLat/2)**2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon/2)**2;
+    return $earthRadius * 2 * atan2(sqrt($a), sqrt(1-$a));
+}
+
+/**
  * Shop order status metadata — same idea as booking_status_meta() but
  * for pickup orders (different status set: preparing/ready/picked_up
  * instead of checked_in/checked_out).
@@ -726,8 +803,7 @@ function profanity_wordlist(): array {
         'putangina', 'putang ina', 'puta', 'putanginamo', 'gago', 'gaga',
         'tangina', 'tang ina', 'tanginamo', 'ulol', 'bobo', 'tarantado',
         'leche', 'lintik', 'hayop', 'hayop ka', 'kupal', 'peste', 'pakyu',
-        'punyeta', 'bwisit', 'yawa', 'inutil', 'buwisit', 'siraulo', 'titi',
-        'tite',
+        'punyeta', 'bwisit', 'yawa', 'inutil', 'buwisit', 'siraulo',
     ];
 }
 
