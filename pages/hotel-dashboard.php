@@ -212,24 +212,27 @@ require_once __DIR__ . '/../includes/header.php';
 <div class="container py-4">
 
   <!-- Stats row -->
-  <div class="row g-3 mb-4">
+  <div class="stat-strip mb-4" style="border-radius:var(--radius)">
+    <div class="row g-0 text-center">
     <?php
     $stats = [
-      ['bi-calendar-check', 'Today\'s Bookings', $today_bookings, '#dbeafe','#1e40af'],
-      ['bi-hourglass-split', 'Pending Bookings', $pending_count,  '#fef3c7','#92400e'],
-      ['bi-door-closed',    'Room Types',       $total_rooms,    '#f7dde1','#5c1620'],
-      ['bi-cash-stack',     'Total Revenue',    '₱'.number_format($total_revenue,2), '#f3e8ff','#6b21a8'],
+      ['bi-calendar-check',  "Today's Bookings", $today_bookings],
+      ['bi-hourglass-split', 'Pending Bookings', $pending_count],
+      ['bi-door-closed',     'Room Types',       $total_rooms],
+      ['bi-cash-stack',      'Total Revenue',    '₱'.number_format($total_revenue,2)],
     ];
-    foreach ($stats as [$ico,$lbl,$val,$bg,$fg]): ?>
+    foreach ($stats as [$ico,$lbl,$val]): ?>
     <div class="col-6 col-lg-3">
-      <div class="p-3 h-100" style="background:<?= $bg ?>;border-radius:var(--radius);border:1.5px solid <?= $fg ?>22">
-        <div style="font-size:1.6rem;margin-bottom:.3rem;color:<?= $fg ?>"><i class="bi <?= $ico ?>"></i></div>
-        <div style="font-size:1.4rem;font-weight:800;color:<?= $fg ?>"><?= $val ?></div>
-        <div style="font-size:.78rem;color:<?= $fg ?>;opacity:.8"><?= $lbl ?></div>
+      <div class="stat-item">
+        <div class="stat-item-icon"><i class="bi <?= $ico ?>"></i></div>
+        <div class="stat-num" style="font-size:1.5rem"><?= $val ?></div>
+        <div class="stat-lbl"><?= $lbl ?></div>
       </div>
     </div>
     <?php endforeach; ?>
+    </div>
   </div>
+
 
   <!-- Nav tabs -->
   <ul class="nav nav-tabs mb-4" style="border-bottom:2px solid var(--border)">

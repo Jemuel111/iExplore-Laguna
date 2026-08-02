@@ -187,24 +187,26 @@ require_once __DIR__ . '/../includes/header.php';
 <div class="container py-4">
 
   <!-- Stats -->
-  <div class="row g-3 mb-4">
-    <?php
-    $stats = [
-      ['bi-hourglass-split', 'Pending Shops',  count($pending_shops),  '#fef3c7','#92400e'],
-      ['bi-hourglass-split', 'Pending Hotels', count($pending_hotels), '#fef3c7','#92400e'],
-      ['bi-shop',            'Verified Shops', $verified_shops_count,  '#d4edda','#155724'],
-      ['bi-building',        'Verified Hotels',$verified_hotels_count, '#d4edda','#155724'],
-      ['bi-people-fill',     'Total Users',    $total_users,            '#dbeafe','#1e40af'],
-    ];
-    foreach ($stats as [$ico,$lbl,$val,$bg,$fg]): ?>
-    <div class="col-6 col-lg">
-      <div class="p-3 h-100" style="background:<?= $bg ?>;border-radius:var(--radius);border:1.5px solid <?= $fg ?>22">
-        <div style="font-size:1.4rem;margin-bottom:.2rem;color:<?= $fg ?>"><i class="bi <?= $ico ?>"></i></div>
-        <div style="font-size:1.3rem;font-weight:800;color:<?= $fg ?>"><?= $val ?></div>
-        <div style="font-size:.75rem;color:<?= $fg ?>;opacity:.8"><?= $lbl ?></div>
+  <div class="stat-strip mb-4" style="border-radius:var(--radius)">
+    <div class="row g-0 text-center">
+      <?php
+      $stats = [
+        ['bi-hourglass-split', 'Pending Shops',   count($pending_shops)],
+        ['bi-hourglass-split', 'Pending Hotels',  count($pending_hotels)],
+        ['bi-shop',            'Verified Shops',  $verified_shops_count],
+        ['bi-building',        'Verified Hotels', $verified_hotels_count],
+        ['bi-people-fill',     'Total Users',     $total_users],
+      ];
+      foreach ($stats as [$ico,$lbl,$val]): ?>
+      <div class="col-6 col-lg">
+        <div class="stat-item">
+          <div class="stat-item-icon"><i class="bi <?= $ico ?>"></i></div>
+          <div class="stat-num" style="font-size:1.5rem"><?= $val ?></div>
+          <div class="stat-lbl"><?= $lbl ?></div>
+        </div>
       </div>
+      <?php endforeach; ?>
     </div>
-    <?php endforeach; ?>
   </div>
 
   <!-- Tabs -->

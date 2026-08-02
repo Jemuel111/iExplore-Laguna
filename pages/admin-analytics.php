@@ -100,7 +100,7 @@ $site_total_checkins  = array_sum(array_column($spot_stats, 'total_checkins'));
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
-<section class="py-3" style="background:linear-gradient(135deg,#1b4332,#2d6a4f);color:#fff">
+<section class="py-3" style="background:linear-gradient(135deg,#5c1620,#8e2434);color:#fff">
   <div class="container">
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-bar-chart-line-fill fs-2" style="color:var(--sand-dark)"></i>
@@ -115,37 +115,39 @@ require_once __DIR__ . '/../includes/header.php';
 <div class="container py-4">
 
   <!-- ── Tourist Demographics ──────────────────────────────── -->
-  <h5 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--red-dark)">
+  <h5 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
     <i class="bi bi-people-fill me-2"></i>Tourist Demographics
   </h5>
 
-  <div class="row g-3 mb-4">
-    <div class="col-6 col-lg-3">
-      <div class="p-3 h-100" style="background:#dbeafe;border-radius:var(--radius);border:1.5px solid #1e40af22">
-        <div style="font-size:1.5rem;color:#1e40af"><i class="bi bi-people-fill"></i></div>
-        <div style="font-size:1.4rem;font-weight:800;color:#1e40af"><?= number_format($total_tourists) ?></div>
-        <div style="font-size:.78rem;color:#1e40af;opacity:.8">Registered Tourists</div>
+  <div class="stat-strip mb-4" style="border-radius:var(--radius)">
+    <div class="row g-0 text-center">
+      <div class="col-6 col-lg-3">
+        <div class="stat-item">
+          <div class="stat-item-icon"><i class="bi bi-people-fill"></i></div>
+          <div class="stat-num"><?= number_format($total_tourists) ?></div>
+          <div class="stat-lbl">Registered Tourists</div>
+        </div>
       </div>
-    </div>
-    <div class="col-6 col-lg-3">
-      <div class="p-3 h-100" style="background:#d4edda;border-radius:var(--radius);border:1.5px solid #15572422">
-        <div style="font-size:1.5rem;color:#155724"><i class="bi bi-house-door-fill"></i></div>
-        <div style="font-size:1.4rem;font-weight:800;color:#155724"><?= number_format($local_count) ?></div>
-        <div style="font-size:.78rem;color:#155724;opacity:.8">Local Tourists</div>
+      <div class="col-6 col-lg-3">
+        <div class="stat-item">
+          <div class="stat-item-icon"><i class="bi bi-house-door-fill"></i></div>
+          <div class="stat-num"><?= number_format($local_count) ?></div>
+          <div class="stat-lbl">Local Tourists</div>
+        </div>
       </div>
-    </div>
-    <div class="col-6 col-lg-3">
-      <div class="p-3 h-100" style="background:#fef3c7;border-radius:var(--radius);border:1.5px solid #92400e22">
-        <div style="font-size:1.5rem;color:#92400e"><i class="bi bi-airplane-fill"></i></div>
-        <div style="font-size:1.4rem;font-weight:800;color:#92400e"><?= number_format($intl_count) ?></div>
-        <div style="font-size:.78rem;color:#92400e;opacity:.8">International Tourists</div>
+      <div class="col-6 col-lg-3">
+        <div class="stat-item">
+          <div class="stat-item-icon"><i class="bi bi-airplane-fill"></i></div>
+          <div class="stat-num"><?= number_format($intl_count) ?></div>
+          <div class="stat-lbl">International Tourists</div>
+        </div>
       </div>
-    </div>
-    <div class="col-6 col-lg-3">
-      <div class="p-3 h-100" style="background:#fbdede;border-radius:var(--radius);border:1.5px solid #6b0f1422">
-        <div style="font-size:1.5rem;color:#6b0f14"><i class="bi bi-geo-alt-fill"></i></div>
-        <div style="font-size:1.4rem;font-weight:800;color:#6b0f14"><?= number_format($site_total_checkins) ?></div>
-        <div style="font-size:.78rem;color:#6b0f14;opacity:.8">Confirmed Spot Visits</div>
+      <div class="col-6 col-lg-3">
+        <div class="stat-item">
+          <div class="stat-item-icon"><i class="bi bi-geo-alt-fill"></i></div>
+          <div class="stat-num"><?= number_format($site_total_checkins) ?></div>
+          <div class="stat-lbl">Confirmed Spot Visits</div>
+        </div>
       </div>
     </div>
   </div>
@@ -154,7 +156,7 @@ require_once __DIR__ . '/../includes/header.php';
     <!-- Gender -->
     <div class="col-md-4">
       <div class="form-panel h-100">
-        <h6 class="fw-bold mb-3" style="color:var(--red-dark)">Gender</h6>
+        <h6 class="fw-bold mb-3" style="color:var(--green-dark)">Gender</h6>
         <?php if (empty($gender_split)): ?>
           <p class="text-muted small mb-0">No data yet.</p>
         <?php else:
@@ -169,7 +171,7 @@ require_once __DIR__ . '/../includes/header.php';
             <span class="fw-bold"><?= $g['c'] ?> (<?= $pct ?>%)</span>
           </div>
           <div style="background:#eee;border-radius:10px;height:8px;overflow:hidden">
-            <div style="background:var(--red-mid);height:100%;width:<?= $pct ?>%"></div>
+            <div style="background:var(--green-mid);height:100%;width:<?= $pct ?>%"></div>
           </div>
         </div>
         <?php endforeach; endif; ?>
@@ -179,7 +181,7 @@ require_once __DIR__ . '/../includes/header.php';
     <!-- Age -->
     <div class="col-md-4">
       <div class="form-panel h-100">
-        <h6 class="fw-bold mb-3" style="color:var(--red-dark)">Age Range</h6>
+        <h6 class="fw-bold mb-3" style="color:var(--green-dark)">Age Range</h6>
         <?php
         $ageTotal = array_sum($age_ordered);
         if ($ageTotal === 0): ?>
@@ -203,7 +205,7 @@ require_once __DIR__ . '/../includes/header.php';
     <!-- Top origins -->
     <div class="col-md-4">
       <div class="form-panel h-100">
-        <h6 class="fw-bold mb-3" style="color:var(--red-dark)">Top Provinces &amp; Nationalities</h6>
+        <h6 class="fw-bold mb-3" style="color:var(--green-dark)">Top Provinces &amp; Nationalities</h6>
         <?php if (empty($top_provinces) && empty($top_nationalities)): ?>
           <p class="text-muted small mb-0">No data yet.</p>
         <?php else: ?>
@@ -211,7 +213,7 @@ require_once __DIR__ . '/../includes/header.php';
           <div class="small fw-bold text-muted mb-1"><i class="bi bi-house-door me-1"></i>Local — by Province</div>
           <div class="d-flex flex-wrap gap-1 mb-3">
             <?php foreach ($top_provinces as $p): ?>
-            <span class="badge" style="background:var(--red-pale);color:var(--red-dark);font-weight:600">
+            <span class="badge" style="background:var(--green-pale);color:var(--green-dark);font-weight:600">
               <?= e($p['province']) ?> (<?= $p['c'] ?>)
             </span>
             <?php endforeach; ?>
@@ -221,7 +223,7 @@ require_once __DIR__ . '/../includes/header.php';
           <div class="small fw-bold text-muted mb-1"><i class="bi bi-airplane me-1"></i>International — by Nationality</div>
           <div class="d-flex flex-wrap gap-1">
             <?php foreach ($top_nationalities as $n): ?>
-            <span class="badge" style="background:#fef3c7;color:#92400e;font-weight:600">
+            <span class="badge" style="background:#f3e2d3;color:var(--terracotta);font-weight:600">
               <?= e($n['nationality']) ?> (<?= $n['c'] ?>)
             </span>
             <?php endforeach; ?>
@@ -233,7 +235,7 @@ require_once __DIR__ . '/../includes/header.php';
   </div>
 
   <!-- ── Spot Visit Analytics ──────────────────────────────── -->
-  <h5 class="fw-bold mb-1" style="font-family:'Playfair Display',serif;color:var(--red-dark)">
+  <h5 class="fw-bold mb-1" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
     <i class="bi bi-signpost-2-fill me-2"></i>Spot Visit Analytics
   </h5>
   <p class="text-muted small mb-3">
@@ -265,7 +267,7 @@ require_once __DIR__ . '/../includes/header.php';
             <td class="text-muted small"><?= e($row['city_name']) ?></td>
             <td class="text-end"><?= number_format($row['total_views']) ?></td>
             <td class="text-end">
-              <span class="fw-bold" style="color:var(--red-dark)"><?= number_format($row['total_checkins']) ?></span>
+              <span class="fw-bold" style="color:var(--green-dark)"><?= number_format($row['total_checkins']) ?></span>
             </td>
             <td class="text-end"><?= number_format($row['avg_per_month'], 1) ?></td>
           </tr>
@@ -275,7 +277,7 @@ require_once __DIR__ . '/../includes/header.php';
           <tr style="border-top:2px solid var(--border);font-weight:700">
             <td colspan="2">Site Total</td>
             <td class="text-end"><?= number_format($site_total_views) ?></td>
-            <td class="text-end" style="color:var(--red-dark)"><?= number_format($site_total_checkins) ?></td>
+            <td class="text-end" style="color:var(--green-dark)"><?= number_format($site_total_checkins) ?></td>
             <td></td>
           </tr>
         </tfoot>
