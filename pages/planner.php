@@ -485,8 +485,10 @@ async function planRoute() {
     renderTransportOptions(routeData.transport_options);
     renderRouteStats(routeData);
     renderSpotsGrid(allSpots);
-    renderBudget(routeData, allSpots, days, persons, budget);
-    renderItinerary(routeData, allSpots, days);
+    // Itinerary first — it decides which spots actually get scheduled
+    // (includedSpotIds), so the budget total below can match what's shown.
+    await renderItinerary(routeData, allSpots, days);
+    renderBudget(routeData, allSpots.filter(s => includedSpotIds.includes(s.id)), days, persons, budget);
 
     document.getElementById('route-summary').classList.remove('d-none');
     document.getElementById('spots-section').classList.remove('d-none');
@@ -839,11 +841,12 @@ async function renderBudget(routeData, spots, days, persons, budgetLevel) {
   document.getElementById('total-budget').textContent = formatPeso(b.grand_total + totalFees * persons);
 
   document.getElementById('budget-breakdown').innerHTML = `
-    ${budgetRow('bi-bus-front',   'Transport',     b.transport * persons)}
-    ${budgetRow('bi-house-door',  'Accommodation', b.accommodation * persons * days)}
-    ${budgetRow('bi-cup-hot',     'Food',          b.food * persons * days)}
-    ${budgetRow('bi-ticket',      'Entrance Fees', totalFees * persons)}
-    ${budgetRow('bi-three-dots',  'Miscellaneous', b.misc * persons)}
+    ${budgetRow('bi-bus-front',   'Transport',       b.transport * persons)}
+    ${budgetRow('bi-house-door',  'Accommodation',   b.accommodation * persons * Math.max(0, days - 1))}
+    ${budgetRow('bi-cup-hot',     'Food',            b.food * persons * days)}
+    ${budgetRow('bi-signpost-2',  'Local Transport', b.local * persons * days)}
+    ${budgetRow('bi-ticket',      'Entrance Fees',   totalFees * persons)}
+    ${budgetRow('bi-three-dots',  'Miscellaneous',   b.misc * persons)}
   `;
 }
 
@@ -857,34 +860,116 @@ function budgetRow(icon, label, amount) {
 }
 
 // ── Render itinerary ────────────────────────────────────────
-function renderItinerary(routeData, spots, days) {
+// Touring window per day: how late we'll schedule a new stop, and how
+// many stops of ~2 hours each realistically fit (minus a fixed lunch
+// hour). Day 1 starts later since the morning is spent traveling.
+const TOUR_END_MIN   = 18 * 60; // stop scheduling new visits after 6 PM
+const HOURS_PER_STOP = 120;     // minutes budgeted per spot visit
+const LUNCH_MIN      = 60;
+
+function dayTouringStart(day) {
+  return (day === 1 ? 10 : 8) * 60;
+}
+
+function dayCapacity(day) {
+  const available = Math.max(0, TOUR_END_MIN - dayTouringStart(day) - LUNCH_MIN);
+  return Math.max(1, Math.floor(available / HOURS_PER_STOP));
+}
+
+// Groups spots by city, then orders those city clusters by how far along
+// the straight line from origin to destination they sit (vector
+// projection). Within a cluster, spots are still ranked by rating. This
+// keeps a day's stops in one "base" city before moving on, instead of the
+// old rating-only order which could bounce origin → dest → origin → dest.
+function orderSpotsAlongRoute(spots, routeData) {
+  const oLat = parseFloat(routeData.origin.latitude);
+  const oLng = parseFloat(routeData.origin.longitude);
+  const dLat = parseFloat(routeData.destination.latitude);
+  const dLng = parseFloat(routeData.destination.longitude);
+  const dx = dLng - oLng, dy = dLat - oLat;
+  const lenSq = (dx * dx + dy * dy) || 1;
+
+  const groups = new Map();
+  spots.forEach(s => {
+    if (!groups.has(s.city_id)) groups.set(s.city_id, []);
+    groups.get(s.city_id).push(s);
+  });
+
+  const clusters = [...groups.values()].map(list => {
+    const avgLat = list.reduce((sum, s) => sum + s.latitude, 0) / list.length;
+    const avgLng = list.reduce((sum, s) => sum + s.longitude, 0) / list.length;
+    // Projection of the cluster's centroid onto the origin→destination
+    // vector: ~0 means "near origin", ~1 means "near destination".
+    const t = ((avgLng - oLng) * dx + (avgLat - oLat) * dy) / lenSq;
+    return { t, list: list.slice().sort((a, b) => b.rating - a.rating) };
+  });
+  clusters.sort((a, b) => a.t - b.t);
+
+  return clusters.flatMap(c => c.list);
+}
+
+// Fetch verified hotels in a spot's city (reuses the existing
+// nearby_hotels endpoint, which groups by the spot's own city_id) and
+// return the one closest to that spot — so travelers check in somewhere
+// that doesn't cost them a detour the next morning.
+async function findNearestHotel(anchorSpot) {
+  try {
+    const res = await fetch(API_BASE + `spots.php?action=nearby_hotels&id=${anchorSpot.id}`).then(r => r.json());
+    if (!res.success || !res.data.length) return null;
+    let best = null, bestKm = Infinity;
+    res.data.forEach(h => {
+      const km = haversineKm(anchorSpot.latitude, anchorSpot.longitude, parseFloat(h.latitude), parseFloat(h.longitude));
+      if (km < bestKm) { bestKm = km; best = h; }
+    });
+    return best ? { ...best, distKm: bestKm } : null;
+  } catch {
+    return null;
+  }
+}
+
+async function renderItinerary(routeData, spots, days) {
   const container = document.getElementById('itinerary-days');
 
-  // Keep a spot in the itinerary if it's open, or if it's closed but
-  // expected to reopen before the tourist's chosen travel date.
-  const availableSpots = spots.filter(s => {
+  // Closed spots (that won't reopen before travel) are never scheduled.
+  const closedSpots = spots.filter(s => {
     const c = spotClosureInfo(s);
-    return !c || c.reopensBeforeTravel;
+    return c && !c.reopensBeforeTravel;
   });
-  const excludedSpots = spots.filter(s => !availableSpots.includes(s));
-  includedSpotIds = availableSpots.map(s => s.id);
+  const openSpots = spots.filter(s => !closedSpots.includes(s));
 
-  const spotsPerDay = Math.ceil(availableSpots.length / days) || 2;
+  // Order by city cluster along the route (not just rating) so a day's
+  // stops stay in one base city before moving to the next.
+  const ordered = orderSpotsAlongRoute(openSpots, routeData);
+
+  // Slice into days up-front (capacity-limited), so each day already knows
+  // what the *next* day's first spot is — needed to pick a same-direction
+  // hotel for tonight's check-in.
+  const daySlices = [];
+  let cursor = 0;
+  for (let day = 1; day <= days; day++) {
+    const capacity = dayCapacity(day);
+    const daySpots = ordered.slice(cursor, cursor + capacity);
+    cursor += daySpots.length;
+    daySlices.push(daySpots);
+  }
+  const scheduledSpots = ordered.slice(0, cursor);
+  const timeCutSpots = ordered.slice(cursor);
+  includedSpotIds = scheduledSpots.map(s => s.id);
+
   let html = '';
 
-  // Running "current location" used to estimate distance/time to the next
-  // stop, starting at the trip origin. Updated as we walk through each spot
-  // in route order.
+  // Running "current location" (and the city name that goes with it),
+  // used to estimate distance/time to the next stop and to detect when a
+  // day's plan has moved into a new city. Starts at the trip origin.
   let lastPoint = {
     latitude:  parseFloat(routeData.origin.latitude),
     longitude: parseFloat(routeData.origin.longitude),
+    cityName:  routeData.origin.name,
   };
 
   for (let day = 1; day <= days; day++) {
-    const daySpots = availableSpots.slice((day-1)*spotsPerDay, day*spotsPerDay);
-    const cityName = day === 1
-      ? routeData.origin.name
-      : (day === days ? routeData.destination.name : 'En Route');
+    const daySpots = daySlices[day - 1];
+    const cityName = daySpots.length ? daySpots[daySpots.length - 1].city_name : lastPoint.cityName;
 
     html += `
       <div class="itinerary-day">
@@ -895,58 +980,119 @@ function renderItinerary(routeData, spots, days) {
         </div>
     `;
 
+    // Collect this day's items as {minutes-since-midnight, html} pairs so
+    // we can sort them into real chronological order before rendering —
+    // spot visit times are dynamic (depend on how many stops are that day),
+    // so fixed-time items like Lunch/Check-in can't just be appended last.
+    const events = [];
+
     if (day === 1) {
-      html += itineraryItem('7:00 AM', 'bi-sun', 'Depart from ' + routeData.origin.name,
-        'Prepare your bags and head to the terminal early.');
-      html += itineraryItem('8:00 AM', 'bi-bus-front', 'Travel to ' + routeData.destination.name,
-        routeData.transport_options[0]
-          ? `Via ${routeData.transport_options[0].transport_type} · ${formatDuration(routeData.transport_options[0].duration_min)}`
-          : 'Check transport options above.');
+      events.push({ t: 7*60, html: itineraryItem('7:00 AM', 'bi-sun', 'Start your day',
+        'Pack your bags and get ready to explore.') });
     }
 
-    let time = day === 1 ? 10 : 8;
+    let time = dayTouringStart(day); // minutes since midnight
     daySpots.forEach(spot => {
-      const timeStr = `${time > 12 ? time-12 : time}:00 ${time >= 12 ? 'PM' : 'AM'}`;
+      // Insert a travel step whenever the plan actually moves to a new
+      // city — whether that's right at the start of the day or mid-day
+      // once the previous city's spots are used up. This replaces the old
+      // fixed "Travel to destination at 8 AM" step, which fired even on
+      // days that never left the current city.
+      if (spot.city_name !== lastPoint.cityName) {
+        const hopKm = haversineKm(lastPoint.latitude, lastPoint.longitude, spot.latitude, spot.longitude);
+        events.push({
+          t: time,
+          html: itineraryItem(minutesToLabel(time), 'bi-bus-front', 'Travel to ' + spot.city_name,
+            `${distanceTimeLabel(hopKm)} from ${lastPoint.cityName}`)
+        });
+        time += estimateTravelMinutes(hopKm);
+      }
 
-      // Distance/time to reach this spot from wherever the last stop was.
+      const timeStr = minutesToLabel(time);
       const legKm = haversineKm(lastPoint.latitude, lastPoint.longitude, spot.latitude, spot.longitude);
       const legLabel = `<i class="bi bi-car-front-fill me-1"></i>${distanceTimeLabel(legKm)} from previous stop`;
-      lastPoint = spot;
+      lastPoint = { latitude: spot.latitude, longitude: spot.longitude, cityName: spot.city_name };
 
-      html += itineraryItem(timeStr, 'bi-geo-alt-fill', spot.name,
-        `${spot.city_name} · ${spot.entrance_fee > 0 ? '₱'+parseFloat(spot.entrance_fee).toFixed(0) : 'Free'} entrance · ${legLabel}`,
-        true);
-      time += 2;
+      events.push({
+        t: time,
+        html: itineraryItem(timeStr, 'bi-geo-alt-fill', spot.name,
+          `${spot.city_name} · ${spot.entrance_fee > 0 ? '₱'+parseFloat(spot.entrance_fee).toFixed(0) : 'Free'} entrance · ${legLabel}`,
+          true)
+      });
+      time += 120; // 2 hours per stop
     });
 
-    html += itineraryItem('12:00 PM', 'bi-cup-hot', 'Lunch Break',
-      'Try local Laguna specialties: buko pie, kesong puti, or fresh bangus.');
+    events.push({ t: 12*60, html: itineraryItem('12:00 PM', 'bi-cup-hot', 'Lunch Break',
+      'Try local Laguna specialties: buko pie, kesong puti, or fresh bangus.') });
 
-    if (day === days) {
-      html += itineraryItem('5:00 PM', 'bi-house-check', 'Check-in / Rest',
-        'Settle in at your accommodation and rest for the next day.');
+    // Overnight stay — only when there's a next day to prep for. Picks
+    // whichever verified hotel is closest to *tomorrow's* first stop, so
+    // the traveler isn't backtracking across town the next morning.
+    if (day < days) {
+      const nextSpot = daySlices[day][0]; // daySlices[day] is tomorrow (0-indexed)
+      if (nextSpot) {
+        const hotel = await findNearestHotel(nextSpot);
+        if (hotel) {
+          const priceLabel = hotel.price_min
+            ? `₱${Math.round(hotel.price_min).toLocaleString()}${hotel.price_max ? '–₱'+Math.round(hotel.price_max).toLocaleString() : ''}/night`
+            : 'Price on request';
+          events.push({
+            t: TOUR_END_MIN,
+            html: itineraryItem(minutesToLabel(TOUR_END_MIN), 'bi-house-check', 'Check-in at ' + hotel.name,
+              `${hotel.address || nextSpot.city_name} · ${priceLabel} · ${distanceTimeLabel(hotel.distKm)} from tomorrow's first stop`)
+          });
+          // Sleep at the hotel, not at the last spot visited — tomorrow's
+          // first "distance from previous stop" should measure from here.
+          lastPoint = { latitude: parseFloat(hotel.latitude), longitude: parseFloat(hotel.longitude), cityName: nextSpot.city_name };
+        } else {
+          events.push({
+            t: TOUR_END_MIN,
+            html: itineraryItem(minutesToLabel(TOUR_END_MIN), 'bi-house-check', 'Check-in / Rest',
+              `No listed accommodations in ${nextSpot.city_name} yet — settle in nearby and rest for the next day.`)
+          });
+        }
+      }
     }
+
+    // Render in actual chronological order. Array.sort is stable in all
+    // current browsers, so same-time items (e.g. Lunch vs. a spot also at
+    // noon) keep a sensible relative order.
+    events.sort((a, b) => a.t - b.t);
+    html += events.map(e => e.html).join('');
 
     html += '</div>';
   }
 
-  // Notice about spots left out due to closures — shown above the days so
-  // it's the first thing a tourist sees if their planned count looks short.
+  // Notices about spots left out — shown above the days so they're the
+  // first thing a tourist sees if their planned count looks short.
   let noticeHtml = '';
-  if (excludedSpots.length) {
-    noticeHtml = `
+  if (closedSpots.length) {
+    noticeHtml += `
       <div class="mb-3 p-3" style="background:#fee2e2;border:1.5px solid #fca5a5;border-radius:var(--radius-sm);font-size:.82rem">
         <div class="fw-bold mb-1" style="color:#a61c1c">
           <i class="bi bi-exclamation-triangle-fill me-1"></i>
-          ${excludedSpots.length} spot${excludedSpots.length > 1 ? 's' : ''} left out — temporarily closed
+          ${closedSpots.length} spot${closedSpots.length > 1 ? 's' : ''} left out — temporarily closed
         </div>
         <ul class="mb-0 ps-3" style="color:#7f1d1d">
-          ${excludedSpots.map(s => `
+          ${closedSpots.map(s => `
             <li>
               <strong>${s.name}</strong>${s.closure_reason ? ' — ' + s.closure_reason : ''}
               ${s.closed_until ? ` (expected back ${formatDateNice(s.closed_until)})` : ' (no reopening date yet)'}
             </li>`).join('')}
         </ul>
+      </div>`;
+  }
+  if (timeCutSpots.length) {
+    noticeHtml += `
+      <div class="mb-3 p-3" style="background:#fef3c7;border:1.5px solid #fcd34d;border-radius:var(--radius-sm);font-size:.82rem">
+        <div class="fw-bold mb-1" style="color:#92400e">
+          <i class="bi bi-clock-history me-1"></i>
+          ${timeCutSpots.length} spot${timeCutSpots.length > 1 ? 's' : ''} left out — not enough time for ${days} day${days > 1 ? 's' : ''}
+        </div>
+        <div style="color:#78350f">
+          ${timeCutSpots.map(s => `<strong>${s.name}</strong>`).join(', ')}.
+          Add more days to your trip to fit ${timeCutSpots.length > 1 ? 'them' : 'it'} in.
+        </div>
       </div>`;
   }
 
@@ -1121,6 +1267,18 @@ document.getElementById('save-itinerary-btn').addEventListener('click', async ()
 // ── Helpers ─────────────────────────────────────────────────
 function showMapLoading(show) {
   document.getElementById('map-loading').style.display = show ? 'flex' : 'none';
+}
+
+// Minutes-since-midnight → "H:MM AM/PM" label. Wraps correctly past noon
+// and past midnight (e.g. a heavily-packed day rolling past 12:00 AM),
+// unlike a plain "hour > 12 ? hour-12 : hour" check.
+function minutesToLabel(totalMinutes) {
+  const h = Math.floor(totalMinutes / 60) % 24;
+  const m = totalMinutes % 60;
+  const period = h >= 12 ? 'PM' : 'AM';
+  let h12 = h % 12;
+  if (h12 === 0) h12 = 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${period}`;
 }
 
 function formatDuration(min) {
