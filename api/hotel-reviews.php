@@ -69,6 +69,7 @@ switch ($action) {
         if (!is_logged_in()) {
             json_error('You must be logged in to submit a review.', 401);
         }
+        csrf_verify();
 
         $hid      = (int)   input('hotel_id',  'post', 0);
         $rating   = (int)   input('rating',    'post', 0);
@@ -127,6 +128,7 @@ switch ($action) {
         if (!is_logged_in()) {
             json_error('You must be logged in to edit a review.', 401);
         }
+        csrf_verify();
 
         $reviewId = (int)   input('review_id',  'post', 0);
         $rating   = (int)   input('rating',     'post', 0);
@@ -176,6 +178,7 @@ switch ($action) {
         if (!is_logged_in()) {
             json_error('You must be logged in to delete a review.', 401);
         }
+        csrf_verify_header();
 
         $data     = json_decode(file_get_contents('php://input'), true);
         $reviewId = (int) ($data['review_id'] ?? 0);

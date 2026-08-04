@@ -248,6 +248,28 @@ function csrf_verify(): void {
 }
 
 /**
+ * Verify the CSRF token on a fetch()-driven JSON API request. These
+ * endpoints read a JSON body via php://input, so $_POST is never
+ * populated the way a classic <form method="POST"> submission fills it,
+ * and csrf_verify() (which reads $_POST) can't be reused as-is here.
+ * The token instead travels in the X-CSRF-Token header, sent by the
+ * frontend from the <meta name="csrf-token"> tag in includes/header.php.
+ * Same timing-safe comparison and behavior as csrf_verify().
+ */
+function csrf_verify_header(): void {
+    session_start_safe();
+    $submitted = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    $expected  = $_SESSION['csrf_token'] ?? '';
+
+    if ($expected === '' || $submitted === '' || !hash_equals($expected, $submitted)) {
+        http_response_code(403);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'message' => 'Your session expired or this request looks invalid. Please refresh the page and try again.']);
+        exit;
+    }
+}
+
+/**
  * Simple login rate-limiter, tracked per email+IP in the session (no
  * extra table needed). After MAX_ATTEMPTS failed logins, blocks further
  * tries for LOCKOUT_SECONDS. Call login_attempt_blocked() before

@@ -25,6 +25,7 @@ if (($u['role'] ?? '') === 'admin') {
     echo json_encode(['success'=>false,'message'=>'Admin accounts cannot place orders']);
     exit;
 }
+csrf_verify_header();
 $data = json_decode(file_get_contents('php://input'), true);
 
 $shop_id        = (int)   ($data['shop_id']        ?? 0);

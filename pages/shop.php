@@ -401,7 +401,7 @@ function placeOrder(shopId) {
 
   fetch('<?= APP_URL ?>/api/orders.php', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN },
     body: JSON.stringify(payload)
   })
   .then(r => r.json())
@@ -473,7 +473,7 @@ if (submitShopReviewBtn) {
 
     fetch('<?= APP_URL ?>/api/shops.php?action=review', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN },
       body: JSON.stringify({
         shop_id:  <?= $shop_id ?>,
         order_id: <?= $reviewable_order['id'] ?? 0 ?>,

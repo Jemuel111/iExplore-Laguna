@@ -25,6 +25,7 @@ if (($u['role'] ?? '') === 'admin') {
     echo json_encode(['success'=>false,'message'=>'Admin accounts cannot make bookings']);
     exit;
 }
+csrf_verify_header();
 $data = json_decode(file_get_contents('php://input'), true);
 
 $hotel_id         = (int)   ($data['hotel_id']         ?? 0);

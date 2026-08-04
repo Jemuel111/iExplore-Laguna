@@ -710,7 +710,7 @@ if (checkinBtn) {
         try {
           const res = await fetch(API_BASE + 'spot-checkin.php', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN },
             body: JSON.stringify({
               spot_id: SPOT_ID,
               latitude: pos.coords.latitude,
@@ -859,7 +859,7 @@ document.addEventListener('click', async (e) => {
 
   const res = await fetch(API_BASE + 'spots.php?action=delete_review', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN },
     body: JSON.stringify({ review_id: btn.dataset.reviewId })
   }).then(r => r.json()).catch(() => null);
 
@@ -882,6 +882,7 @@ if (submitBtn) {
     const endpoint  = isEditing ? 'update_review' : 'review';
 
     const fd = new FormData();
+    fd.append('csrf_token', window.CSRF_TOKEN);
     fd.append('rating', rating);
     fd.append('title', document.getElementById('review-title').value.trim());
     fd.append('body', document.getElementById('review-body').value.trim());

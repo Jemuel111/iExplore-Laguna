@@ -24,6 +24,7 @@ if (($u['role'] ?? '') === 'admin') {
     echo json_encode(['success'=>false,'message'=>'Admin accounts cannot book packages']);
     exit;
 }
+csrf_verify_header();
 $data = json_decode(file_get_contents('php://input'), true);
 
 $package_id      = (int)   ($data['package_id']     ?? 0);

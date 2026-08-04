@@ -210,7 +210,7 @@ function bookPackage(packageId) {
 
   fetch('<?= APP_URL ?>/api/packages.php', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN },
     body: JSON.stringify({
       package_id:    packageId,
       start_date:    startDate,

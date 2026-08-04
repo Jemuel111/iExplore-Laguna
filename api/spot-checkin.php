@@ -21,6 +21,7 @@ session_start_safe();
 if (!is_logged_in()) {
     json_error('You must be logged in to check in.', 401);
 }
+csrf_verify_header();
 
 // Maximum allowed distance between the tourist's device and the spot's
 // real coordinates for a check-in to count as "confirmed." Consumer

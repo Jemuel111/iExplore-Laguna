@@ -96,7 +96,7 @@
     const id = item.dataset.id;
     fetch('<?= APP_URL ?>/api/notifications.php?action=mark_read', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN },
       body: JSON.stringify({ id })
     }).catch(() => {});
     // Let the link navigation proceed normally — no preventDefault needed
@@ -104,7 +104,10 @@
 
   markAll.addEventListener('click', async (e) => {
     e.preventDefault();
-    await fetch('<?= APP_URL ?>/api/notifications.php?action=mark_all_read', { method: 'POST' }).catch(() => {});
+    await fetch('<?= APP_URL ?>/api/notifications.php?action=mark_all_read', {
+      method: 'POST',
+      headers: { 'X-CSRF-Token': window.CSRF_TOKEN }
+    }).catch(() => {});
     loadNotifications();
   });
 

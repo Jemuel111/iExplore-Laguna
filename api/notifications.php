@@ -41,6 +41,7 @@ switch ($action) {
 
     case 'mark_read':
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_error('POST method required.', 405);
+        csrf_verify_header();
         $data = json_decode(file_get_contents('php://input'), true);
         $id   = (int) ($data['id'] ?? 0);
         if ($id) {
@@ -51,6 +52,7 @@ switch ($action) {
 
     case 'mark_all_read':
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_error('POST method required.', 405);
+        csrf_verify_header();
         db_execute("UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0", [$user_id]);
         json_ok(null, 'All marked as read.');
         break;

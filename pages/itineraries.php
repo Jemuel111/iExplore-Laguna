@@ -161,7 +161,10 @@ require_once __DIR__ . '/../includes/header.php';
 async function deleteItinerary(id, btn) {
   if (!confirm('Delete this itinerary?')) return;
   const API_BASE = '<?= APP_URL ?>/api/';
-  const res = await fetch(API_BASE + `itineraries.php?action=delete&id=${id}`, { method: 'POST' }).then(r=>r.json());
+  const res = await fetch(API_BASE + `itineraries.php?action=delete&id=${id}`, {
+    method: 'POST',
+    headers: { 'X-CSRF-Token': window.CSRF_TOKEN }
+  }).then(r=>r.json());
   if (res.success) {
     btn.closest('.col-md-6').remove();
     IExploreApp.toast('Itinerary deleted.', 'success');

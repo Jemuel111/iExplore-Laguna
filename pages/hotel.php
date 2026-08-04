@@ -789,7 +789,7 @@ document.addEventListener('click', async (e) => {
 
   const res = await fetch('<?= APP_URL ?>/api/hotel-reviews.php?action=delete_review', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN },
     body: JSON.stringify({ review_id: btn.dataset.reviewId })
   }).then(r => r.json()).catch(() => null);
 
@@ -812,6 +812,7 @@ if (submitHotelReviewBtn) {
     const endpoint  = isEditing ? 'update_review' : 'review';
 
     const fd = new FormData();
+    fd.append('csrf_token', window.CSRF_TOKEN);
     fd.append('rating', rating);
     fd.append('title', document.getElementById('hotel-review-title').value.trim());
     fd.append('body', document.getElementById('hotel-review-body').value.trim());
@@ -1016,7 +1017,7 @@ function submitBooking(hotelId) {
 
   fetch('<?= APP_URL ?>/api/bookings.php', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN },
     body: JSON.stringify(payload)
   })
   .then(r => r.json())

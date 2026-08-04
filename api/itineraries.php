@@ -23,6 +23,8 @@ if (($user['role'] ?? '') === 'admin') {
 switch ($action) {
 
     case 'save':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_error('POST method required.', 405);
+        csrf_verify_header();
         $body = json_decode(file_get_contents('php://input'), true);
         if (!$body) json_error('Invalid request body.', 400);
 
@@ -65,6 +67,8 @@ switch ($action) {
         break;
 
     case 'delete':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_error('POST method required.', 405);
+        csrf_verify_header();
         $id = (int) input('id', 'get');
         if (!$id) json_error('Itinerary ID required.', 400);
 

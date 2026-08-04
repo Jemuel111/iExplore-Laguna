@@ -30,6 +30,7 @@ if ($user && ($user['role'] ?? '') === 'admin') {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="IExplore Laguna — Smart Travel Planner for Laguna Province">
+  <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
   <title><?= e($page_title) ?> | <?= APP_NAME ?></title>
 
   <!-- Bootstrap 5 -->

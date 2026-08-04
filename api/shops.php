@@ -20,6 +20,7 @@ switch ($action) {
         if (!is_logged_in()) {
             json_error('You must be logged in to submit a review.', 401);
         }
+        csrf_verify_header();
 
         $u    = current_user();
         $data = json_decode(file_get_contents('php://input'), true);
