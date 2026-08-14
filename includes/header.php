@@ -12,6 +12,16 @@ send_security_headers();
 $page_title  = $page_title  ?? APP_NAME;
 $active_page = $active_page ?? '';
 $user        = current_user();
+$__site_settings = site_settings();
+$__logo_path = trim((string)($__site_settings['logo_path'] ?? ''));
+$__theme_css = sprintf(
+    '--green-dark:%s;--green-mid:%s;--green-light:%s;--green-pale:%s;--sand-dark:%s;',
+    e($__site_settings['theme_dark']),
+    e($__site_settings['theme_primary']),
+    e($__site_settings['theme_light']),
+    e($__site_settings['theme_pale']),
+    e($__site_settings['theme_accent'])
+);
 
 // Admins are restricted to the admin area — bounce them off every
 // tourist-facing page (browsing, planner, ordering, booking, etc.)
@@ -52,7 +62,7 @@ if ($user && ($user['role'] ?? '') === 'admin') {
   <!-- App CSS -->
   <link rel="stylesheet" href="<?= APP_URL ?>/assets/css/app.css">
 </head>
-<body>
+<body style="<?= $__theme_css ?>">
 
 <!-- ── Navbar ─────────────────────────────────────────────── -->
 <nav class="navbar navbar-expand-lg navbar-dark sticky-top" id="main-nav">
@@ -60,7 +70,11 @@ if ($user && ($user['role'] ?? '') === 'admin') {
 
     <!-- Brand -->
     <a class="navbar-brand d-flex align-items-center gap-2" href="<?= APP_URL ?>">
-      <span class="brand-icon"><i class="bi bi-map-fill"></i></span>
+      <?php if ($__logo_path): ?>
+        <img src="<?= APP_URL . '/' . ltrim(e($__logo_path), '/') ?>" alt="<?= e(APP_NAME) ?> logo" class="brand-logo site-navbar-logo">
+      <?php else: ?>
+        <span class="brand-icon"><i class="bi bi-map-fill"></i></span>
+      <?php endif; ?>
       <span class="brand-text"><span class="brand-i">i</span>Explore <span class="brand-accent">Laguna</span></span>
     </a>
 

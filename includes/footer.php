@@ -12,7 +12,11 @@
       <!-- Brand col -->
       <div class="col-lg-4">
         <div class="d-flex align-items-center gap-2 mb-3">
-          <span class="brand-icon-sm"><i class="bi bi-map-fill"></i></span>
+          <?php if (!empty($__site_settings['logo_path'])): ?>
+        <img src="<?= APP_URL . '/' . ltrim(e($__site_settings['logo_path']), '/') ?>" alt="<?= e(APP_NAME) ?> logo" class="brand-logo-sm">
+      <?php else: ?>
+        <span class="brand-icon-sm"><i class="bi bi-map-fill"></i></span>
+      <?php endif; ?>
           <span class="fw-bold fs-5"><span style="font-style:italic;color:var(--sand-dark)">i</span>Explore <span style="color:var(--sand-dark)">Laguna</span></span>
         </div>
         <p class="small mb-3" style="color:rgba(255,255,255,.55);line-height:1.75">

@@ -92,6 +92,20 @@ img { max-width: 100%; height: auto; display: block; }
 }
 
 .brand-icon { font-size: 1.4rem; }
+.brand-logo {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: rgba(255,255,255,.08);
+}
+.brand-logo-sm {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  border-radius: 7px;
+}
+
 .brand-text {
   font-family: 'Playfair Display', serif;
   font-size: 1.22rem;
@@ -1304,3 +1318,232 @@ section .card-app:hover {
 .auth-split-wide .auth-split-photo { flex: 1 1 38%; }
 .auth-split-wide .auth-split-form  { flex: 1 1 62%; }
 .auth-split-wide .auth-form-inner  { max-width: 460px; }
+
+
+/* iExplore Laguna Analytics - restrained site-consistent layout */
+.analytics-page {
+    --analytics-border: rgba(107, 15, 20, .12);
+    --analytics-muted: #6f6f6f;
+    --analytics-bg: #fff;
+    --analytics-soft: #faf7f7;
+}
+
+.analytics-page .analytics-toolbar {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:16px;
+    margin-bottom:24px;
+    padding-bottom:16px;
+    border-bottom:1px solid var(--analytics-border);
+}
+
+.analytics-page .analytics-toolbar h1 {
+    margin:0;
+    font-size:28px;
+    font-weight:700;
+}
+
+.analytics-page .analytics-toolbar p {
+    margin:4px 0 0;
+    color:var(--analytics-muted);
+    font-size:14px;
+}
+
+.analytics-page .analytics-filter {
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+
+.analytics-page .analytics-filter select {
+    min-width:160px;
+}
+
+.analytics-page .analytics-kpis {
+    display:grid;
+    grid-template-columns:repeat(4, minmax(0,1fr));
+    gap:14px;
+    margin-bottom:20px;
+}
+
+.analytics-page .analytics-kpi {
+    background:var(--analytics-bg);
+    border:1px solid var(--analytics-border);
+    border-radius:6px;
+    padding:16px 18px;
+}
+
+.analytics-page .analytics-kpi-label {
+    color:var(--analytics-muted);
+    font-size:13px;
+    margin-bottom:7px;
+}
+
+.analytics-page .analytics-kpi-value {
+    font-size:25px;
+    line-height:1.15;
+    font-weight:700;
+}
+
+.analytics-page .analytics-kpi-change {
+    margin-top:7px;
+    font-size:12px;
+}
+
+.analytics-page .analytics-kpi-change.up { color:#2f7d32; }
+.analytics-page .analytics-kpi-change.down { color:#a33a3a; }
+
+.analytics-page .analytics-grid {
+    display:grid;
+    grid-template-columns:minmax(0,1.45fr) minmax(280px,.8fr);
+    gap:18px;
+    margin-bottom:18px;
+}
+
+.analytics-page .analytics-panel {
+    background:#fff;
+    border:1px solid var(--analytics-border);
+    border-radius:6px;
+    overflow:hidden;
+}
+
+.analytics-page .analytics-panel-header {
+    padding:14px 16px;
+    border-bottom:1px solid var(--analytics-border);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+}
+
+.analytics-page .analytics-panel-header h2 {
+    margin:0;
+    font-size:16px;
+    font-weight:700;
+}
+
+.analytics-page .analytics-panel-header small {
+    color:var(--analytics-muted);
+}
+
+.analytics-page .analytics-panel-body {
+    padding:16px;
+}
+
+.analytics-page .analytics-simple-list {
+    list-style:none;
+    padding:0;
+    margin:0;
+}
+
+.analytics-page .analytics-simple-list li {
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    padding:11px 0;
+    border-bottom:1px solid rgba(0,0,0,.06);
+}
+
+.analytics-page .analytics-simple-list li:last-child {
+    border-bottom:0;
+}
+
+.analytics-page .analytics-rank {
+    display:inline-flex;
+    width:24px;
+    height:24px;
+    align-items:center;
+    justify-content:center;
+    margin-right:8px;
+    border:1px solid var(--analytics-border);
+    border-radius:4px;
+    font-size:12px;
+    font-weight:700;
+}
+
+.analytics-page .analytics-table {
+    width:100%;
+    border-collapse:collapse;
+}
+
+.analytics-page .analytics-table th {
+    text-align:left;
+    font-size:12px;
+    color:var(--analytics-muted);
+    font-weight:600;
+    padding:9px 10px;
+    border-bottom:1px solid var(--analytics-border);
+}
+
+.analytics-page .analytics-table td {
+    padding:10px;
+    border-bottom:1px solid rgba(0,0,0,.06);
+    font-size:13px;
+}
+
+.analytics-page .analytics-table tr:last-child td {
+    border-bottom:0;
+}
+
+.analytics-page .analytics-empty {
+    padding:22px 8px;
+    color:var(--analytics-muted);
+    text-align:center;
+    font-size:13px;
+}
+
+@media (max-width: 1000px) {
+    .analytics-page .analytics-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .analytics-page .analytics-grid { grid-template-columns:1fr; }
+}
+
+@media (max-width: 620px) {
+    .analytics-page .analytics-toolbar { align-items:flex-start; flex-direction:column; }
+    .analytics-page .analytics-kpis { grid-template-columns:1fr; }
+}
+
+
+/* Compact analytics tables: prevent empty vertical space when there are few rows */
+.analytics-page .analytics-compact-panel .analytics-panel-body {
+    padding: 0;
+}
+
+.analytics-page .analytics-compact-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.analytics-page .analytics-compact-table th,
+.analytics-page .analytics-compact-table td {
+    padding: 9px 12px;
+    line-height: 1.25;
+    vertical-align: middle;
+}
+
+.analytics-page .analytics-compact-table th {
+    background: var(--analytics-soft);
+}
+
+.analytics-page .analytics-compact-table td {
+    height: auto;
+}
+
+.analytics-page .analytics-compact-table tr:last-child td {
+    border-bottom: 0;
+}
+
+.analytics-page .analytics-compact-panel .analytics-empty {
+    padding: 16px;
+}
+
+/* Let the panel height follow its actual content instead of stretching. */
+.analytics-page .analytics-grid {
+    align-items: start;
+}
+
+.analytics-page .analytics-panel {
+    height: fit-content;
+    align-self: start;
+}

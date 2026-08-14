@@ -6,6 +6,78 @@
 
 require_once __DIR__ . '/db.php';
 
+
+/**
+ * Global site branding/theme settings.
+ * The table is created automatically so the feature can be added to
+ * an existing installation without requiring a manual SQL migration.
+ */
+function ensure_site_settings_table(): void {
+    db()->exec(
+        "CREATE TABLE IF NOT EXISTS site_settings (
+            setting_key VARCHAR(80) PRIMARY KEY,
+            setting_value TEXT NULL,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                       ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+
+    $defaults = [
+        'logo_path'     => '',
+        'theme_dark'    => '#6b0f14',
+        'theme_primary' => '#a61c1c',
+        'theme_light'   => '#e2574c',
+        'theme_pale'    => '#fbdede',
+        'theme_accent'  => '#e9c46a',
+    ];
+
+    foreach ($defaults as $key => $value) {
+        db_execute(
+            "INSERT IGNORE INTO site_settings (setting_key, setting_value) VALUES (?, ?)",
+            [$key, $value]
+        );
+    }
+}
+
+/** Get all site settings, with safe defaults. */
+function site_settings(): array {
+    static $settings = null;
+    if ($settings !== null) return $settings;
+
+    ensure_site_settings_table();
+    $rows = db_fetch_all("SELECT setting_key, setting_value FROM site_settings");
+    $settings = [];
+    foreach ($rows as $row) {
+        $settings[$row['setting_key']] = $row['setting_value'];
+    }
+
+    $settings += [
+        'logo_path'     => '',
+        'theme_dark'    => '#6b0f14',
+        'theme_primary' => '#a61c1c',
+        'theme_light'   => '#e2574c',
+        'theme_pale'    => '#fbdede',
+        'theme_accent'  => '#e9c46a',
+    ];
+    return $settings;
+}
+
+/** Update one site setting. */
+function set_site_setting(string $key, string $value): void {
+    ensure_site_settings_table();
+    db_execute(
+        "INSERT INTO site_settings (setting_key, setting_value)
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)",
+        [$key, $value]
+    );
+}
+
+/** Only allow CSS color values that are safe to put in an inline style. */
+function valid_hex_color(string $value): bool {
+    return (bool) preg_match('/^#[0-9a-fA-F]{6}$/', $value);
+}
+
 // ── Output ────────────────────────────────────────────────────
 
 /**

@@ -15,6 +15,119 @@ if (!is_logged_in()) { header('Location: ' . APP_URL . '/pages/login.php'); exit
 $u = current_user();
 if (($u['role'] ?? '') !== 'admin') { header('Location: ' . APP_URL); exit; }
 
+
+// ── Site branding / theme settings ──────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = input('action', 'post', '');
+
+    if ($action === 'save_site_settings') {
+        $colors = [
+            'theme_dark'    => trim((string)input('theme_dark', 'post', '')),
+            'theme_primary' => trim((string)input('theme_primary', 'post', '')),
+            'theme_light'   => trim((string)input('theme_light', 'post', '')),
+            'theme_pale'    => trim((string)input('theme_pale', 'post', '')),
+            'theme_accent'  => trim((string)input('theme_accent', 'post', '')),
+        ];
+
+        $valid = true;
+        foreach ($colors as $color) {
+            if (!valid_hex_color($color)) {
+                $valid = false;
+                break;
+            }
+        }
+
+        if (!$valid) {
+            $_SESSION['flash']['danger'] = 'Please use valid 6-digit HEX colors (for example #6b0f14).';
+            header('Location: ' . APP_URL . '/pages/admin-dashboard.php#site-settings'); exit;
+        }
+
+        foreach ($colors as $key => $value) {
+            set_site_setting($key, $value);
+        }
+
+        if (!empty($_FILES['site_logo']['name'])) {
+            $file = $_FILES['site_logo'];
+
+            if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                $_SESSION['flash']['danger'] = 'The logo upload failed. Please try again.';
+                header('Location: ' . APP_URL . '/pages/admin-dashboard.php#site-settings'); exit;
+            }
+
+            if (($file['size'] ?? 0) > 2 * 1024 * 1024) {
+                $_SESSION['flash']['danger'] = 'Logo must be 2 MB or smaller.';
+                header('Location: ' . APP_URL . '/pages/admin-dashboard.php#site-settings'); exit;
+            }
+
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $mime = $finfo->file($file['tmp_name']);
+            $allowed = [
+                'image/png'  => 'png',
+                'image/jpeg' => 'jpg',
+                'image/webp' => 'webp',
+                'image/svg+xml' => 'svg',
+            ];
+
+            if (!isset($allowed[$mime])) {
+                $_SESSION['flash']['danger'] = 'Logo must be PNG, JPG, WEBP, or SVG.';
+                header('Location: ' . APP_URL . '/pages/admin-dashboard.php#site-settings'); exit;
+            }
+
+            $upload_dir = __DIR__ . '/../uploads';
+            if (!is_dir($upload_dir) || !is_writable($upload_dir)) {
+                $_SESSION['flash']['danger'] = 'The uploads folder is missing or not writable by PHP. Please check the uploads folder permissions.';
+                header('Location: ' . APP_URL . '/pages/admin-dashboard.php#site-settings'); exit;
+            }
+
+            $filename = 'site-logo-' . bin2hex(random_bytes(8)) . '.' . $allowed[$mime];
+            $target = $upload_dir . '/' . $filename;
+
+            if (!move_uploaded_file($file['tmp_name'], $target)) {
+                $_SESSION['flash']['danger'] = 'Could not save the uploaded logo. Please check that the uploads folder is writable by PHP.';
+                header('Location: ' . APP_URL . '/pages/admin-dashboard.php#site-settings'); exit;
+            }
+
+            $old_logo = trim((string)(site_settings()['logo_path'] ?? ''));
+            if ($old_logo && strpos($old_logo, 'uploads/site-logo-') === 0) {
+                $old_file = dirname(__DIR__) . '/' . $old_logo;
+                if (is_file($old_file)) @unlink($old_file);
+            }
+
+            set_site_setting('logo_path', 'uploads/' . $filename);
+        }
+
+        $_SESSION['flash']['success'] = 'Site branding and color theme updated successfully.';
+        header('Location: ' . APP_URL . '/pages/admin-dashboard.php#site-settings'); exit;
+    }
+
+    if ($action === 'reset_site_theme') {
+        // Restore the original iExplore Laguna color theme without changing the logo.
+        $default_theme = [
+            'theme_dark'    => '#6b0f14',
+            'theme_primary' => '#a61c1c',
+            'theme_light'   => '#e2574c',
+            'theme_pale'    => '#fbdede',
+            'theme_accent'  => '#e9c46a',
+        ];
+        foreach ($default_theme as $key => $value) {
+            set_site_setting($key, $value);
+        }
+        $_SESSION['flash']['success'] = 'Color theme restored to the default iExplore Laguna colors.';
+        header('Location: ' . APP_URL . '/pages/admin-dashboard.php#site-settings'); exit;
+    }
+
+    if ($action === 'remove_site_logo') {
+        $old_logo = trim((string)(site_settings()['logo_path'] ?? ''));
+        if ($old_logo && strpos($old_logo, 'uploads/site-logo-') === 0) {
+            $old_file = dirname(__DIR__) . '/' . $old_logo;
+            if (is_file($old_file)) @unlink($old_file);
+        }
+        set_site_setting('logo_path', '');
+        $_SESSION['flash']['success'] = 'Custom logo removed. The default map icon is now being used.';
+        header('Location: ' . APP_URL . '/pages/admin-dashboard.php#site-settings'); exit;
+    }
+}
+
 // ── Handle POST actions ─────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = input('action', 'post', '');
@@ -158,6 +271,7 @@ $verified_hotels = db_fetch_all(
 $verified_shops_count  = count($verified_shops);
 $verified_hotels_count = count($verified_hotels);
 $total_users            = db_fetch_one("SELECT COUNT(*) n FROM users")['n'] ?? 0;
+$site_settings = site_settings();
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
@@ -212,6 +326,11 @@ require_once __DIR__ . '/../includes/header.php';
   <!-- Tabs -->
   <ul class="nav nav-tabs mb-4" style="border-bottom:2px solid var(--border)">
     <li class="nav-item">
+      <a class="nav-link" data-bs-toggle="tab" href="#site-settings" style="font-weight:600">
+        <i class="bi bi-palette me-1"></i>Site Settings
+      </a>
+    </li>
+    <li class="nav-item">
       <a class="nav-link active" data-bs-toggle="tab" href="#shops" style="font-weight:600">
         <i class="bi bi-shop me-1"></i>Shops
         <?php if (count($pending_shops)): ?>
@@ -230,6 +349,127 @@ require_once __DIR__ . '/../includes/header.php';
   </ul>
 
   <div class="tab-content">
+
+    <!-- ── SITE SETTINGS ── -->
+    <div class="tab-pane fade" id="site-settings">
+      <div class="row g-4">
+        <div class="col-lg-5">
+          <div class="form-panel h-100">
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <i class="bi bi-image fs-4" style="color:var(--green-mid)"></i>
+              <h4 class="mb-0">Website Logo</h4>
+            </div>
+            <p class="text-muted small mb-3">Upload a new logo and it will immediately replace the current logo across the website.</p>
+
+            <?php if (!empty($site_settings['logo_path'])): ?>
+              <div class="p-3 mb-3 text-center" style="border:1px solid var(--border);border-radius:var(--radius);background:#fff">
+                <img src="<?= APP_URL . '/' . ltrim(e($site_settings['logo_path']), '/') ?>"
+                     alt="Current website logo" style="max-height:110px;max-width:220px;object-fit:contain;margin:auto">
+                <div class="small text-muted mt-2">Current logo</div>
+              </div>
+            <?php else: ?>
+              <div class="p-4 mb-3 text-center" style="border:1px dashed var(--border);border-radius:var(--radius)">
+                <i class="bi bi-map fs-1 text-muted"></i>
+                <div class="small text-muted mt-2">Using the default map icon</div>
+              </div>
+            <?php endif; ?>
+
+            <form method="post" enctype="multipart/form-data" class="mb-2">
+              <?= csrf_field() ?>
+              <input type="hidden" name="action" value="save_site_settings">
+              <input type="hidden" name="theme_dark" value="<?= e($site_settings['theme_dark']) ?>">
+              <input type="hidden" name="theme_primary" value="<?= e($site_settings['theme_primary']) ?>">
+              <input type="hidden" name="theme_light" value="<?= e($site_settings['theme_light']) ?>">
+              <input type="hidden" name="theme_pale" value="<?= e($site_settings['theme_pale']) ?>">
+              <input type="hidden" name="theme_accent" value="<?= e($site_settings['theme_accent']) ?>">
+              <label class="form-label">Choose new logo</label>
+              <input type="file" name="site_logo" class="form-control" accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml" required>
+              <div class="form-text">PNG, JPG, WEBP or SVG · maximum 2 MB</div>
+              <button class="btn btn-primary-app w-100 mt-3">
+                <i class="bi bi-upload me-1"></i>Upload &amp; Apply Logo
+              </button>
+            </form>
+
+            <?php if (!empty($site_settings['logo_path'])): ?>
+              <form method="post">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="remove_site_logo">
+                <button class="btn btn-outline-secondary w-100" type="submit">
+                  <i class="bi bi-arrow-counterclockwise me-1"></i>Use Default Logo
+                </button>
+              </form>
+            <?php endif; ?>
+          </div>
+        </div>
+
+        <div class="col-lg-7">
+          <div class="form-panel">
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <i class="bi bi-palette2 fs-4" style="color:var(--green-mid)"></i>
+              <h4 class="mb-0">Color Theme</h4>
+            </div>
+            <p class="text-muted small">Pick a preset or customize the colors. Changes are applied throughout the website after saving.</p>
+
+            <div class="d-flex flex-wrap gap-2 mb-4">
+              <button type="button" class="btn btn-sm btn-outline-secondary theme-preset" data-theme='{"dark":"#1a3a2a","primary":"#2d6a4f","light":"#52b788","pale":"#d8f3dc","accent":"#e9c46a"}'>Laguna Green</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary theme-preset" data-theme='{"dark":"#6b0f14","primary":"#a61c1c","light":"#e2574c","pale":"#fbdede","accent":"#e9c46a"}'>Sunset Red</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary theme-preset" data-theme='{"dark":"#073b4c","primary":"#118ab2","light":"#06d6a0","pale":"#d8f3dc","accent":"#ffd166"}'>Laguna Blue</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary theme-preset" data-theme='{"dark":"#3b1f5f","primary":"#6c3aa3","light":"#9b72cf","pale":"#eee3ff","accent":"#f2c94c"}'>Royal Purple</button>
+            </div>
+
+            <form method="post" id="siteThemeForm">
+              <?= csrf_field() ?>
+              <input type="hidden" name="action" value="save_site_settings">
+              <input type="hidden" name="MAX_FILE_SIZE" value="2097152">
+
+              <div class="row g-3">
+                <?php
+                $theme_fields = [
+                  ['theme_dark', 'Dark / Header', $site_settings['theme_dark']],
+                  ['theme_primary', 'Primary', $site_settings['theme_primary']],
+                  ['theme_light', 'Light / Hover', $site_settings['theme_light']],
+                  ['theme_pale', 'Pale / Background', $site_settings['theme_pale']],
+                  ['theme_accent', 'Accent', $site_settings['theme_accent']],
+                ];
+                foreach ($theme_fields as [$name,$label,$value]): ?>
+                  <div class="col-sm-6">
+                    <label class="form-label"><?= e($label) ?></label>
+                    <div class="d-flex align-items-center gap-2">
+                      <input type="color" name="<?= e($name) ?>" value="<?= e($value) ?>" class="form-control form-control-color theme-color-picker" title="<?= e($label) ?>">
+                      <input type="text" value="<?= e($value) ?>" class="form-control theme-hex" maxlength="7" pattern="#[0-9A-Fa-f]{6}" aria-label="<?= e($label) ?> HEX">
+                    </div>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+
+              <div class="mt-4 p-3" style="border-radius:var(--radius);background:var(--green-pale)">
+                <div class="fw-bold mb-1">Theme preview</div>
+                <div class="d-flex gap-2 flex-wrap">
+                  <span class="badge" style="background:var(--green-dark)">Header</span>
+                  <span class="badge" style="background:var(--green-mid)">Primary</span>
+                  <span class="badge" style="background:var(--green-light)">Hover</span>
+                  <span class="badge" style="background:var(--sand-dark);color:var(--green-dark)">Accent</span>
+                </div>
+              </div>
+
+              <div class="d-flex flex-wrap gap-2 mt-4">
+                <button class="btn btn-primary-app">
+                  <i class="bi bi-check2-circle me-1"></i>Save Color Theme
+                </button>
+              </form>
+
+              <form method="post" class="d-inline" onsubmit="return confirm('Restore the default iExplore Laguna colors? Your uploaded logo will not be changed.');">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="reset_site_theme">
+                <button type="submit" class="btn btn-outline-secondary">
+                  <i class="bi bi-arrow-counterclockwise me-1"></i>Restore Default Colors
+                </button>
+              </form>
+              </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- ── PENDING SHOPS ── -->
     <div class="tab-pane fade show active" id="shops">
@@ -424,6 +664,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const tab = document.querySelector(`[href="${hash}"]`);
     if (tab) new bootstrap.Tab(tab).show();
   }
+
+  const fields = ['dark', 'primary', 'light', 'pale', 'accent'];
+  const map = {
+    dark: 'theme_dark',
+    primary: 'theme_primary',
+    light: 'theme_light',
+    pale: 'theme_pale',
+    accent: 'theme_accent'
+  };
+
+  document.querySelectorAll('.theme-preset').forEach(button => {
+    button.addEventListener('click', () => {
+      const theme = JSON.parse(button.dataset.theme);
+      fields.forEach(key => {
+        const color = theme[key];
+        const colorInput = document.querySelector(`input[name="${map[key]}"]`);
+        const hexInput = colorInput?.closest('.d-flex')?.querySelector('.theme-hex');
+        if (colorInput) colorInput.value = color;
+        if (hexInput) hexInput.value = color;
+      });
+    });
+  });
+
+  document.querySelectorAll('.theme-color-picker').forEach(colorInput => {
+    colorInput.addEventListener('input', () => {
+      const hexInput = colorInput.closest('.d-flex')?.querySelector('.theme-hex');
+      if (hexInput) hexInput.value = colorInput.value.toUpperCase();
+    });
+  });
+
+  document.querySelectorAll('.theme-hex').forEach(hexInput => {
+    hexInput.addEventListener('input', () => {
+      const value = hexInput.value.trim();
+      const colorInput = hexInput.closest('.d-flex')?.querySelector('.theme-color-picker');
+      if (colorInput && /^#[0-9A-Fa-f]{6}$/.test(value)) colorInput.value = value;
+    });
+  });
 });
 </script>
 
