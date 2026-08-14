@@ -9,6 +9,7 @@ $active_page = 'explore';
 require_once __DIR__ . '/../includes/header.php';
 
 // Fetch all cities for filter
+ensure_all_laguna_cities();
 $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
 
 // Fetch all active spots

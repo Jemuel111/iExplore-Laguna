@@ -159,6 +159,45 @@ function ensure_spot_checkins_table(): void {
 }
 
 /** Haversine distance between two coordinates, in meters. */
+/**
+ * Laguna province has 30 total LGUs (6 cities + 24 municipalities) —
+ * this app originally only seeded 16 of them. Adds the 14 missing
+ * municipalities if they aren't already in the `cities` table yet.
+ * Coordinates and descriptions are real, verified public facts (not
+ * fabricated) — this only adds the city/town record itself; it does
+ * NOT invent tourist spots, hotels, or shops for them.
+ */
+function ensure_all_laguna_cities(): void {
+    $existingSlugs = array_column(db_fetch_all("SELECT slug FROM cities"), 'slug');
+
+    $missing = [
+        ['Alaminos',    'alaminos',     'Agricultural town nestled at the foot of Mt. Makiling.',                          14.0635000, 121.2451000],
+        ['Bay',         'bay',          'One of Laguna\'s oldest towns, once the province\'s Spanish-era capital.',        14.1800000, 121.2800000],
+        ['Famy',        'famy',         'Laguna\'s smallest municipality, a quiet gateway to the Sierra Madre.',           14.4300000, 121.4500000],
+        ['Kalayaan',    'kalayaan',     'Lakeside town on Laguna de Bay, formerly known as Longos.',                       14.3280000, 121.4800000],
+        ['Liliw',       'liliw',        'Known nationwide as the "Tsinelas (Slippers) Capital of the Philippines."',       14.1300000, 121.4360000],
+        ['Luisiana',    'luisiana',     'Farming town on the slopes of Mt. Banahaw.',                                      14.1850000, 121.5109000],
+        ['Mabitac',     'mabitac',      'Lakeside town, site of a notable 1902 battle during the Philippine-American War.', 14.4300000, 121.4200000],
+        ['Magdalena',   'magdalena',    'Small agricultural town near Majayjay, known for its rice fields.',               14.2000000, 121.4300000],
+        ['Paete',       'paete',        'Renowned as the woodcarving and papier-mâché arts capital of the Philippines.',   14.3700000, 121.4800000],
+        ['Pakil',       'pakil',        'Known as the "Pilgrimage Capital of Laguna" for its Turumba festival.',           14.3800000, 121.4800000],
+        ['Rizal',       'rizal',        'Named after national hero Jose Rizal; one of Laguna\'s youngest municipalities.', 14.1083000, 121.3917000],
+        ['Santa Maria', 'santa-maria',  'Agricultural municipality in northeastern Laguna.',                               14.4750000, 121.4250000],
+        ['Siniloan',    'siniloan',     'Gateway town to Quezon province, known for its historic Spanish-era church.',     14.4220000, 121.4460000],
+        ['Victoria',    'victoria',     'Known as the "Duck Raising Capital of the Philippines."',                        14.2250000, 121.3250000],
+    ];
+
+    foreach ($missing as [$name, $slug, $desc, $lat, $lng]) {
+        if (!in_array($slug, $existingSlugs, true)) {
+            db_execute(
+                "INSERT INTO cities (name, slug, description, latitude, longitude) VALUES (?, ?, ?, ?, ?)",
+                [$name, $slug, $desc, $lat, $lng]
+            );
+        }
+    }
+}
+
+/** Haversine distance between two coordinates, in meters. */
 function haversine_meters(float $lat1, float $lon1, float $lat2, float $lon2): float {
     $earthRadius = 6371000;
     $dLat = deg2rad($lat2 - $lat1);

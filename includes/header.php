@@ -31,6 +31,14 @@ if ($user && ($user['role'] ?? '') === 'admin') {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="IExplore Laguna — Smart Travel Planner for Laguna Province">
   <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
+  <script>
+    // The meta tag above holds the real CSRF token, but nothing was ever
+    // reading it into JS — every fetch() call across the app that sent
+    // window.CSRF_TOKEN as a header was silently sending the literal
+    // string "undefined", which the server correctly rejected with a
+    // 403 every time. This one line is the missing link.
+    window.CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
+  </script>
   <title><?= e($page_title) ?> | <?= APP_NAME ?></title>
 
   <!-- Bootstrap 5 -->

@@ -92,6 +92,7 @@ if ($view_mode === 'map') {
     );
 }
 
+ensure_all_laguna_cities();
 $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
 
 // Distinct amenity labels across all hotels, for the filter checkboxes

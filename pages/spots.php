@@ -80,6 +80,7 @@ if ($view_mode === 'map') {
     );
 }
 
+ensure_all_laguna_cities();
 $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
 
 // Category metadata now comes from the shared spot_categories() helper

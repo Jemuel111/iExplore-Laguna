@@ -32,6 +32,7 @@ $cta_photo = db_fetch_one(
 // Stats from DB
 $stat_spots  = db_fetch_one("SELECT COUNT(*) as n FROM tourist_spots WHERE is_active=1")['n'] ?? '17+';
 $stat_hotels = db_fetch_one("SELECT COUNT(*) as n FROM hotels WHERE is_active=1")['n'] ?? '9';
+ensure_all_laguna_cities();
 $stat_cities = db_fetch_one("SELECT COUNT(*) as n FROM cities")['n'] ?? '10+';
 $stat_routes = db_fetch_one("SELECT COUNT(*) as n FROM routes")['n'] ?? '24+';
 
@@ -156,7 +157,7 @@ function spot_badge(string $category): string {
     <div class="row g-0 text-center">
       <?php
       $stats = [
-        [$stat_cities, 'Cities &amp; Municipalities', 'bi-buildings-fill'],
+        [$stat_cities . ' of 30', 'Cities &amp; Municipalities', 'bi-buildings-fill'],
         [$stat_spots,  'Tourist Destinations',         'bi-geo-alt-fill'],
         [$stat_hotels, 'Hotels &amp; Resorts',          'bi-house-heart-fill'],
         [$stat_routes, 'Transport Routes',              'bi-signpost-split-fill'],

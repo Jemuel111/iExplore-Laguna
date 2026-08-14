@@ -99,6 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
     }
 }
 
+ensure_all_laguna_cities();
 $cities = db_fetch_all("SELECT id, name FROM cities ORDER BY name");
 
 // Real photo for the split-screen panel
