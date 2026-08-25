@@ -178,7 +178,6 @@ $transport_labels = [
 <div class="traffic-map-legend-item"><span class="traffic-map-dot traffic-free"></span>Free flow</div>
     <div class="traffic-map-legend-item"><span class="traffic-map-dot traffic-moderate"></span>Moderate</div>
     <div class="traffic-map-legend-item"><span class="traffic-map-dot traffic-heavy"></span>Heavy</div>
-</div>
 
       <div class="planner-traffic-control" id="planner-traffic-control">
         <button type="button" id="traffic-toggle-btn" class="btn btn-sm btn-light planner-traffic-btn" aria-pressed="false">
@@ -247,7 +246,7 @@ $transport_labels = [
           <div class="small text-muted">Calculating road route…</div>
         </div>
       </div>
-    </div>
+    </div><!-- /#map-wrapper -->
 
     <!-- Map legend — a plain caption strip under the map, not floating on top of it -->
     <div class="d-flex align-items-center justify-content-center flex-wrap gap-3 mb-3"
