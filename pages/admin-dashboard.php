@@ -116,6 +116,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: ' . APP_URL . '/pages/admin-dashboard.php#site-settings'); exit;
     }
 
+    if ($action === 'save_route_fare') {
+        $route_id = (int) input('route_id', 'post', 0);
+        $origin_city_id = (int) input('origin_city_id', 'post', 0);
+        $dest_city_id = (int) input('dest_city_id', 'post', 0);
+        $transport_type = trim((string) input('transport_type', 'post', ''));
+        $fare_php = (float) input('fare_php', 'post', 0);
+        $notes = trim((string) input('notes', 'post', ''));
+        $allowed_types = ['jeepney','bus','tricycle','fx_uv','private_car'];
+        if (!$origin_city_id || !$dest_city_id || $origin_city_id === $dest_city_id) { $_SESSION['flash']['danger']='Please choose two different cities.'; header('Location: '.APP_URL.'/pages/admin-dashboard.php#transport-fares'); exit; }
+        if (!in_array($transport_type, $allowed_types, true)) { $_SESSION['flash']['danger']='Please choose a valid transportation type.'; header('Location: '.APP_URL.'/pages/admin-dashboard.php#transport-fares'); exit; }
+        if ($fare_php < 0 || $fare_php > 10000) { $_SESSION['flash']['danger']='Please enter a valid fare between ₱0 and ₱10,000.'; header('Location: '.APP_URL.'/pages/admin-dashboard.php#transport-fares'); exit; }
+        $origin = db_fetch_one("SELECT id,name FROM cities WHERE id=?",[$origin_city_id]);
+        $dest = db_fetch_one("SELECT id,name FROM cities WHERE id=?",[$dest_city_id]);
+        if (!$origin || !$dest) { $_SESSION['flash']['danger']='One of the selected cities could not be found.'; header('Location: '.APP_URL.'/pages/admin-dashboard.php#transport-fares'); exit; }
+        if ($route_id) {
+            $existing=db_fetch_one("SELECT id FROM routes WHERE id=?",[$route_id]);
+            if (!$existing) { $_SESSION['flash']['danger']='The selected fare record no longer exists.'; header('Location: '.APP_URL.'/pages/admin-dashboard.php#transport-fares'); exit; }
+            db_execute("UPDATE routes SET origin_city_id=?, dest_city_id=?, transport_type=?, fare_php=?, notes=? WHERE id=?",[$origin_city_id,$dest_city_id,$transport_type,$fare_php,$notes!==''?$notes:null,$route_id]);
+            $_SESSION['flash']['success']="Fare updated: {$origin['name']} → {$dest['name']}.";
+        } else {
+            $duplicate=db_fetch_one("SELECT id FROM routes WHERE origin_city_id=? AND dest_city_id=? AND transport_type=?",[$origin_city_id,$dest_city_id,$transport_type]);
+            if ($duplicate) { db_execute("UPDATE routes SET fare_php=?, notes=? WHERE id=?",[$fare_php,$notes!==''?$notes:null,$duplicate['id']]); $_SESSION['flash']['success']="Existing fare updated: {$origin['name']} → {$dest['name']}."; }
+            else { db_execute("INSERT INTO routes (origin_city_id,dest_city_id,transport_type,fare_php,notes) VALUES (?,?,?,?,?)",[$origin_city_id,$dest_city_id,$transport_type,$fare_php,$notes!==''?$notes:null]); $_SESSION['flash']['success']="Fare added: {$origin['name']} → {$dest['name']}."; }
+        }
+        header('Location: '.APP_URL.'/pages/admin-dashboard.php#transport-fares'); exit;
+    }
+
+    if ($action === 'delete_route_fare') {
+        $route_id=(int) input('route_id','post',0);
+        if ($route_id) { db_execute("DELETE FROM routes WHERE id=?",[$route_id]); $_SESSION['flash']['success']='Transportation fare removed.'; }
+        header('Location: '.APP_URL.'/pages/admin-dashboard.php#transport-fares'); exit;
+    }
+
     if ($action === 'remove_site_logo') {
         $old_logo = trim((string)(site_settings()['logo_path'] ?? ''));
         if ($old_logo && strpos($old_logo, 'uploads/site-logo-') === 0) {
@@ -273,6 +306,8 @@ $verified_hotels_count = count($verified_hotels);
 $total_users            = db_fetch_one("SELECT COUNT(*) n FROM users")['n'] ?? 0;
 $site_settings = site_settings();
 
+$cities = db_fetch_all("SELECT id,name FROM cities ORDER BY name");
+$route_fares = db_fetch_all("SELECT r.id,r.origin_city_id,r.dest_city_id,r.transport_type,r.fare_php,r.notes,o.name AS origin_name,d.name AS dest_name FROM routes r JOIN cities o ON r.origin_city_id=o.id JOIN cities d ON r.dest_city_id=d.id ORDER BY o.name,d.name,r.fare_php ASC");
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
@@ -328,6 +363,11 @@ require_once __DIR__ . '/../includes/header.php';
     <li class="nav-item">
       <a class="nav-link" data-bs-toggle="tab" href="#site-settings" style="font-weight:600">
         <i class="bi bi-palette me-1"></i>Site Settings
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" data-bs-toggle="tab" href="#transport-fares" style="font-weight:600">
+        <i class="bi bi-signpost-2 me-1"></i>Transport &amp; Fares
       </a>
     </li>
     <li class="nav-item">
@@ -466,6 +506,173 @@ require_once __DIR__ . '/../includes/header.php';
                 </button>
               </form>
               </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TRANSPORT & FARES ── -->
+    <div class="tab-pane fade" id="transport-fares">
+      <div class="row g-4">
+        <div class="col-lg-5">
+          <div class="form-panel h-100">
+            <div class="d-flex align-items-start gap-3 mb-1">
+              <div class="d-flex align-items-center justify-content-center flex-shrink-0"
+                   style="width:42px;height:42px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--sand);color:var(--terracotta)">
+                <i class="bi bi-signpost-2 fs-5"></i>
+              </div>
+              <div>
+                <h4 class="mb-1">Transport &amp; Fares</h4>
+                <p class="text-muted small mb-0">Manage the fares used by the Trip Planner for city-to-city travel legs.</p>
+              </div>
+            </div>
+
+            <hr class="my-4" style="border-color:var(--border);opacity:1">
+
+            <div class="d-flex align-items-center justify-content-between mb-3">
+              <div>
+                <div class="fw-semibold">Add / Update Fare</div>
+                <div class="text-muted small">Stored fares replace the planner's estimated fare when a matching route is found.</div>
+              </div>
+              <span class="badge border text-body" style="background:#fff;border-color:var(--border)!important">Per passenger</span>
+            </div>
+
+            <form method="post" id="routeFareForm">
+              <?= csrf_field() ?>
+              <input type="hidden" name="action" value="save_route_fare">
+              <input type="hidden" name="route_id" id="route_id" value="0">
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">From</label>
+                <select name="origin_city_id" id="fare_origin" class="form-select" required>
+                  <option value="">Select starting city</option>
+                  <?php foreach ($cities as $c): ?>
+                    <option value="<?= (int)$c['id'] ?>"><?= e($c['name']) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">To</label>
+                <select name="dest_city_id" id="fare_dest" class="form-select" required>
+                  <option value="">Select destination city</option>
+                  <?php foreach ($cities as $c): ?>
+                    <option value="<?= (int)$c['id'] ?>"><?= e($c['name']) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Transportation</label>
+                <select name="transport_type" id="fare_transport" class="form-select" required>
+                  <option value="jeepney">Jeepney</option>
+                  <option value="bus">Bus</option>
+                  <option value="tricycle">Tricycle</option>
+                  <option value="fx_uv">FX / UV Express</option>
+                  <option value="private_car">Private Car</option>
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Fare per person</label>
+                <div class="input-group">
+                  <span class="input-group-text">₱</span>
+                  <input type="number" name="fare_php" id="fare_php" class="form-control" min="0" max="10000" step="0.01" required placeholder="e.g. 35">
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Notes <span class="text-muted fw-normal">(optional)</span></label>
+                <textarea name="notes" id="fare_notes" class="form-control" rows="3" maxlength="500" placeholder="e.g. Regular passenger fare; verify current fare locally."></textarea>
+              </div>
+
+              <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-primary-app" type="submit">
+                  <i class="bi bi-check2-circle me-1"></i><span id="fareSubmitLabel">Save Fare</span>
+                </button>
+                <button class="btn btn-outline-secondary" type="button" id="fareCancelEdit" style="display:none">
+                  Cancel Edit
+                </button>
+              </div>
+            </form>
+
+            <div class="mt-4 p-3" style="background:var(--sand);border:1px solid var(--border);border-radius:var(--radius-sm)">
+              <div class="fw-semibold small mb-1"><i class="bi bi-info-circle me-1"></i>How this affects the planner</div>
+              <div class="small text-muted">When the planner finds a matching route and transport type, this stored fare is used. Otherwise, the planner can continue using an estimated fare.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-7">
+          <div class="form-panel h-100">
+            <div class="d-flex align-items-start justify-content-between gap-3 mb-1">
+              <div>
+                <div class="d-flex align-items-center gap-2">
+                  <i class="bi bi-list-check fs-5" style="color:var(--terracotta)"></i>
+                  <h4 class="mb-0">Saved Transportation Fares</h4>
+                </div>
+                <p class="text-muted small mb-0 mt-1">Review and maintain the fares currently available to the Trip Planner.</p>
+              </div>
+              <span class="badge border text-body" style="background:#fff;border-color:var(--border)!important">
+                <?= count($route_fares) ?> saved
+              </span>
+            </div>
+
+            <hr class="my-4" style="border-color:var(--border);opacity:1">
+
+            <?php if (empty($route_fares)): ?>
+              <div class="text-center py-5 text-muted">
+                <i class="bi bi-signpost fs-1 d-block mb-2"></i>
+                <div class="fw-semibold">No stored fares yet</div>
+                <div class="small">Add your first city-to-city fare using the form.</div>
+              </div>
+            <?php else: ?>
+              <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Route</th>
+                      <th>Transport</th>
+                      <th>Fare</th>
+                      <th class="text-end">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <?php $transport_labels=['jeepney'=>'Jeepney','bus'=>'Bus','tricycle'=>'Tricycle','fx_uv'=>'FX / UV Express','private_car'=>'Private Car']; foreach($route_fares as $r): ?>
+                      <tr>
+                        <td>
+                          <div class="fw-semibold small"><?= e($r['origin_name']) ?> <span class="text-muted">→</span> <?= e($r['dest_name']) ?></div>
+                          <?php if(!empty($r['notes'])): ?><div class="small text-muted mt-1"><?= e($r['notes']) ?></div><?php endif; ?>
+                        </td>
+                        <td>
+                          <span class="badge border text-body" style="background:var(--sand);border-color:var(--border)!important">
+                            <?= e($transport_labels[$r['transport_type']]??ucwords(str_replace('_',' ',$r['transport_type']))) ?>
+                          </span>
+                        </td>
+                        <td class="fw-bold">₱<?= number_format((float)$r['fare_php'],2) ?></td>
+                        <td class="text-end text-nowrap">
+                          <button type="button" class="btn btn-sm btn-outline-secondary edit-route-fare"
+                            data-id="<?= (int)$r['id'] ?>"
+                            data-origin="<?= (int)$r['origin_city_id'] ?>"
+                            data-dest="<?= (int)$r['dest_city_id'] ?>"
+                            data-transport="<?= e($r['transport_type']) ?>"
+                            data-fare="<?= e((string)$r['fare_php']) ?>"
+                            data-notes="<?= e((string)($r['notes']??'')) ?>">
+                            <i class="bi bi-pencil me-1"></i>Edit
+                          </button>
+                          <form method="post" class="d-inline" onsubmit="return confirm('Remove this transportation fare? The planner will fall back to an estimated fare for this route.')">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="action" value="delete_route_fare">
+                            <input type="hidden" name="route_id" value="<?= (int)$r['id'] ?>">
+                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Remove</button>
+                          </form>
+                        </td>
+                      </tr>
+                    <?php endforeach; ?>
+                  </tbody>
+                </table>
+              </div>
+            <?php endif; ?>
           </div>
         </div>
       </div>
@@ -700,6 +907,28 @@ document.addEventListener('DOMContentLoaded', () => {
       const colorInput = hexInput.closest('.d-flex')?.querySelector('.theme-color-picker');
       if (colorInput && /^#[0-9A-Fa-f]{6}$/.test(value)) colorInput.value = value;
     });
+  });
+
+  document.querySelectorAll('.edit-route-fare').forEach(button => {
+    button.addEventListener('click', () => {
+      document.getElementById('route_id').value = button.dataset.id || '0';
+      document.getElementById('fare_origin').value = button.dataset.origin || '';
+      document.getElementById('fare_dest').value = button.dataset.dest || '';
+      document.getElementById('fare_transport').value = button.dataset.transport || 'jeepney';
+      document.getElementById('fare_php').value = button.dataset.fare || '';
+      document.getElementById('fare_notes').value = button.dataset.notes || '';
+      document.getElementById('fareSubmitLabel').textContent = 'Update Fare';
+      document.getElementById('fareCancelEdit').style.display = 'inline-block';
+      document.querySelector('a[href="#transport-fares"]')?.click();
+      document.getElementById('fare_origin')?.scrollIntoView({behavior:'smooth',block:'center'});
+    });
+  });
+
+  document.getElementById('fareCancelEdit')?.addEventListener('click', () => {
+    document.getElementById('routeFareForm').reset();
+    document.getElementById('route_id').value = '0';
+    document.getElementById('fareSubmitLabel').textContent = 'Save Fare';
+    document.getElementById('fareCancelEdit').style.display = 'none';
   });
 });
 </script>

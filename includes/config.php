@@ -25,6 +25,11 @@ define('BCRYPT_COST', 12);
 // https://openrouteservice.org/dev/#/signup  (free tier: 2,000
 // requests/day, plenty for a capstone demo). Paste it below.
 define('ORS_API_KEY', 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImExNzQ5NjM5OWNmYzQ3ODNiYzFkNjE3NmVkN2Q3ODEzIiwiaCI6Im11cm11cjY0In0=');
+
+// TomTom Traffic API — optional live traffic overlay for the trip planner.
+// Get a key from the TomTom Developer Portal and paste it here.
+// Leave empty to keep the Traffic button disabled.
+define('TOMTOM_API_KEY', 'TlTaokHXGRhqDSv05IYJneQdNMwY3g1a');
 date_default_timezone_set('Asia/Manila');
 
 // ── Error display (set false in production) ───────────────────

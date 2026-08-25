@@ -174,7 +174,24 @@ $transport_labels = [
 
     <!-- Map -->
     <div class="position-relative mb-2" id="map-wrapper">
-      <div id="trip-map"></div>
+            <div id="trip-map"></div>
+<div class="traffic-map-legend-item"><span class="traffic-map-dot traffic-free"></span>Free flow</div>
+    <div class="traffic-map-legend-item"><span class="traffic-map-dot traffic-moderate"></span>Moderate</div>
+    <div class="traffic-map-legend-item"><span class="traffic-map-dot traffic-heavy"></span>Heavy</div>
+</div>
+
+      <div class="planner-traffic-control" id="planner-traffic-control">
+        <button type="button" id="traffic-toggle-btn" class="btn btn-sm btn-light planner-traffic-btn" aria-pressed="false">
+          <i class="bi bi-traffic-cone me-1"></i>Traffic
+        </button>
+        <div id="traffic-legend" class="planner-traffic-legend d-none">
+          <div class="fw-semibold mb-1">Live traffic</div>
+          <div><span class="traffic-dot traffic-green"></span> Normal</div>
+          <div><span class="traffic-dot traffic-yellow"></span> Moderate</div>
+          <div><span class="traffic-dot traffic-red"></span> Heavy</div>
+          <div class="traffic-updated" id="traffic-updated">Traffic data updates frequently</div>
+        </div>
+      </div>
 
       <!-- Map spot count badge (top-right) -->
       <div id="map-spots-badge" class="position-absolute top-0 end-0 m-2 d-none"
@@ -335,6 +352,64 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   maxZoom: 18,
 }).addTo(map);
+
+// ── Optional TomTom live traffic layer ──────────────────────
+// The API key is injected from includes/config.php. The layer is
+// deliberately off by default so the existing map behaves exactly
+// as before until the visitor chooses to show traffic.
+const TOMTOM_API_KEY = <?= json_encode(defined('TOMTOM_API_KEY') ? TOMTOM_API_KEY : '') ?>;
+let trafficLayer = null;
+let trafficEnabled = false;
+
+function setTrafficEnabled(enabled) {
+  const btn = document.getElementById('traffic-toggle-btn');
+  const legend = document.getElementById('traffic-legend');
+
+  if (!TOMTOM_API_KEY) {
+    IExploreApp.toast('Live traffic is not configured yet. Add your TomTom API key in includes/config.php.', 'info');
+    if (btn) btn.setAttribute('aria-pressed', 'false');
+    return;
+  }
+
+  trafficEnabled = !!enabled;
+
+  if (trafficEnabled) {
+    if (!trafficLayer) {
+      // TomTom Raster Flow Tiles. Relative style highlights congestion
+      // compared with normal/free-flow speed.
+      trafficLayer = L.tileLayer(
+        'https://api.tomtom.com/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.png?key=' + encodeURIComponent(TOMTOM_API_KEY),
+        {
+          tileSize: 256,
+          opacity: 0.72,
+          maxZoom: 18,
+          attribution: 'Traffic data © TomTom'
+        }
+      );
+    }
+    trafficLayer.addTo(map);
+    syncTrafficLegend(true);
+    if (btn) {
+      btn.classList.add('active');
+      btn.setAttribute('aria-pressed', 'true');
+      btn.innerHTML = '<i class=\"bi bi-traffic-cone me-1\"></i>Hide Traffic';
+    }
+    if (legend) legend.classList.remove('d-none');
+  } else {
+    if (trafficLayer && map.hasLayer(trafficLayer)) map.removeLayer(trafficLayer);
+    syncTrafficLegend(false);
+    if (btn) {
+      btn.classList.remove('active');
+      btn.setAttribute('aria-pressed', 'false');
+      btn.innerHTML = '<i class=\"bi bi-traffic-cone me-1\"></i>Traffic';
+    }
+    if (legend) legend.classList.add('d-none');
+  }
+}
+
+document.getElementById('traffic-toggle-btn')?.addEventListener('click', () => {
+  setTrafficEnabled(!trafficEnabled);
+});
 
 setTimeout(() => { map.invalidateSize(); }, 100);
 setTimeout(() => { map.invalidateSize(); }, 400);

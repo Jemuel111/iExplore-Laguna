@@ -102,6 +102,102 @@ switch ($action) {
         ]);
         break;
 
+    // ── Live traffic for selected route sections ───────────
+    // Accepts a small list of route points and asks TomTom Flow Segment
+    // Data for the closest road segment to each point. The TomTom key stays
+    // server-side instead of being exposed in this request.
+    case 'traffic':
+        if (!defined('TOMTOM_API_KEY') || !TOMTOM_API_KEY) {
+            json_error('TomTom API key not configured.', 501);
+        }
+
+        $raw_points = input('points', 'get');
+        $points = json_decode($raw_points, true);
+        if (!is_array($points) || empty($points)) {
+            json_error('Traffic points are required.', 400);
+        }
+
+        // Keep API usage predictable. The browser normally sends <= 18 points.
+        $points = array_slice($points, 0, 20);
+        $mh = curl_multi_init();
+        $handles = [];
+
+        foreach ($points as $i => $point) {
+            $lat = isset($point['lat']) ? (float)$point['lat'] : 0;
+            $lng = isset($point['lng']) ? (float)$point['lng'] : 0;
+            if (!$lat || !$lng) continue;
+
+            $url = 'https://api.tomtom.com/traffic/services/4/flowSegmentData/relative0/16/json'
+                 . '?key=' . urlencode(TOMTOM_API_KEY)
+                 . '&point=' . urlencode($lat . ',' . $lng)
+                 . '&unit=kmph';
+
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 6,
+                CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+            ]);
+            curl_multi_add_handle($mh, $ch);
+            $handles[$i] = $ch;
+        }
+
+        do {
+            $status = curl_multi_exec($mh, $running);
+            if ($running) curl_multi_select($mh, 1.0);
+        } while ($running && $status === CURLM_OK);
+
+        $results = [];
+        foreach ($handles as $i => $ch) {
+            $raw = curl_multi_getcontent($ch);
+            $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $data = json_decode($raw, true);
+            $flow = $data['flowSegmentData'] ?? null;
+
+            if ($http === 200 && is_array($flow)) {
+                $closure = !empty($flow['roadClosure']);
+                $current = isset($flow['currentSpeed']) ? (float)$flow['currentSpeed'] : null;
+                $free = isset($flow['freeFlowSpeed']) ? (float)$flow['freeFlowSpeed'] : null;
+                $ratio = ($current !== null && $free !== null && $free > 0) ? $current / $free : 1;
+
+                if ($closure) $condition = 'closed';
+                elseif ($ratio < 0.15) $condition = 'heavy';
+                elseif ($ratio < 0.35) $condition = 'slow';
+                elseif ($ratio < 0.75) $condition = 'moderate';
+                else $condition = 'free';
+
+                $results[] = [
+                    'index' => $i,
+                    'condition' => $condition,
+                    'currentSpeed' => $current,
+                    'freeFlowSpeed' => $free,
+                    'relativeSpeed' => $ratio,
+                    'roadClosure' => $closure,
+                    'confidence' => isset($flow['confidence']) ? (float)$flow['confidence'] : null,
+                ];
+            } else {
+                // Keep the route usable even if an individual segment cannot
+                // be resolved. It will be drawn as free flow by the frontend.
+                $results[] = [
+                    'index' => $i,
+                    'condition' => 'free',
+                    'currentSpeed' => null,
+                    'freeFlowSpeed' => null,
+                    'relativeSpeed' => 1,
+                    'roadClosure' => false,
+                    'confidence' => null,
+                ];
+            }
+
+            curl_multi_remove_handle($mh, $ch);
+            curl_close($ch);
+        }
+        curl_multi_close($mh);
+
+        usort($results, fn($a, $b) => $a['index'] <=> $b['index']);
+        json_ok($results);
+        break;
+
     // ── Tourist spots along/near the route ────────────────
     case 'spots':
         $origin = (int) input('origin', 'get');

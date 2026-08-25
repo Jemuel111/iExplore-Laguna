@@ -1547,3 +1547,125 @@ section .card-app:hover {
     height: fit-content;
     align-self: start;
 }
+/* Trip planner — live traffic control */
+.traffic-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.traffic-legend {
+  display: none;
+  margin-top: 10px;
+}
+
+.traffic-legend.is-visible {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.traffic-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.traffic-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.traffic-legend-dot.normal {
+  background: #2e9d50;
+}
+
+.traffic-legend-dot.moderate {
+  background: #f0a500;
+}
+
+.traffic-legend-dot.heavy {
+  background: #d33;
+}
+
+/* ── Live traffic legend ──────────────────────────────────────
+   Added for the Route Guide TomTom traffic layer.
+   Kept separate from the existing .map-legend styles.
+   ──────────────────────────────────────────────────────────── */
+#trip-map {
+  position: relative;
+}
+
+.traffic-map-legend {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 1000;
+  min-width: 132px;
+  padding: .55rem .75rem;
+  background: rgba(255,255,255,.96);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  font-size: .72rem;
+  line-height: 1.45;
+}
+
+.traffic-map-legend[hidden] {
+  display: none !important;
+}
+
+.traffic-map-legend-title {
+  margin-bottom: .3rem;
+  color: var(--charcoal);
+  font-weight: 700;
+}
+
+.traffic-map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  margin-top: .2rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.traffic-map-dot {
+  display: inline-block;
+  width: 18px;
+  height: 4px;
+  flex: 0 0 auto;
+  border-radius: 3px;
+}
+
+.traffic-free {
+  background: #31a354;
+}
+
+.traffic-moderate {
+  background: #f0a500;
+}
+
+.traffic-heavy {
+  background: #d83b3b;
+}
+
+@media (max-width: 767px) {
+  .traffic-map-legend {
+    left: 8px;
+    bottom: 8px;
+    min-width: 118px;
+    padding: .45rem .6rem;
+    font-size: .68rem;
+  }
+
+  .traffic-map-dot {
+    width: 16px;
+  }
+}
