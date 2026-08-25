@@ -1,10 +1,13 @@
 <?php
 
+require_once __DIR__ . '/env.php';
+load_env(__DIR__ . '/../.env');
+
 // ── Database ─────────────────────────────────────────────────
-define('DB_HOST',   'localhost');
-define('DB_NAME',   'iexplore_laguna');
-define('DB_USER',   'root');        // Change in production
-define('DB_PASS',   '');            // Change in production
+define('DB_HOST',   env('DB_HOST', 'localhost'));
+define('DB_NAME',   env('DB_NAME', 'iexplore_laguna'));
+define('DB_USER',   env('DB_USER', 'root'));
+define('DB_PASS',   env('DB_PASS', ''));
 define('DB_CHARSET','utf8mb4');
 
 // ── App ───────────────────────────────────────────────────────
@@ -23,13 +26,16 @@ define('BCRYPT_COST', 12);
 // OpenRouteService — used for live road-following route polylines
 // on the trip planner map. Get a free API key at:
 // https://openrouteservice.org/dev/#/signup  (free tier: 2,000
-// requests/day, plenty for a capstone demo). Paste it below.
-define('ORS_API_KEY', 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImExNzQ5NjM5OWNmYzQ3ODNiYzFkNjE3NmVkN2Q3ODEzIiwiaCI6Im11cm11cjY0In0=');
-
+// requests/day, plenty for a capstone demo).
+//
 // TomTom Traffic API — optional live traffic overlay for the trip planner.
-// Get a key from the TomTom Developer Portal and paste it here.
-// Leave empty to keep the Traffic button disabled.
-define('TOMTOM_API_KEY', 'TlTaokHXGRhqDSv05IYJneQdNMwY3g1a');
+// Get a key from the TomTom Developer Portal.
+//
+// Both keys now live in a .env file (gitignored, never committed) instead
+// of being hardcoded here. See .env.example for the format. Leave
+// TOMTOM_API_KEY empty in .env to keep the Traffic button disabled.
+define('ORS_API_KEY',    env('ORS_API_KEY', ''));
+define('TOMTOM_API_KEY', env('TOMTOM_API_KEY', ''));
 date_default_timezone_set('Asia/Manila');
 
 // ── Error display (set false in production) ───────────────────

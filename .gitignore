@@ -1,0 +1,14 @@
+# Secrets — never commit real API keys or DB credentials
+.env
+
+# PHP error logs generated at runtime
+/logs/
+
+# OS/editor cruft
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Composer, if added later
+/vendor/

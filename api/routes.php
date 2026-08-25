@@ -294,8 +294,23 @@ switch ($action) {
         $curlErr  = curl_error($ch);
         curl_close($ch);
 
+        // Log the real reason server-side so it shows up in php-error.log
+        // instead of being silently swallowed. ORS error bodies look like
+        // {"error":{"code":...,"message":"..."}} — surface that message.
         if ($raw === false || $httpCode !== 200) {
-            json_error('Could not reach routing service' . ($curlErr ? ": {$curlErr}" : '.'), 502);
+            $orsMsg = null;
+            if ($raw !== false) {
+                $errBody = json_decode($raw, true);
+                $orsMsg = $errBody['error']['message'] ?? $errBody['error'] ?? null;
+            }
+            error_log(sprintf(
+                '[ORS directions] curl_error=%s http_code=%s body=%s',
+                $curlErr ?: '(none)',
+                $httpCode,
+                $raw === false ? '(no response)' : substr($raw, 0, 500)
+            ));
+            $reason = $curlErr ?: ($orsMsg ?: "HTTP {$httpCode}");
+            json_error("Could not reach routing service: {$reason}", 502);
         }
 
         $data = json_decode($raw, true);

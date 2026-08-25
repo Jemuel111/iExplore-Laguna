@@ -388,7 +388,6 @@ function setTrafficEnabled(enabled) {
       );
     }
     trafficLayer.addTo(map);
-    syncTrafficLegend(true);
     if (btn) {
       btn.classList.add('active');
       btn.setAttribute('aria-pressed', 'true');
@@ -397,7 +396,6 @@ function setTrafficEnabled(enabled) {
     if (legend) legend.classList.remove('d-none');
   } else {
     if (trafficLayer && map.hasLayer(trafficLayer)) map.removeLayer(trafficLayer);
-    syncTrafficLegend(false);
     if (btn) {
       btn.classList.remove('active');
       btn.setAttribute('aria-pressed', 'false');
