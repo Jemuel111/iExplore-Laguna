@@ -186,7 +186,7 @@ require_once __DIR__ . '/../includes/header.php';
   <?php endforeach; unset($_SESSION['flash']); ?>
 <?php endif; ?>
 
-<section class="py-3" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
+<section class="py-3" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container d-flex align-items-center justify-content-between flex-wrap gap-3">
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-geo-alt-fill fs-2" style="color:var(--sand-dark)"></i>
@@ -205,7 +205,7 @@ require_once __DIR__ . '/../includes/header.php';
   <div class="col-lg-5">
     <div class="form-panel">
       <div class="d-flex align-items-center justify-content-between mb-3">
-        <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
+        <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
           <?= $editing_spot ? '<i class="bi bi-pencil-square me-2"></i>Edit Spot' : '<i class="bi bi-plus-circle me-2"></i>New Spot' ?>
         </h6>
         <?php if ($editing_spot): ?>
@@ -364,7 +364,7 @@ require_once __DIR__ . '/../includes/header.php';
   <!-- ── Spot list ────────────────────────────────────────────── -->
   <div class="col-lg-7">
     <div class="d-flex align-items-center justify-content-between mb-3 gap-2 flex-wrap">
-      <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
+      <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
         All Spots (<?= count($spots_list) ?>)
       </h6>
       <form method="GET" class="d-flex gap-1">
@@ -393,7 +393,7 @@ require_once __DIR__ . '/../includes/header.php';
             <?= spot_category_label($sp['category']) ?> · <?= e($sp['city_name']) ?> · <i class="bi bi-star-fill" style="color:var(--sand-dark)"></i> <?= number_format($sp['rating'],1) ?>
           </div>
         </div>
-        <div class="fw-bold flex-shrink-0" style="color:var(--green-dark);white-space:nowrap">
+        <div class="fw-bold flex-shrink-0" style="color:var(--maroon-dark);white-space:nowrap">
           <?= $sp['entrance_fee'] > 0 ? '₱'.number_format($sp['entrance_fee'],0) : 'Free' ?>
         </div>
         <div class="d-flex gap-1 flex-shrink-0">

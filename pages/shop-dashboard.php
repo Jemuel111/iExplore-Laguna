@@ -309,7 +309,7 @@ require_once __DIR__ . '/../includes/header.php';
                   <?php endif; ?>
                   <?php if ($ord['pickup_code']): ?>
                   <div class="mt-1">
-                    <span style="background:var(--green-pale);color:var(--green-dark);padding:.25rem .75rem;border-radius:8px;font-family:monospace;font-weight:700;font-size:.95rem;letter-spacing:.1em">
+                    <span style="background:var(--maroon-pale);color:var(--maroon-dark);padding:.25rem .75rem;border-radius:8px;font-family:monospace;font-weight:700;font-size:.95rem;letter-spacing:.1em">
                       <?= e($ord['pickup_code']) ?>
                     </span>
                   </div>
@@ -334,7 +334,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <div class="col-sm-4 d-flex flex-column align-items-end justify-content-between">
                   <div class="text-end">
                     <div class="small text-muted">Total</div>
-                    <div class="fw-bold fs-5" style="color:var(--green-dark)">₱<?= number_format($ord['total_amount'],2) ?></div>
+                    <div class="fw-bold fs-5" style="color:var(--maroon-dark)">₱<?= number_format($ord['total_amount'],2) ?></div>
                   </div>
 
                   <!-- Status update buttons -->
@@ -344,7 +344,7 @@ require_once __DIR__ . '/../includes/header.php';
                       <input type="hidden" name="action"   value="update_order">
                       <input type="hidden" name="order_id" value="<?= $ord['id'] ?>">
                       <input type="hidden" name="status"   value="confirmed">
-                      <button class="btn btn-sm" style="background:var(--green-mid);color:#fff;border-radius:var(--radius-pill)">
+                      <button class="btn btn-sm" style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-pill)">
                         <i class="bi bi-check me-1"></i>Accept
                       </button>
                     </form>
@@ -362,7 +362,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <input type="hidden" name="action"   value="update_order">
                     <input type="hidden" name="order_id" value="<?= $ord['id'] ?>">
                     <input type="hidden" name="status"   value="preparing">
-                    <button class="btn btn-sm" style="background:var(--sand-dark);color:var(--green-dark);font-weight:600;border-radius:var(--radius-pill)">
+                    <button class="btn btn-sm" style="background:var(--sand-dark);color:var(--maroon-dark);font-weight:600;border-radius:var(--radius-pill)">
                       <i class="bi bi-fire me-1"></i>Start Preparing
                     </button>
                   </form>
@@ -371,7 +371,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <input type="hidden" name="action"   value="update_order">
                     <input type="hidden" name="order_id" value="<?= $ord['id'] ?>">
                     <input type="hidden" name="status"   value="ready">
-                    <button class="btn btn-sm" style="background:var(--green-mid);color:#fff;border-radius:var(--radius-pill)">
+                    <button class="btn btn-sm" style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-pill)">
                       <i class="bi bi-box-seam me-1"></i>Mark Ready
                     </button>
                   </form>
@@ -401,7 +401,7 @@ require_once __DIR__ . '/../includes/header.php';
         <!-- Add product form -->
         <div class="col-lg-4">
           <div class="form-panel">
-            <h6 class="fw-bold mb-3" style="color:var(--green-dark);font-family:'Playfair Display',serif">
+            <h6 class="fw-bold mb-3" style="color:var(--maroon-dark);font-family:'Playfair Display',serif">
               <i class="bi bi-plus-circle me-2" style="color:var(--terracotta)"></i>Add New Product
             </h6>
             <form method="POST"><?= csrf_field() ?>
@@ -449,7 +449,7 @@ require_once __DIR__ . '/../includes/header.php';
             <div class="d-flex align-items-center gap-3 p-3"
                  style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);
                         opacity:<?= $p['is_available'] ? '1' : '.55' ?>">
-              <div style="width:44px;height:44px;background:var(--green-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:var(--green-mid);flex-shrink:0">
+              <div style="width:44px;height:44px;background:var(--maroon-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:var(--maroon-mid);flex-shrink:0">
                 <i class="bi bi-bag"></i>
               </div>
               <div class="flex-grow-1 min-w-0">
@@ -496,7 +496,7 @@ require_once __DIR__ . '/../includes/header.php';
       <div class="row justify-content-center">
         <div class="col-lg-7">
           <div class="form-panel">
-            <h6 class="fw-bold mb-3" style="color:var(--green-dark);font-family:'Playfair Display',serif">
+            <h6 class="fw-bold mb-3" style="color:var(--maroon-dark);font-family:'Playfair Display',serif">
               <i class="bi bi-pencil-square me-2"></i>Edit Shop Info
             </h6>
             <form method="POST" enctype="multipart/form-data"><?= csrf_field() ?>

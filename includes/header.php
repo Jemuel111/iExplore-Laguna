@@ -15,7 +15,7 @@ $user        = current_user();
 $__site_settings = site_settings();
 $__logo_path = trim((string)($__site_settings['logo_path'] ?? ''));
 $__theme_css = sprintf(
-    '--green-dark:%s;--green-mid:%s;--green-light:%s;--green-pale:%s;--sand-dark:%s;',
+    '--maroon-dark:%s;--maroon-mid:%s;--maroon-light:%s;--maroon-pale:%s;--sand-dark:%s;',
     e($__site_settings['theme_dark']),
     e($__site_settings['theme_primary']),
     e($__site_settings['theme_light']),
@@ -180,7 +180,7 @@ if ($user && ($user['role'] ?? '') === 'admin') {
               <?php elseif ($__role === 'hotel_owner'): ?>
                 <span class="badge ms-1" style="background:#8e2434;font-size:.65rem">Hotel</span>
               <?php elseif ($__role === 'admin'): ?>
-                <span class="badge ms-1" style="background:var(--green-dark);font-size:.65rem">Admin</span>
+                <span class="badge ms-1" style="background:var(--maroon-dark);font-size:.65rem">Admin</span>
               <?php endif; ?>
             </a>
             <ul class="dropdown-menu dropdown-menu-end shadow">
@@ -207,7 +207,7 @@ if ($user && ($user['role'] ?? '') === 'admin') {
 
               <?php elseif ($__role === 'admin'): ?>
                 <li><a class="dropdown-item fw-bold" href="<?= APP_URL ?>/pages/admin-dashboard.php">
-                  <i class="bi bi-shield-check me-2" style="color:var(--green-dark)"></i>Admin Dashboard</a></li>
+                  <i class="bi bi-shield-check me-2" style="color:var(--maroon-dark)"></i>Admin Dashboard</a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-dashboard.php#shops">
                   <i class="bi bi-shop me-2"></i>Approve Shops</a></li>

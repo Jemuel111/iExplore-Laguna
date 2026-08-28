@@ -126,7 +126,7 @@ require_once __DIR__ . '/../includes/header.php';
   <?php endforeach; unset($_SESSION['flash']); ?>
 <?php endif; ?>
 
-<section class="py-3" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
+<section class="py-3" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container">
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-images fs-2" style="color:var(--sand-dark)"></i>
@@ -144,7 +144,7 @@ require_once __DIR__ . '/../includes/header.php';
   <!-- ── Spot picker ─────────────────────────────────────────── -->
   <div class="col-lg-4">
     <div class="form-panel">
-      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
+      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
         <i class="bi bi-geo-alt me-2"></i>Select a Spot
       </h6>
       <form method="GET">
@@ -161,7 +161,7 @@ require_once __DIR__ . '/../includes/header.php';
 
     <?php if ($selected_spot): ?>
     <div class="form-panel mt-3">
-      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
+      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
         <i class="bi bi-cloud-upload me-2"></i>Upload Photos
       </h6>
       <form method="POST" enctype="multipart/form-data"><?= csrf_field() ?>
@@ -200,7 +200,7 @@ require_once __DIR__ . '/../includes/header.php';
         <h5>Pick a spot to manage its photos</h5>
       </div>
     <?php else: ?>
-      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
+      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
         <?= e($selected_spot['name']) ?> — <?= count($spot_photos) ?> photo<?= count($spot_photos)!=1?'s':'' ?>
       </h6>
       <?php if (empty($spot_photos)): ?>
@@ -213,7 +213,7 @@ require_once __DIR__ . '/../includes/header.php';
             <div style="position:relative;height:140px">
               <img src="<?= e($ph['url']) ?>" alt="" style="width:100%;height:100%;object-fit:cover">
               <?php if ($ph['photo_type'] === 'main'): ?>
-              <span class="badge" style="position:absolute;top:6px;left:6px;background:var(--sand-dark);color:var(--green-dark);font-size:.68rem">
+              <span class="badge" style="position:absolute;top:6px;left:6px;background:var(--sand-dark);color:var(--maroon-dark);font-size:.68rem">
                 <i class="bi bi-star-fill me-1"></i>Main Photo
               </span>
               <?php endif; ?>

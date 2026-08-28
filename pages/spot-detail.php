@@ -107,9 +107,9 @@ require_once __DIR__ . '/../includes/header.php';
 <!-- ── Back breadcrumb ──────────────────────────────────────── -->
 <div class="py-2 px-3" style="background:var(--sand);border-bottom:1px solid var(--border)">
   <div class="container d-flex align-items-center gap-2" style="font-size:.85rem">
-    <a href="<?= APP_URL ?>" style="color:var(--green-mid);text-decoration:none">Home</a>
+    <a href="<?= APP_URL ?>" style="color:var(--maroon-mid);text-decoration:none">Home</a>
     <i class="bi bi-chevron-right text-muted" style="font-size:.7rem"></i>
-    <a href="<?= APP_URL ?>/pages/spots.php" style="color:var(--green-mid);text-decoration:none">Tourist Spots</a>
+    <a href="<?= APP_URL ?>/pages/spots.php" style="color:var(--maroon-mid);text-decoration:none">Tourist Spots</a>
     <i class="bi bi-chevron-right text-muted" style="font-size:.7rem"></i>
     <span style="color:var(--charcoal)"><?= e($spot['name']) ?></span>
   </div>
@@ -192,12 +192,12 @@ foreach ($photos as $idx => $p) {
         <?php endif; ?>
       </div>
 
-      <h1 style="font-family:'Playfair Display',serif;font-size:2rem;color:var(--green-dark);margin-bottom:.35rem">
+      <h1 style="font-family:'Playfair Display',serif;font-size:2rem;color:var(--maroon-dark);margin-bottom:.35rem">
         <?= e($spot['name']) ?>
       </h1>
 
       <div class="d-flex align-items-center gap-3 flex-wrap mb-3" style="font-size:.9rem;color:var(--text-muted)">
-        <span><i class="bi bi-geo-alt-fill me-1" style="color:var(--green-mid)"></i><?= e($spot['city_name']) ?>, Laguna</span>
+        <span><i class="bi bi-geo-alt-fill me-1" style="color:var(--maroon-mid)"></i><?= e($spot['city_name']) ?>, Laguna</span>
         <span>·</span>
         <!-- Rating -->
         <span class="d-flex align-items-center gap-1">
@@ -253,7 +253,7 @@ foreach ($photos as $idx => $p) {
     <?php if (!empty($amenities)): ?>
     <div class="detail-section">
       <h4 class="detail-section-title">
-        <i class="bi bi-grid-3x3-gap-fill me-2" style="color:var(--green-light)"></i>What You Can Find Here
+        <i class="bi bi-grid-3x3-gap-fill me-2" style="color:var(--maroon-light)"></i>What You Can Find Here
       </h4>
       <div class="amenities-grid">
         <?php foreach ($amenities as $am): ?>
@@ -270,7 +270,7 @@ foreach ($photos as $idx => $p) {
     <?php if (count($photos) > 1): ?>
     <div class="detail-section">
       <h4 class="detail-section-title">
-        <i class="bi bi-images me-2" style="color:var(--green-light)"></i>Photo Gallery
+        <i class="bi bi-images me-2" style="color:var(--maroon-light)"></i>Photo Gallery
       </h4>
 
       <!-- Tab filters -->
@@ -310,9 +310,9 @@ foreach ($photos as $idx => $p) {
     <!-- ── Check In ──────────────────────────────────────────── -->
     <div class="detail-section" id="checkin-section">
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 p-3"
-           style="background:var(--green-pale);border-radius:var(--radius-sm)">
+           style="background:var(--maroon-pale);border-radius:var(--radius-sm)">
         <div>
-          <h6 class="fw-bold mb-1" style="color:var(--green-dark)">
+          <h6 class="fw-bold mb-1" style="color:var(--maroon-dark)">
             <i class="bi bi-geo-alt-fill me-1"></i>Been here in person?
           </h6>
           <p class="small text-muted mb-0">
@@ -341,7 +341,7 @@ foreach ($photos as $idx => $p) {
     <div class="detail-section" id="reviews-section">
       <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
         <h4 class="detail-section-title mb-0">
-          <i class="bi bi-chat-quote-fill me-2" style="color:var(--green-light)"></i>
+          <i class="bi bi-chat-quote-fill me-2" style="color:var(--maroon-light)"></i>
           Visitor Reviews
           <?php if ($review_stats['total'] > 0): ?>
             <span style="font-size:.85rem;font-weight:400;color:var(--text-muted)">
@@ -387,7 +387,7 @@ foreach ($photos as $idx => $p) {
       <!-- Write review form (hidden by default) -->
       <?php if (is_logged_in()): ?>
       <div id="review-form-wrap" class="review-form-wrap d-none mb-4">
-        <h6 class="fw-bold mb-3" style="color:var(--green-dark)">Share Your Experience</h6>
+        <h6 class="fw-bold mb-3" style="color:var(--maroon-dark)">Share Your Experience</h6>
 
         <!-- Star picker -->
         <div class="mb-3">
@@ -483,7 +483,7 @@ foreach ($photos as $idx => $p) {
             <?php endif; ?>
             <?php if ((int)$rv['user_id'] === $my_user_id && $my_user_id): ?>
             <div class="d-flex gap-3 mt-2">
-              <button class="btn btn-link btn-sm p-0 review-edit-btn" style="color:var(--green-mid);text-decoration:none;font-size:.8rem"
+              <button class="btn btn-link btn-sm p-0 review-edit-btn" style="color:var(--maroon-mid);text-decoration:none;font-size:.8rem"
                       data-review-id="<?= $rv['id'] ?>" data-rating="<?= $rv['rating'] ?>"
                       data-title="<?= e($rv['title'] ?? '') ?>" data-body="<?= e($rv['body'] ?? '') ?>"
                       data-visited="<?= e($rv['visited_on'] ?? '') ?>">
@@ -538,7 +538,7 @@ foreach ($photos as $idx => $p) {
     <!-- Location mini-map -->
     <div class="sidebar-card mb-3">
       <h6 class="sidebar-card-title">
-        <i class="bi bi-pin-map-fill me-2" style="color:var(--green-light)"></i>Location
+        <i class="bi bi-pin-map-fill me-2" style="color:var(--maroon-light)"></i>Location
       </h6>
       <div id="mini-map" style="height:200px;border-radius:10px;overflow:hidden"></div>
       <div class="mt-2 small text-muted">
@@ -550,7 +550,7 @@ foreach ($photos as $idx => $p) {
     <?php if (!empty($hotels)): ?>
     <div class="sidebar-card mb-3">
       <h6 class="sidebar-card-title">
-        <i class="bi bi-building me-2" style="color:var(--green-light)"></i>Where to Stay Nearby
+        <i class="bi bi-building me-2" style="color:var(--maroon-light)"></i>Where to Stay Nearby
       </h6>
 
       <?php foreach ($hotels as $hotel): ?>
@@ -595,7 +595,7 @@ foreach ($photos as $idx => $p) {
     <!-- Share -->
     <div class="sidebar-card mb-3">
       <h6 class="sidebar-card-title">
-        <i class="bi bi-share me-2" style="color:var(--green-light)"></i>Share This Spot
+        <i class="bi bi-share me-2" style="color:var(--maroon-light)"></i>Share This Spot
       </h6>
       <div class="d-flex gap-2 flex-wrap">
         <?php $share_url = APP_URL . '/pages/spot-detail.php?id=' . $spot_id; ?>
@@ -781,7 +781,7 @@ if (reviewPhotosInput) {
     const files = Array.from(reviewPhotosInput.files).slice(0, 3);
     files.forEach(file => {
       const chip = document.createElement('span');
-      chip.style.cssText = 'font-size:.75rem;background:var(--green-pale);color:var(--green-dark);padding:.25rem .6rem;border-radius:20px';
+      chip.style.cssText = 'font-size:.75rem;background:var(--maroon-pale);color:var(--maroon-dark);padding:.25rem .6rem;border-radius:20px';
       chip.innerHTML = '<i class="bi bi-image me-1"></i>' + escapeHtml(file.name);
       preview.appendChild(chip);
     });
@@ -959,7 +959,7 @@ if (loadMoreBtn) {
           </div>` : ''}
           ${isMine ? `
           <div class="d-flex gap-3 mt-2">
-            <button class="btn btn-link btn-sm p-0 review-edit-btn" style="color:var(--green-mid);text-decoration:none;font-size:.8rem"
+            <button class="btn btn-link btn-sm p-0 review-edit-btn" style="color:var(--maroon-mid);text-decoration:none;font-size:.8rem"
                     data-review-id="${rv.id}" data-rating="${rv.rating}"
                     data-title="${escapeHtml(rv.title || '')}" data-body="${escapeHtml(rv.body || '')}"
                     data-visited="${rv.stayed_on || rv.visited_on || ''}">
@@ -1053,7 +1053,7 @@ if (loadMoreBtn) {
 .detail-section { border-top:1px solid var(--border);padding-top:1.75rem;margin-top:1.75rem; }
 .detail-section-title {
   font-family:'Playfair Display',serif;font-size:1.15rem;
-  color:var(--green-dark);margin-bottom:1rem;
+  color:var(--maroon-dark);margin-bottom:1rem;
 }
 
 /* ── Amenities ────────────────────────────────────── */
@@ -1062,10 +1062,10 @@ if (loadMoreBtn) {
 }
 .amenity-item {
   display:flex;align-items:center;gap:.6rem;
-  background:var(--green-pale);border-radius:10px;padding:.6rem .85rem;
-  font-size:.84rem;font-weight:500;color:var(--green-dark);
+  background:var(--maroon-pale);border-radius:10px;padding:.6rem .85rem;
+  font-size:.84rem;font-weight:500;color:var(--maroon-dark);
 }
-.amenity-item i { font-size:1rem;color:var(--green-mid);flex-shrink:0; }
+.amenity-item i { font-size:1rem;color:var(--maroon-mid);flex-shrink:0; }
 
 /* ── Gallery masonry ──────────────────────────────── */
 .gallery-masonry {
@@ -1088,17 +1088,17 @@ if (loadMoreBtn) {
   color:var(--charcoal);font-family:'DM Sans',sans-serif;
 }
 .gallery-tab.active, .gallery-tab:hover {
-  background:var(--green-mid);color:#fff;border-color:var(--green-mid);
+  background:var(--maroon-mid);color:#fff;border-color:var(--maroon-mid);
 }
 
 /* ── Review cards ─────────────────────────────────── */
 .review-summary {
   display:flex;align-items:center;gap:1.25rem;
-  background:var(--green-pale);border-radius:12px;padding:1rem 1.25rem;
+  background:var(--maroon-pale);border-radius:12px;padding:1rem 1.25rem;
 }
 .review-big-rating { display:flex;align-items:center;gap:.85rem; }
 .review-score {
-  font-size:2.5rem;font-weight:700;color:var(--green-dark);
+  font-size:2.5rem;font-weight:700;color:var(--maroon-dark);
   font-family:'Playfair Display',serif;line-height:1;
 }
 .review-card {
@@ -1108,7 +1108,7 @@ if (loadMoreBtn) {
 }
 .review-card:hover { box-shadow:0 2px 12px rgba(0,0,0,.08); }
 .review-avatar {
-  width:38px;height:38px;border-radius:50%;background:var(--green-mid);
+  width:38px;height:38px;border-radius:50%;background:var(--maroon-mid);
   color:#fff;display:flex;align-items:center;justify-content:center;
   font-weight:700;font-size:.95rem;flex-shrink:0;
 }
@@ -1126,7 +1126,7 @@ if (loadMoreBtn) {
 }
 .sidebar-card-title {
   font-family:'Playfair Display',serif;font-size:1rem;
-  color:var(--green-dark);margin-bottom:1rem;font-weight:700;
+  color:var(--maroon-dark);margin-bottom:1rem;font-weight:700;
 }
 .hotel-nearby-card {
   border-bottom:1px solid var(--border);padding:.85rem 0;

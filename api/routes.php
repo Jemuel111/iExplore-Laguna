@@ -229,7 +229,8 @@ switch ($action) {
                     s.latitude, s.longitude, s.entrance_fee,
                     s.operating_hours, s.rating, s.image_url,
                     s.is_closed, s.closure_reason, s.closed_until,
-                    c.name AS city_name, c.id AS city_id
+                    c.name AS city_name, c.id AS city_id,
+                    c.latitude AS city_latitude, c.longitude AS city_longitude
              FROM tourist_spots s
              JOIN cities c ON s.city_id = c.id
              WHERE s.is_active = 1
@@ -246,10 +247,12 @@ switch ($action) {
         // date has already passed, even if the admin never flipped the
         // flag back).
         foreach ($spots as &$s) {
-            $s['latitude']     = (float) $s['latitude'];
-            $s['longitude']    = (float) $s['longitude'];
-            $s['entrance_fee'] = (float) $s['entrance_fee'];
-            $s['rating']       = (float) $s['rating'];
+            $s['latitude']       = (float) $s['latitude'];
+            $s['longitude']      = (float) $s['longitude'];
+            $s['city_latitude']  = (float) $s['city_latitude'];
+            $s['city_longitude'] = (float) $s['city_longitude'];
+            $s['entrance_fee']   = (float) $s['entrance_fee'];
+            $s['rating']         = (float) $s['rating'];
 
             $status = spot_closure_status($s);
             $s['is_closed']     = $status['closed'];

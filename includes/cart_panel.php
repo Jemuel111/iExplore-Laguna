@@ -40,11 +40,11 @@ $pid = $cart_include_count === 1 ? 'cart-panel-desktop' : 'cart-panel-offcanvas'
   <div class="cart-footer">
     <div class="d-flex justify-content-between align-items-center mb-2">
       <span class="small text-muted">Estimated entrance/room cost:</span>
-      <span class="fw-bold cart-total-cost" style="color:var(--green-dark)">—</span>
+      <span class="fw-bold cart-total-cost" style="color:var(--maroon-dark)">—</span>
     </div>
     <div class="d-grid gap-2">
       <button class="btn btn-sm w-100"
-              style="background:linear-gradient(135deg,var(--green-mid),var(--green-dark));color:#fff;font-weight:600;border-radius:var(--radius-pill)"
+              style="background:linear-gradient(135deg,var(--maroon-mid),var(--maroon-dark));color:#fff;font-weight:600;border-radius:var(--radius-pill)"
               onclick="generateItinerary()">
         <i class="bi bi-magic me-2"></i>Generate Itinerary
       </button>

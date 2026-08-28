@@ -90,7 +90,7 @@ $base_qs = http_build_query(array_filter([
 ]));
 ?>
 
-<section class="py-3" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
+<section class="py-3" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container">
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-shop fs-2" style="color:var(--sand-dark)"></i>
@@ -153,8 +153,8 @@ $base_qs = http_build_query(array_filter([
   <!-- Filters sidebar -->
   <div class="col-lg-3">
     <div class="form-panel">
-      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
-        <i class="bi bi-funnel me-2" style="color:var(--green-light)"></i>Filter Shops
+      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
+        <i class="bi bi-funnel me-2" style="color:var(--maroon-light)"></i>Filter Shops
       </h6>
       <form method="GET">
         <input type="hidden" name="view" value="<?= e($view_mode) ?>">
@@ -197,7 +197,7 @@ $base_qs = http_build_query(array_filter([
 
     <!-- Results summary -->
     <div class="mt-3 p-3" style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:.83rem">
-      <div class="fw-bold mb-1" style="color:var(--green-dark)">
+      <div class="fw-bold mb-1" style="color:var(--maroon-dark)">
         <i class="bi bi-bar-chart-fill me-1"></i>Results
       </div>
       <div class="text-muted">
@@ -254,13 +254,13 @@ $base_qs = http_build_query(array_filter([
           <?php endif; ?>
           <div class="card-body-app d-flex flex-column">
             <div class="mb-1">
-              <span class="badge" style="background:var(--green-pale);color:var(--green-dark);font-size:.72rem">
+              <span class="badge" style="background:var(--maroon-pale);color:var(--maroon-dark);font-size:.72rem">
                 <i class="bi <?= shop_category_icon($shop['category']) ?> me-1"></i><?= shop_category_label($shop['category']) ?>
               </span>
             </div>
             <h5 class="card-title-app mb-1" style="font-size:.98rem"><?= e($shop['name']) ?></h5>
             <div class="card-meta mb-1">
-              <i class="bi bi-geo-alt text-green"></i>
+              <i class="bi bi-geo-alt text-maroon"></i>
               <span><?= e($shop['city_name']) ?></span>
             </div>
             <?php if ($shop['address']): ?>
@@ -295,13 +295,13 @@ $base_qs = http_build_query(array_filter([
     <div class="d-flex flex-column gap-2">
       <?php foreach ($shops as $shop): ?>
       <div class="d-flex align-items-center gap-3 p-3" style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm)">
-        <div style="width:52px;height:52px;background:var(--green-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:var(--green-mid);flex-shrink:0">
+        <div style="width:52px;height:52px;background:var(--maroon-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:var(--maroon-mid);flex-shrink:0">
           <i class="bi <?= shop_category_icon($shop['category']) ?>"></i>
         </div>
         <div class="flex-grow-1 min-w-0">
           <div class="d-flex align-items-center gap-2 flex-wrap">
             <span class="fw-bold" style="font-size:.92rem"><?= e($shop['name']) ?></span>
-            <span class="badge" style="background:var(--green-pale);color:var(--green-dark);font-size:.68rem">
+            <span class="badge" style="background:var(--maroon-pale);color:var(--maroon-dark);font-size:.68rem">
               <i class="bi <?= shop_category_icon($shop['category']) ?> me-1"></i><?= shop_category_label($shop['category']) ?>
             </span>
           </div>

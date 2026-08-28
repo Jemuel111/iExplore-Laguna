@@ -303,11 +303,11 @@ require_once __DIR__ . '/../includes/header.php';
                 <div class="col-sm-4">
                   <div class="small text-muted mb-1 fw-600">Stay</div>
                   <div class="small">
-                    <i class="bi bi-box-arrow-in-right me-1 text-green"></i>
+                    <i class="bi bi-box-arrow-in-right me-1 text-maroon"></i>
                     <?= date('M d, Y', strtotime($bk['check_in_date'])) ?>
                   </div>
                   <div class="small">
-                    <i class="bi bi-box-arrow-left me-1 text-green"></i>
+                    <i class="bi bi-box-arrow-left me-1 text-maroon"></i>
                     <?= date('M d, Y', strtotime($bk['check_out_date'])) ?>
                   </div>
                   <div class="small text-muted"><?= $bk['nights'] ?> night<?= $bk['nights']!=1?'s':'' ?></div>
@@ -320,7 +320,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <div class="col-sm-4 d-flex flex-column align-items-end justify-content-between">
                   <div class="text-end">
                     <div class="small text-muted">Total</div>
-                    <div class="fw-bold fs-5" style="color:var(--green-dark)">₱<?= number_format($bk['total_amount'],2) ?></div>
+                    <div class="fw-bold fs-5" style="color:var(--maroon-dark)">₱<?= number_format($bk['total_amount'],2) ?></div>
                   </div>
 
                   <!-- Status update buttons -->
@@ -330,7 +330,7 @@ require_once __DIR__ . '/../includes/header.php';
                       <input type="hidden" name="action"     value="update_booking">
                       <input type="hidden" name="booking_id" value="<?= $bk['id'] ?>">
                       <input type="hidden" name="status"     value="confirmed">
-                      <button class="btn btn-sm" style="background:var(--green-mid);color:#fff;border-radius:var(--radius-pill)">
+                      <button class="btn btn-sm" style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-pill)">
                         <i class="bi bi-check me-1"></i>Accept
                       </button>
                     </form>
@@ -348,7 +348,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <input type="hidden" name="action"     value="update_booking">
                     <input type="hidden" name="booking_id" value="<?= $bk['id'] ?>">
                     <input type="hidden" name="status"     value="checked_in">
-                    <button class="btn btn-sm" style="background:var(--sand-dark);color:var(--green-dark);font-weight:600;border-radius:var(--radius-pill)">
+                    <button class="btn btn-sm" style="background:var(--sand-dark);color:var(--maroon-dark);font-weight:600;border-radius:var(--radius-pill)">
                       <i class="bi bi-door-open me-1"></i>Check In
                     </button>
                   </form>
@@ -357,7 +357,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <input type="hidden" name="action"     value="update_booking">
                     <input type="hidden" name="booking_id" value="<?= $bk['id'] ?>">
                     <input type="hidden" name="status"     value="checked_out">
-                    <button class="btn btn-sm" style="background:var(--green-mid);color:#fff;border-radius:var(--radius-pill)">
+                    <button class="btn btn-sm" style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-pill)">
                       <i class="bi bi-box-arrow-left me-1"></i>Check Out
                     </button>
                   </form>
@@ -378,7 +378,7 @@ require_once __DIR__ . '/../includes/header.php';
         <!-- Add room form -->
         <div class="col-lg-4">
           <div class="form-panel">
-            <h6 class="fw-bold mb-3" style="color:var(--green-dark);font-family:'Playfair Display',serif">
+            <h6 class="fw-bold mb-3" style="color:var(--maroon-dark);font-family:'Playfair Display',serif">
               <i class="bi bi-plus-circle me-2" style="color:#8e2434"></i>Add Room Type
             </h6>
             <form method="POST"><?= csrf_field() ?>
@@ -478,7 +478,7 @@ require_once __DIR__ . '/../includes/header.php';
       <div class="row justify-content-center">
         <div class="col-lg-7">
           <div class="form-panel">
-            <h6 class="fw-bold mb-3" style="color:var(--green-dark);font-family:'Playfair Display',serif">
+            <h6 class="fw-bold mb-3" style="color:var(--maroon-dark);font-family:'Playfair Display',serif">
               <i class="bi bi-pencil-square me-2"></i>Edit Hotel Info
             </h6>
             <form method="POST" enctype="multipart/form-data"><?= csrf_field() ?>

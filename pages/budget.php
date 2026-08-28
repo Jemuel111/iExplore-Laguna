@@ -11,7 +11,7 @@ $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
 $budgetRanges = get_budget_level_ranges();
 ?>
 
-<section class="py-4" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
+<section class="py-4" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container">
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-calculator-fill fs-2" style="color:var(--sand-dark)"></i>
@@ -30,7 +30,7 @@ $budgetRanges = get_budget_level_ranges();
   <!-- Input form -->
   <div class="col-lg-5">
     <div class="form-panel">
-      <h5 class="fw-bold mb-4" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
+      <h5 class="fw-bold mb-4" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
         Trip Details
       </h5>
 
@@ -118,7 +118,7 @@ $budgetRanges = get_budget_level_ranges();
 
     <!-- Placeholder -->
     <div id="budget-placeholder" class="form-panel text-center py-5" style="color:var(--text-muted)">
-      <i class="bi bi-calculator fs-1 d-block mb-3" style="color:var(--green-pale)"></i>
+      <i class="bi bi-calculator fs-1 d-block mb-3" style="color:var(--maroon-pale)"></i>
       <p class="mb-0 small">Fill in the form and click<br><strong>Calculate Budget</strong></p>
     </div>
 
@@ -134,26 +134,26 @@ $budgetRanges = get_budget_level_ranges();
 
       <!-- Breakdown card -->
       <div class="form-panel mb-3">
-        <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
+        <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
           Cost Breakdown
         </h6>
         <div id="res-breakdown"></div>
       </div>
 
       <!-- Per-person per-day card -->
-      <div class="form-panel mb-3" style="background:var(--green-pale);border-color:var(--green-light)">
+      <div class="form-panel mb-3" style="background:var(--maroon-pale);border-color:var(--maroon-light)">
         <div class="d-flex justify-content-between align-items-center">
           <div>
-            <div class="fw-bold" style="color:var(--green-dark)">Per Person / Per Day</div>
+            <div class="fw-bold" style="color:var(--maroon-dark)">Per Person / Per Day</div>
             <div class="small text-muted">Average daily spending</div>
           </div>
-          <div class="fw-bold fs-4" style="color:var(--green-mid)" id="res-per-day">₱ 0</div>
+          <div class="fw-bold fs-4" style="color:var(--maroon-mid)" id="res-per-day">₱ 0</div>
         </div>
       </div>
 
       <!-- Tips -->
       <div class="form-panel" id="budget-tips">
-        <h6 class="fw-bold mb-2" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
+        <h6 class="fw-bold mb-2" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
           <i class="bi bi-lightbulb me-1"></i>Money-Saving Tips
         </h6>
         <ul class="small text-muted mb-0 ps-3" id="tips-list"></ul>
@@ -237,7 +237,7 @@ async function calculateBudget() {
   `).join('') + `
     <div class="d-flex justify-content-between align-items-center pt-2 fw-bold">
       <span>TOTAL</span>
-      <span style="color:var(--green-mid);font-size:1.1rem">${formatPeso(grand)}</span>
+      <span style="color:var(--maroon-mid);font-size:1.1rem">${formatPeso(grand)}</span>
     </div>
   `;
 

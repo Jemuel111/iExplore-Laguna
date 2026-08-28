@@ -321,7 +321,7 @@ require_once __DIR__ . '/../includes/header.php';
   <?php endforeach; unset($_SESSION['flash']); ?>
 <?php endif; ?>
 
-<section class="py-3" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
+<section class="py-3" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container">
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-shield-check fs-2" style="color:var(--sand-dark)"></i>
@@ -396,7 +396,7 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="col-lg-5">
           <div class="form-panel h-100">
             <div class="d-flex align-items-center gap-2 mb-1">
-              <i class="bi bi-image fs-4" style="color:var(--green-mid)"></i>
+              <i class="bi bi-image fs-4" style="color:var(--maroon-mid)"></i>
               <h4 class="mb-0">Website Logo</h4>
             </div>
             <p class="text-muted small mb-3">Upload a new logo and it will immediately replace the current logo across the website.</p>
@@ -445,7 +445,7 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="col-lg-7">
           <div class="form-panel">
             <div class="d-flex align-items-center gap-2 mb-1">
-              <i class="bi bi-palette2 fs-4" style="color:var(--green-mid)"></i>
+              <i class="bi bi-palette2 fs-4" style="color:var(--maroon-mid)"></i>
               <h4 class="mb-0">Color Theme</h4>
             </div>
             <p class="text-muted small">Pick a preset or customize the colors. Changes are applied throughout the website after saving.</p>
@@ -482,13 +482,13 @@ require_once __DIR__ . '/../includes/header.php';
                 <?php endforeach; ?>
               </div>
 
-              <div class="mt-4 p-3" style="border-radius:var(--radius);background:var(--green-pale)">
+              <div class="mt-4 p-3" style="border-radius:var(--radius);background:var(--maroon-pale)">
                 <div class="fw-bold mb-1">Theme preview</div>
                 <div class="d-flex gap-2 flex-wrap">
-                  <span class="badge" style="background:var(--green-dark)">Header</span>
-                  <span class="badge" style="background:var(--green-mid)">Primary</span>
-                  <span class="badge" style="background:var(--green-light)">Hover</span>
-                  <span class="badge" style="background:var(--sand-dark);color:var(--green-dark)">Accent</span>
+                  <span class="badge" style="background:var(--maroon-dark)">Header</span>
+                  <span class="badge" style="background:var(--maroon-mid)">Primary</span>
+                  <span class="badge" style="background:var(--maroon-light)">Hover</span>
+                  <span class="badge" style="background:var(--sand-dark);color:var(--maroon-dark)">Accent</span>
                 </div>
               </div>
 
@@ -614,7 +614,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <p class="text-muted small mb-0 mt-1">Review and maintain the fares currently available to the Trip Planner.</p>
               </div>
               <span class="badge border text-body" style="background:#fff;border-color:var(--border)!important">
-                <?= count($route_fares) ?> saved
+                <span id="fare-visible-count"><?= count($route_fares) ?></span> / <?= count($route_fares) ?> shown
               </span>
             </div>
 
@@ -627,6 +627,12 @@ require_once __DIR__ . '/../includes/header.php';
                 <div class="small">Add your first city-to-city fare using the form.</div>
               </div>
             <?php else: ?>
+              <div class="input-group mb-3">
+                <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                <input type="text" id="fare-search" class="form-control"
+                       placeholder="Search by city or transport type (e.g. &quot;Calamba&quot; or &quot;jeepney&quot;)…">
+              </div>
+
               <div class="table-responsive">
                 <table class="table align-middle mb-0">
                   <thead>
@@ -637,16 +643,19 @@ require_once __DIR__ . '/../includes/header.php';
                       <th class="text-end">Actions</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    <?php $transport_labels=['jeepney'=>'Jeepney','bus'=>'Bus','tricycle'=>'Tricycle','fx_uv'=>'FX / UV Express','private_car'=>'Private Car']; foreach($route_fares as $r): ?>
-                      <tr>
+                  <tbody id="fare-table-body">
+                    <?php $transport_labels=['jeepney'=>'Jeepney','bus'=>'Bus','tricycle'=>'Tricycle','fx_uv'=>'FX / UV Express','private_car'=>'Private Car']; foreach($route_fares as $r):
+                      $transportLabel = $transport_labels[$r['transport_type']] ?? ucwords(str_replace('_',' ',$r['transport_type']));
+                      $searchBlob = strtolower($r['origin_name'].' '.$r['dest_name'].' '.$transportLabel.' '.($r['notes']??''));
+                    ?>
+                      <tr class="fare-row" data-search="<?= e($searchBlob) ?>">
                         <td>
                           <div class="fw-semibold small"><?= e($r['origin_name']) ?> <span class="text-muted">→</span> <?= e($r['dest_name']) ?></div>
                           <?php if(!empty($r['notes'])): ?><div class="small text-muted mt-1"><?= e($r['notes']) ?></div><?php endif; ?>
                         </td>
                         <td>
                           <span class="badge border text-body" style="background:var(--sand);border-color:var(--border)!important">
-                            <?= e($transport_labels[$r['transport_type']]??ucwords(str_replace('_',' ',$r['transport_type']))) ?>
+                            <?= e($transportLabel) ?>
                           </span>
                         </td>
                         <td class="fw-bold">₱<?= number_format((float)$r['fare_php'],2) ?></td>
@@ -672,6 +681,65 @@ require_once __DIR__ . '/../includes/header.php';
                   </tbody>
                 </table>
               </div>
+
+              <div class="text-center mt-3">
+                <button type="button" id="fare-show-more" class="btn btn-outline-secondary btn-sm">
+                  Show more <i class="bi bi-chevron-down ms-1"></i>
+                </button>
+                <div id="fare-no-results" class="text-muted small py-3 d-none">
+                  <i class="bi bi-search me-1"></i>No fares match "<span id="fare-no-results-query"></span>".
+                </div>
+              </div>
+
+              <script>
+              (function () {
+                const PAGE_SIZE = 20;
+                const rows = Array.from(document.querySelectorAll('#fare-table-body .fare-row'));
+                const searchInput = document.getElementById('fare-search');
+                const showMoreBtn = document.getElementById('fare-show-more');
+                const visibleCountEl = document.getElementById('fare-visible-count');
+                const noResultsEl = document.getElementById('fare-no-results');
+                const noResultsQueryEl = document.getElementById('fare-no-results-query');
+                let shownCount = PAGE_SIZE;
+
+                function renderPaged() {
+                  rows.forEach((row, i) => { row.style.display = i < shownCount ? '' : 'none'; });
+                  visibleCountEl.textContent = Math.min(shownCount, rows.length);
+                  showMoreBtn.classList.toggle('d-none', shownCount >= rows.length);
+                  noResultsEl.classList.add('d-none');
+                }
+
+                function renderSearch(query) {
+                  let matches = 0;
+                  rows.forEach(row => {
+                    const isMatch = row.dataset.search.includes(query);
+                    row.style.display = isMatch ? '' : 'none';
+                    if (isMatch) matches++;
+                  });
+                  visibleCountEl.textContent = matches;
+                  showMoreBtn.classList.add('d-none'); // pagination doesn't apply while filtering
+                  noResultsEl.classList.toggle('d-none', matches > 0);
+                  noResultsQueryEl.textContent = query;
+                }
+
+                showMoreBtn.addEventListener('click', () => {
+                  shownCount = Math.min(shownCount + PAGE_SIZE, rows.length);
+                  renderPaged();
+                });
+
+                searchInput.addEventListener('input', () => {
+                  const query = searchInput.value.trim().toLowerCase();
+                  if (query) {
+                    renderSearch(query);
+                  } else {
+                    shownCount = PAGE_SIZE;
+                    renderPaged();
+                  }
+                });
+
+                renderPaged();
+              })();
+              </script>
             <?php endif; ?>
           </div>
         </div>
@@ -694,7 +762,7 @@ require_once __DIR__ . '/../includes/header.php';
               <div class="col-md-8">
                 <div class="d-flex align-items-center gap-2 mb-1">
                   <span class="fw-bold" style="font-family:'Playfair Display',serif;font-size:1.05rem"><?= e($s['name']) ?></span>
-                  <span class="badge" style="background:var(--green-pale);color:var(--green-dark);font-size:.72rem"><?= e(ucfirst($s['category'])) ?></span>
+                  <span class="badge" style="background:var(--maroon-pale);color:var(--maroon-dark);font-size:.72rem"><?= e(ucfirst($s['category'])) ?></span>
                 </div>
                 <div class="small text-muted mb-1"><i class="bi bi-geo-alt me-1"></i><?= e($s['city_name']) ?><?= $s['address'] ? ' — '.e($s['address']) : '' ?></div>
                 <?php if ($s['description']): ?>
@@ -711,7 +779,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <form method="POST"><?= csrf_field() ?>
                   <input type="hidden" name="action"  value="approve_shop">
                   <input type="hidden" name="shop_id" value="<?= $s['id'] ?>">
-                  <button class="btn btn-sm" style="background:var(--green-mid);color:#fff;border-radius:var(--radius-pill);padding:.4rem 1rem">
+                  <button class="btn btn-sm" style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-pill);padding:.4rem 1rem">
                     <i class="bi bi-check-lg me-1"></i>Approve
                   </button>
                 </form>
@@ -730,9 +798,9 @@ require_once __DIR__ . '/../includes/header.php';
       <?php endif; ?>
 
       <!-- ── VERIFIED SHOPS ── -->
-      <div class="d-flex align-items-center gap-2 mt-5 mb-3 pb-2" style="border-bottom:2px solid var(--green-pale)">
-        <i class="bi bi-patch-check-fill" style="color:var(--green-mid)"></i>
-        <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
+      <div class="d-flex align-items-center gap-2 mt-5 mb-3 pb-2" style="border-bottom:2px solid var(--maroon-pale)">
+        <i class="bi bi-patch-check-fill" style="color:var(--maroon-mid)"></i>
+        <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
           Verified Shops (<?= count($verified_shops) ?>)
         </h6>
       </div>
@@ -746,7 +814,7 @@ require_once __DIR__ . '/../includes/header.php';
             <div class="min-w-0">
               <div class="d-flex align-items-center gap-2 flex-wrap">
                 <span class="fw-bold" style="font-size:.92rem"><?= e($s['name']) ?></span>
-                <span class="badge" style="background:var(--green-pale);color:var(--green-dark);font-size:.68rem"><?= e(ucfirst($s['category'])) ?></span>
+                <span class="badge" style="background:var(--maroon-pale);color:var(--maroon-dark);font-size:.68rem"><?= e(ucfirst($s['category'])) ?></span>
               </div>
               <div class="small text-muted">
                 <i class="bi bi-geo-alt me-1"></i><?= e($s['city_name']) ?>
@@ -802,7 +870,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <form method="POST"><?= csrf_field() ?>
                   <input type="hidden" name="action"   value="approve_hotel">
                   <input type="hidden" name="hotel_id" value="<?= $h['id'] ?>">
-                  <button class="btn btn-sm" style="background:var(--green-mid);color:#fff;border-radius:var(--radius-pill);padding:.4rem 1rem">
+                  <button class="btn btn-sm" style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-pill);padding:.4rem 1rem">
                     <i class="bi bi-check-lg me-1"></i>Approve
                   </button>
                 </form>
@@ -821,9 +889,9 @@ require_once __DIR__ . '/../includes/header.php';
       <?php endif; ?>
 
       <!-- ── VERIFIED HOTELS ── -->
-      <div class="d-flex align-items-center gap-2 mt-5 mb-3 pb-2" style="border-bottom:2px solid var(--green-pale)">
-        <i class="bi bi-patch-check-fill" style="color:var(--green-mid)"></i>
-        <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
+      <div class="d-flex align-items-center gap-2 mt-5 mb-3 pb-2" style="border-bottom:2px solid var(--maroon-pale)">
+        <i class="bi bi-patch-check-fill" style="color:var(--maroon-mid)"></i>
+        <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
           Verified Hotels (<?= count($verified_hotels) ?>)
         </h6>
       </div>

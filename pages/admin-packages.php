@@ -141,7 +141,7 @@ require_once __DIR__ . '/../includes/header.php';
   <?php endforeach; unset($_SESSION['flash']); ?>
 <?php endif; ?>
 
-<section class="py-3" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
+<section class="py-3" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container d-flex align-items-center justify-content-between flex-wrap gap-3">
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-box-seam-fill fs-2" style="color:var(--sand-dark)"></i>
@@ -161,7 +161,7 @@ require_once __DIR__ . '/../includes/header.php';
     <?php if ($step === '2' && $editing_package): ?>
       <!-- STEP 2: Assign spots -->
       <div class="form-panel">
-        <h6 class="fw-bold mb-1" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
+        <h6 class="fw-bold mb-1" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
           <i class="bi bi-geo-alt me-2"></i>Step 2 — Assign Spots
         </h6>
         <p class="text-muted small mb-3">
@@ -195,7 +195,7 @@ require_once __DIR__ . '/../includes/header.php';
     <?php else: ?>
       <!-- STEP 1: Package info -->
       <div class="form-panel">
-        <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
+        <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
           <i class="bi bi-plus-circle me-2"></i>New Package
         </h6>
         <?php if ($errors): ?>
@@ -264,7 +264,7 @@ require_once __DIR__ . '/../includes/header.php';
 
   <!-- ── Existing packages list ─────────────────────────────── -->
   <div class="col-lg-7">
-    <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
+    <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
       All Packages (<?= count($packages) ?>)
     </h6>
     <?php if (empty($packages)): ?>
@@ -273,7 +273,7 @@ require_once __DIR__ . '/../includes/header.php';
     <div class="d-flex flex-column gap-2">
       <?php foreach ($packages as $p): ?>
       <div class="d-flex align-items-center gap-3 p-3" style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);opacity:<?= $p['is_active']?'1':'.55' ?>">
-        <div style="width:44px;height:44px;background:var(--green-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">
+        <div style="width:44px;height:44px;background:var(--maroon-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">
           <?= $p['cover_emoji'] ?>
         </div>
         <div class="flex-grow-1 min-w-0">
@@ -283,7 +283,7 @@ require_once __DIR__ . '/../includes/header.php';
             · <?= $p['days'] ?>d · <?= $p['spot_count'] ?> spots · <?= e($p['hotel_name'] ?? '—') ?>
           </div>
         </div>
-        <div class="fw-bold flex-shrink-0" style="color:var(--green-dark)">₱<?= number_format($p['estimated_price'],0) ?></div>
+        <div class="fw-bold flex-shrink-0" style="color:var(--maroon-dark)">₱<?= number_format($p['estimated_price'],0) ?></div>
         <div class="d-flex gap-1 flex-shrink-0">
           <a href="?step=2&id=<?= $p['id'] ?>" class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;padding:.25rem .6rem" title="Edit spots">
             <i class="bi bi-pencil"></i>

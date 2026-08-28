@@ -63,7 +63,7 @@ unset($it);
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
-<section class="py-4" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
+<section class="py-4" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container">
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-journal-bookmark-fill fs-2" style="color:var(--sand-dark)"></i>
@@ -114,18 +114,18 @@ require_once __DIR__ . '/../includes/header.php';
             <?php endif; ?>
 
             <div class="card-meta mb-2">
-              <i class="bi bi-calendar3 text-green"></i>
+              <i class="bi bi-calendar3 text-maroon"></i>
               <span><?= $it['travel_date'] ? date('M d, Y', strtotime($it['travel_date'])) : 'Date not set' ?></span>
               <span>·</span>
               <span><?= $it['num_days'] ?> day<?= $it['num_days']>1?'s':'' ?></span>
             </div>
             <h5 class="card-title-app mb-2"><?= e($it['title'] ?: $it['origin_name'].' → '.$it['dest_name']) ?></h5>
             <div class="d-flex align-items-center gap-2 mb-3" style="font-size:.85rem;color:var(--text-muted)">
-              <i class="bi bi-geo-alt text-green"></i>
+              <i class="bi bi-geo-alt text-maroon"></i>
               <span><?= e($it['origin_name']) ?> → <?= e($it['dest_name']) ?></span>
             </div>
             <div class="d-flex gap-2 mb-3 flex-wrap">
-              <span class="badge rounded-pill" style="background:var(--green-pale);color:var(--green-dark);padding:.3rem .8rem;font-size:.75rem">
+              <span class="badge rounded-pill" style="background:var(--maroon-pale);color:var(--maroon-dark);padding:.3rem .8rem;font-size:.75rem">
                 <?= $it['num_persons'] ?> pax
               </span>
               <span class="badge rounded-pill" style="background:var(--sand);color:var(--charcoal);padding:.3rem .8rem;font-size:.75rem">
@@ -133,7 +133,7 @@ require_once __DIR__ . '/../includes/header.php';
               </span>
             </div>
             <?php if ($it['total_budget']): ?>
-            <div class="fw-bold mb-3" style="color:var(--green-mid)">
+            <div class="fw-bold mb-3" style="color:var(--maroon-mid)">
               Est. ₱<?= number_format($it['total_budget'], 2) ?>
             </div>
             <?php endif; ?>

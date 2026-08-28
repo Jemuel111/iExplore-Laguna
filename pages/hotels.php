@@ -144,7 +144,7 @@ $base_qs = http_build_query(array_filter([
 
 
 
-<section class="py-3" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
+<section class="py-3" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container">
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-building fs-2" style="color:var(--sand-dark)"></i>
@@ -208,8 +208,8 @@ $base_qs = http_build_query(array_filter([
   <!-- Filters sidebar -->
   <div class="col-lg-3">
     <div class="form-panel">
-      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
-        <i class="bi bi-funnel me-2" style="color:var(--green-light)"></i>Filter Hotels
+      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
+        <i class="bi bi-funnel me-2" style="color:var(--maroon-light)"></i>Filter Hotels
       </h6>
       <form method="GET">
         <input type="hidden" name="view" value="<?= e($view_mode) ?>">
@@ -255,7 +255,7 @@ $base_qs = http_build_query(array_filter([
                      value="<?= e($al['label']) ?>" id="am-<?= md5($al['label']) ?>"
                      <?= in_array($al['label'], $filter_amenities, true) ? 'checked' : '' ?>>
               <label class="form-check-label small" for="am-<?= md5($al['label']) ?>">
-                <i class="bi <?= e($al['icon']) ?> me-1" style="color:var(--green-mid)"></i><?= e($al['label']) ?>
+                <i class="bi <?= e($al['icon']) ?> me-1" style="color:var(--maroon-mid)"></i><?= e($al['label']) ?>
               </label>
             </div>
             <?php endforeach; ?>
@@ -280,7 +280,7 @@ $base_qs = http_build_query(array_filter([
 
     <!-- Results summary -->
     <div class="mt-3 p-3" style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:.83rem">
-      <div class="fw-bold mb-1" style="color:var(--green-dark)">
+      <div class="fw-bold mb-1" style="color:var(--maroon-dark)">
         <i class="bi bi-bar-chart-fill me-1"></i>Results
       </div>
       <div class="text-muted">
@@ -346,7 +346,7 @@ $base_qs = http_build_query(array_filter([
               <h5 class="card-title-app mb-1" style="font-size:.98rem"><?= e($hotel['name']) ?></h5>
             </a>
             <div class="card-meta mb-1">
-              <i class="bi bi-geo-alt text-green"></i>
+              <i class="bi bi-geo-alt text-maroon"></i>
               <span><?= e($hotel['city_name']) ?></span>
             </div>
             <?php if ($hotel['address']): ?>
@@ -358,7 +358,7 @@ $base_qs = http_build_query(array_filter([
             <?php if ($amenities): ?>
             <div class="d-flex flex-wrap gap-1 mb-2">
               <?php foreach (array_slice($amenities,0,4) as $a): ?>
-                <span style="font-size:.68rem;background:var(--green-pale);color:var(--green-dark);padding:.15rem .5rem;border-radius:20px">
+                <span style="font-size:.68rem;background:var(--maroon-pale);color:var(--maroon-dark);padding:.15rem .5rem;border-radius:20px">
                   <i class="bi <?= e($a['icon']) ?> me-1"></i><?= e($a['label']) ?>
                 </span>
               <?php endforeach; ?>
@@ -369,7 +369,7 @@ $base_qs = http_build_query(array_filter([
             <?php endif; ?>
             <div class="d-flex justify-content-between align-items-center mt-auto pt-2" style="border-top:1px solid var(--border)">
               <div>
-                <span class="fw-bold" style="color:var(--green-mid);font-size:1.05rem">
+                <span class="fw-bold" style="color:var(--maroon-mid);font-size:1.05rem">
                   ₱<?= number_format($hotel['price_min'], 0) ?>
                 </span>
                 <span class="text-muted" style="font-size:.78rem"> – ₱<?= number_format($hotel['price_max'], 0) ?></span>
@@ -410,7 +410,7 @@ $base_qs = http_build_query(array_filter([
                 <?= e($hotel['name']) ?>
               </h6>
               <div class="card-meta mt-1" style="font-size:.78rem">
-                <i class="bi bi-geo-alt text-green"></i>
+                <i class="bi bi-geo-alt text-maroon"></i>
                 <span><?= e($hotel['city_name']) ?></span>
                 <?php if ($hotel['address']): ?>
                 <span>·</span><span class="text-muted"><?= e(mb_strimwidth($hotel['address'],0,35,'…')) ?></span>
@@ -419,7 +419,7 @@ $base_qs = http_build_query(array_filter([
             </div>
             <div class="d-flex align-items-center gap-2 flex-shrink-0">
               <div class="text-end">
-                <div class="fw-bold" style="color:var(--green-mid);font-size:.95rem">
+                <div class="fw-bold" style="color:var(--maroon-mid);font-size:.95rem">
                   ₱<?= number_format($hotel['price_min'],0) ?>–<?= number_format($hotel['price_max'],0) ?>
                 </div>
                 <div style="font-size:.7rem;color:var(--text-muted)">per night</div>
@@ -432,7 +432,7 @@ $base_qs = http_build_query(array_filter([
           <?php if ($amenities): ?>
           <div class="d-flex flex-wrap gap-1 mt-1">
             <?php foreach (array_slice($amenities,0,5) as $a): ?>
-              <span style="font-size:.68rem;background:var(--green-pale);color:var(--green-dark);padding:.12rem .45rem;border-radius:20px">
+              <span style="font-size:.68rem;background:var(--maroon-pale);color:var(--maroon-dark);padding:.12rem .45rem;border-radius:20px">
                 <i class="bi <?= e($a['icon']) ?> me-1"></i><?= e($a['label']) ?>
               </span>
             <?php endforeach; ?>

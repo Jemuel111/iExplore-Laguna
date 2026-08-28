@@ -130,7 +130,7 @@ require_once __DIR__ . '/../includes/header.php';
       <hr class="my-3" style="border-color:var(--border)">
       <p class="text-center text-muted small mb-0">
         Don't have an account?
-        <a href="register.php" class="fw-bold text-green">Sign up free</a>
+        <a href="register.php" class="fw-bold text-maroon">Sign up free</a>
       </p>
     </div>
   </div>

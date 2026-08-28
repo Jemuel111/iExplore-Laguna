@@ -79,7 +79,7 @@ require_once __DIR__ . '/../includes/header.php';
 ?>
 
 <!-- Shop hero -->
-<section class="py-4" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
+<section class="py-4" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container">
     <div class="d-flex align-items-start gap-4 flex-wrap">
       <div style="width:72px;height:72px;background:rgba(255,255,255,.15);border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:2.5rem;flex-shrink:0">
@@ -134,14 +134,14 @@ require_once __DIR__ . '/../includes/header.php';
     <?php else: ?>
       <?php foreach ($grouped as $cat => $items): ?>
       <div class="mb-4">
-        <h6 class="fw-bold mb-3 pb-2" style="color:var(--green-dark);border-bottom:2px solid var(--green-pale);font-family:'Playfair Display',serif">
+        <h6 class="fw-bold mb-3 pb-2" style="color:var(--maroon-dark);border-bottom:2px solid var(--maroon-pale);font-family:'Playfair Display',serif">
           <?= e($cat) ?>
         </h6>
         <div class="d-flex flex-column gap-2">
           <?php foreach ($items as $p): ?>
           <div class="d-flex align-items-center gap-3 p-3"
                style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);transition:border-color .2s">
-            <div style="width:52px;height:52px;background:var(--green-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:var(--green-mid);flex-shrink:0">
+            <div style="width:52px;height:52px;background:var(--maroon-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:var(--maroon-mid);flex-shrink:0">
               <i class="bi bi-bag"></i>
             </div>
             <div class="flex-grow-1 min-w-0">
@@ -160,7 +160,7 @@ require_once __DIR__ . '/../includes/header.php';
               <div class="d-flex align-items-center gap-2">
                 <button class="qty-btn" onclick="changeQty(<?= $p['id'] ?>,-1)" style="width:28px;height:28px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center">−</button>
                 <span id="qty-<?= $p['id'] ?>" style="min-width:20px;text-align:center;font-weight:700">0</span>
-                <button class="qty-btn" onclick="changeQty(<?= $p['id'] ?>,1,'<?= e(addslashes($p['name'])) ?>',<?= $p['price'] ?>)" style="width:28px;height:28px;border-radius:50%;border:1.5px solid var(--green-mid);background:var(--green-mid);color:#fff;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
+                <button class="qty-btn" onclick="changeQty(<?= $p['id'] ?>,1,'<?= e(addslashes($p['name'])) ?>',<?= $p['price'] ?>)" style="width:28px;height:28px;border-radius:50%;border:1.5px solid var(--maroon-mid);background:var(--maroon-mid);color:#fff;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
               </div>
             </div>
           </div>
@@ -173,7 +173,7 @@ require_once __DIR__ . '/../includes/header.php';
     <!-- Reviews -->
     <div class="mt-4" id="reviews-section">
       <div class="d-flex align-items-center justify-content-between mb-3">
-        <h6 class="fw-bold mb-0" style="color:var(--green-dark);font-family:'Playfair Display',serif">
+        <h6 class="fw-bold mb-0" style="color:var(--maroon-dark);font-family:'Playfair Display',serif">
           <i class="bi bi-star-fill me-2" style="color:var(--sand-dark)"></i>Customer Reviews
           <?php if ($avg_rating): ?>
             <span class="text-muted small">(<?= $avg_rating ?> avg · <?= count($reviews) ?>)</span>
@@ -228,7 +228,7 @@ require_once __DIR__ . '/../includes/header.php';
     <?php $map_lat = $shop['latitude'] ?: $shop['city_latitude']; $map_lng = $shop['longitude'] ?: $shop['city_longitude']; ?>
     <?php if ($map_lat && $map_lng): ?>
     <div class="mt-4">
-      <h6 class="fw-bold mb-2 pb-2" style="color:var(--green-dark);border-bottom:2px solid var(--green-pale);font-family:'Playfair Display',serif">
+      <h6 class="fw-bold mb-2 pb-2" style="color:var(--maroon-dark);border-bottom:2px solid var(--maroon-pale);font-family:'Playfair Display',serif">
         <i class="bi bi-pin-map-fill me-2" style="color:var(--terracotta)"></i>Location
       </h6>
       <div id="mini-map" style="height:220px;border-radius:10px;overflow:hidden"></div>
@@ -246,7 +246,7 @@ require_once __DIR__ . '/../includes/header.php';
   <div class="col-lg-4">
     <div style="position:sticky;top:80px">
       <div style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden">
-        <div class="p-3" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
+        <div class="p-3" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
           <h6 class="mb-0" style="font-family:'Playfair Display',serif">
             <i class="bi bi-bag-check me-2" style="color:var(--sand-dark)"></i>Your Order
           </h6>
@@ -260,9 +260,9 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
 
         <?php if ($nearby_spot): ?>
-        <div class="mx-3 mb-0 p-2 d-flex align-items-center gap-2" style="background:var(--green-pale);border-radius:var(--radius-sm);font-size:.78rem">
-          <i class="bi bi-signpost-split-fill" style="color:var(--green-dark)"></i>
-          <span style="color:var(--green-dark)">
+        <div class="mx-3 mb-0 p-2 d-flex align-items-center gap-2" style="background:var(--maroon-pale);border-radius:var(--radius-sm);font-size:.78rem">
+          <i class="bi bi-signpost-split-fill" style="color:var(--maroon-dark)"></i>
+          <span style="color:var(--maroon-dark)">
             <strong><?= e($shop['name']) ?></strong> is near <strong><?= e($nearby_spot['name']) ?></strong> —
             we'll add it to your itinerary when you order!
           </span>
@@ -300,7 +300,7 @@ require_once __DIR__ . '/../includes/header.php';
 
           <div class="d-flex justify-content-between fw-bold mb-3">
             <span>Total</span>
-            <span style="color:var(--green-dark)" id="order-total">₱0.00</span>
+            <span style="color:var(--maroon-dark)" id="order-total">₱0.00</span>
           </div>
 
           <button class="btn btn-primary-app w-100" id="place-order-btn"
@@ -310,7 +310,7 @@ require_once __DIR__ . '/../includes/header.php';
 
           <?php if (!is_logged_in()): ?>
           <p class="text-center small text-muted mt-2 mb-0">
-            <a href="login.php?redirect=<?= urlencode(APP_URL.'/pages/shop.php?id='.$shop_id) ?>" class="fw-bold text-green">
+            <a href="login.php?redirect=<?= urlencode(APP_URL.'/pages/shop.php?id='.$shop_id) ?>" class="fw-bold text-maroon">
               Log in</a> to place an order
           </p>
           <?php endif; ?>

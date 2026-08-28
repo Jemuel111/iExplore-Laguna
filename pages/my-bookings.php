@@ -114,11 +114,11 @@ require_once __DIR__ . '/../includes/header.php';
             <div class="col-sm-4">
               <div class="small text-muted fw-600 mb-1">Stay</div>
               <div class="small">
-                <i class="bi bi-box-arrow-in-right me-1 text-green"></i>
+                <i class="bi bi-box-arrow-in-right me-1 text-maroon"></i>
                 <?= date('D, M d Y', strtotime($bk['check_in_date'])) ?>
               </div>
               <div class="small">
-                <i class="bi bi-box-arrow-left me-1 text-green"></i>
+                <i class="bi bi-box-arrow-left me-1 text-maroon"></i>
                 <?= date('D, M d Y', strtotime($bk['check_out_date'])) ?>
               </div>
               <div class="small text-muted"><?= $bk['nights'] ?> night<?= $bk['nights']!=1?'s':'' ?></div>
@@ -131,11 +131,11 @@ require_once __DIR__ . '/../includes/header.php';
             <!-- Total -->
             <div class="col-sm-3 text-sm-end">
               <div class="small text-muted fw-600 mb-1">Total</div>
-              <div class="fw-bold fs-5" style="color:var(--green-dark)">₱<?= number_format($bk['total_amount'],2) ?></div>
+              <div class="fw-bold fs-5" style="color:var(--maroon-dark)">₱<?= number_format($bk['total_amount'],2) ?></div>
 
               <?php if ($bk['status'] === 'checked_in'): ?>
               <div class="mt-2">
-                <span class="badge p-2" style="background:var(--green-mid);font-size:.82rem">
+                <span class="badge p-2" style="background:var(--maroon-mid);font-size:.82rem">
                   <i class="bi bi-door-open-fill me-1"></i>Enjoy your stay!
                 </span>
               </div>

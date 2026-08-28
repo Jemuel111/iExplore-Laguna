@@ -191,17 +191,17 @@ require_once __DIR__ . '/../includes/header.php';
 .analytics-card{background:var(--surface,#fff);border:1px solid var(--border,#e8e8e8);border-radius:18px;box-shadow:0 5px 18px rgba(0,0,0,.05);height:auto}
 .analytics-card .card-body{padding:22px}
 .analytics-kpi{position:relative;overflow:hidden}
-.analytics-kpi:after{content:'';position:absolute;width:90px;height:90px;border-radius:50%;right:-28px;top:-28px;background:var(--green-pale,#eef5ee);opacity:.8}
-.analytics-kpi-icon{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;background:var(--green-pale,#eef5ee);color:var(--green-dark,#285943);font-size:1.2rem}
+.analytics-kpi:after{content:'';position:absolute;width:90px;height:90px;border-radius:50%;right:-28px;top:-28px;background:var(--maroon-pale,#eef5ee);opacity:.8}
+.analytics-kpi-icon{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;background:var(--maroon-pale,#eef5ee);color:var(--maroon-dark,#285943);font-size:1.2rem}
 .analytics-kpi .value{font-size:1.75rem;font-weight:800;line-height:1.1}
 .analytics-kpi .label{font-size:.8rem;color:var(--text-muted,#77808c);font-weight:600}
 .analytics-growth{font-size:.75rem;font-weight:700}
 .analytics-growth.up{color:#198754}.analytics-growth.down{color:#c0392b}.analytics-growth.flat{color:#7b8794}
 .chart-wrap{position:relative;height:310px}
-.mini-bar{height:9px;background:#edf0f2;border-radius:99px;overflow:hidden}.mini-bar>span{display:block;height:100%;border-radius:99px;background:var(--green-mid,#5c8d6a)}
+.mini-bar{height:9px;background:#edf0f2;border-radius:99px;overflow:hidden}.mini-bar>span{display:block;height:100%;border-radius:99px;background:var(--maroon-mid,#5c8d6a)}
 .rank-row{padding:10px 0;border-bottom:1px solid var(--border,#eee)}.rank-row:last-child{border-bottom:0}
-.rank-num{width:28px;height:28px;border-radius:9px;background:var(--green-pale,#eef5ee);color:var(--green-dark,#285943);display:inline-flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800}
-.period-btn.active{background:var(--green-dark,#285943);border-color:var(--green-dark,#285943);color:#fff}
+.rank-num{width:28px;height:28px;border-radius:9px;background:var(--maroon-pale,#eef5ee);color:var(--maroon-dark,#285943);display:inline-flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800}
+.period-btn.active{background:var(--maroon-dark,#285943);border-color:var(--maroon-dark,#285943);color:#fff}
 .status-dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px;background:#adb5bd}
 .analytics-table th{font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted,#77808c);white-space:nowrap}
 @media(max-width:767px){.chart-wrap{height:260px}.analytics-kpi .value{font-size:1.45rem}}
@@ -258,7 +258,7 @@ require_once __DIR__ . '/../includes/header.php';
 
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-end mb-3">
-    <div><h5 class="fw-bold mb-1" style="font-family:'Playfair Display',serif;color:var(--green-dark)">Performance Overview</h5><div class="text-muted small">Showing the last <?= $period ?> days · compared with the previous <?= $period ?> days</div></div>
+    <div><h5 class="fw-bold mb-1" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">Performance Overview</h5><div class="text-muted small">Showing the last <?= $period ?> days · compared with the previous <?= $period ?> days</div></div>
   </div>
 
   <div class="row g-3 mb-4">
@@ -333,10 +333,10 @@ require_once __DIR__ . '/../includes/header.php';
     </div></div></div>
   </div>
 
-  <h5 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--green-dark)"><i class="bi bi-people-fill me-2"></i>Tourist Demographics</h5>
+  <h5 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)"><i class="bi bi-people-fill me-2"></i>Tourist Demographics</h5>
   <div class="row g-4 mb-4">
     <div class="col-lg-4"><div class="analytics-card"><div class="card-body"><h6 class="fw-bold mb-3">Tourist Type</h6>
-      <?php $ttotal=max(1,$local_count+$intl_count); foreach([['Local',$local_count,'var(--green-mid,#5c8d6a)'],['International',$intl_count,'var(--sand-dark,#d9a441)']] as [$lab,$cnt,$color]): $pct=round($cnt/$ttotal*100); ?>
+      <?php $ttotal=max(1,$local_count+$intl_count); foreach([['Local',$local_count,'var(--maroon-mid,#5c8d6a)'],['International',$intl_count,'var(--sand-dark,#d9a441)']] as [$lab,$cnt,$color]): $pct=round($cnt/$ttotal*100); ?>
         <div class="d-flex justify-content-between small mb-1"><span><?= $lab ?></span><strong><?= number_format($cnt) ?> (<?= $pct ?>%)</strong></div><div class="mini-bar mb-3"><span style="width:<?= $pct ?>%;background:<?= $color ?>"></span></div>
       <?php endforeach; ?>
     </div></div></div>
@@ -350,16 +350,16 @@ require_once __DIR__ . '/../includes/header.php';
 
   <div class="row g-4 mb-4">
     <div class="col-lg-6"><div class="analytics-card"><div class="card-body"><h6 class="fw-bold mb-1">Top Local Origins</h6><div class="text-muted small mb-3">Registered local tourists by province</div>
-      <?php if (!$top_provinces): ?><p class="text-muted small">No data yet.</p><?php else: foreach($top_provinces as $p): ?><span class="badge me-1 mb-1" style="background:var(--green-pale);color:var(--green-dark);font-weight:600"><?= e($p['province']) ?> (<?= $p['c'] ?>)</span><?php endforeach; endif; ?>
+      <?php if (!$top_provinces): ?><p class="text-muted small">No data yet.</p><?php else: foreach($top_provinces as $p): ?><span class="badge me-1 mb-1" style="background:var(--maroon-pale);color:var(--maroon-dark);font-weight:600"><?= e($p['province']) ?> (<?= $p['c'] ?>)</span><?php endforeach; endif; ?>
     </div></div></div>
     <div class="col-lg-6"><div class="analytics-card"><div class="card-body"><h6 class="fw-bold mb-1">Top International Origins</h6><div class="text-muted small mb-3">Registered international tourists by nationality</div>
       <?php if (!$top_nationalities): ?><p class="text-muted small">No data yet.</p><?php else: foreach($top_nationalities as $n): ?><span class="badge me-1 mb-1" style="background:#f3e2d3;color:var(--terracotta);font-weight:600"><?= e($n['nationality']) ?> (<?= $n['c'] ?>)</span><?php endforeach; endif; ?>
     </div></div></div>
   </div>
 
-  <div class="analytics-card analytics-spot-performance mb-4"><div class="card-body"><div class="d-flex justify-content-between align-items-center mb-3"><div><h6 class="fw-bold mb-1">Spot Performance</h6><div class="text-muted small">Interest views, verified visits and visit conversion</div></div><span class="badge rounded-pill" style="background:var(--green-pale);color:var(--green-dark)"><?= number_format($site_total_views) ?> total views</span></div>
+  <div class="analytics-card analytics-spot-performance mb-4"><div class="card-body"><div class="d-flex justify-content-between align-items-center mb-3"><div><h6 class="fw-bold mb-1">Spot Performance</h6><div class="text-muted small">Interest views, verified visits and visit conversion</div></div><span class="badge rounded-pill" style="background:var(--maroon-pale);color:var(--maroon-dark)"><?= number_format($site_total_views) ?> total views</span></div>
     <div class="table-responsive"><table class="table analytics-table align-middle mb-0 analytics-compact-table"><thead><tr><th>Spot</th><th>City</th><th class="text-end">Views</th><th class="text-end">Visits</th><th class="text-end">Conversion</th><th class="text-end">Avg / Month</th></tr></thead><tbody>
-      <?php foreach($spot_stats as $s): ?><tr><td class="fw-bold"><?= e($s['name']) ?></td><td class="text-muted"><?= e($s['city_name']) ?></td><td class="text-end"><?= number_format($s['total_views']) ?></td><td class="text-end fw-bold" style="color:var(--green-dark)"><?= number_format($s['total_checkins']) ?></td><td class="text-end"><?= number_format($s['conversion'],1) ?>%</td><td class="text-end"><?= number_format($s['avg_per_month'],1) ?></td></tr><?php endforeach; ?>
+      <?php foreach($spot_stats as $s): ?><tr><td class="fw-bold"><?= e($s['name']) ?></td><td class="text-muted"><?= e($s['city_name']) ?></td><td class="text-end"><?= number_format($s['total_views']) ?></td><td class="text-end fw-bold" style="color:var(--maroon-dark)"><?= number_format($s['total_checkins']) ?></td><td class="text-end"><?= number_format($s['conversion'],1) ?>%</td><td class="text-end"><?= number_format($s['avg_per_month'],1) ?></td></tr><?php endforeach; ?>
     </tbody></table></div>
   </div></div>
 
@@ -378,8 +378,8 @@ require_once __DIR__ . '/../includes/header.php';
   const views = <?= json_encode($chart_views) ?>;
   const checkins = <?= json_encode($chart_checkins) ?>;
   const css = getComputedStyle(document.documentElement);
-  const green = css.getPropertyValue('--green-mid').trim() || '#5c8d6a';
-  const dark = css.getPropertyValue('--green-dark').trim() || '#285943';
+  const green = css.getPropertyValue('--maroon-mid').trim() || '#5c8d6a';
+  const dark = css.getPropertyValue('--maroon-dark').trim() || '#285943';
   const accent = css.getPropertyValue('--sand-dark').trim() || '#d9a441';
   const primary = css.getPropertyValue('--theme-primary').trim() || '#a61c1c';
   const muted = '#9aa3ad';

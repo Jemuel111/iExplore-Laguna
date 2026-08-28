@@ -132,14 +132,14 @@ $auth_photo = db_fetch_one(
       <div class="d-flex align-items-center gap-0 mb-4">
         <div class="d-flex align-items-center gap-2">
           <div style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.8rem;
-               background:<?= $step>=1?'var(--green-mid)':'#ddd' ?>;color:#fff">1</div>
-          <span style="font-size:.8rem;font-weight:600;color:<?= $step>=1?'var(--green-dark)':'#999' ?>">Account</span>
+               background:<?= $step>=1?'var(--maroon-mid)':'#ddd' ?>;color:#fff">1</div>
+          <span style="font-size:.8rem;font-weight:600;color:<?= $step>=1?'var(--maroon-dark)':'#999' ?>">Account</span>
         </div>
-        <div style="width:36px;height:2px;background:<?= $step>=2?'var(--green-mid)':'#ddd' ?>;margin:0 .5rem"></div>
+        <div style="width:36px;height:2px;background:<?= $step>=2?'var(--maroon-mid)':'#ddd' ?>;margin:0 .5rem"></div>
         <div class="d-flex align-items-center gap-2">
           <div style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.8rem;
-               background:<?= $step>=2?'var(--green-mid)':'#ddd' ?>;color:<?= $step>=2?'#fff':'#999' ?>">2</div>
-          <span style="font-size:.8rem;font-weight:600;color:<?= $step>=2?'var(--green-dark)':'#999' ?>">Shop Profile</span>
+               background:<?= $step>=2?'var(--maroon-mid)':'#ddd' ?>;color:<?= $step>=2?'#fff':'#999' ?>">2</div>
+          <span style="font-size:.8rem;font-weight:600;color:<?= $step>=2?'var(--maroon-dark)':'#999' ?>">Shop Profile</span>
         </div>
       </div>
 
@@ -300,9 +300,9 @@ $auth_photo = db_fetch_one(
       <hr class="my-3" style="border-color:var(--border)">
       <p class="text-center text-muted small mb-0">
         Already have an account?
-        <a href="login.php" class="fw-bold text-green">Log in here</a>
+        <a href="login.php" class="fw-bold text-maroon">Log in here</a>
         &nbsp;·&nbsp;
-        <a href="register.php" class="fw-bold text-green">Tourist account</a>
+        <a href="register.php" class="fw-bold text-maroon">Tourist account</a>
       </p>
 
     </div>

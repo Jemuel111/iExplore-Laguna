@@ -32,7 +32,7 @@ $orders = db_fetch_all(
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
-<section class="py-3" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
+<section class="py-3" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container">
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-bag-check-fill fs-2" style="color:var(--sand-dark)"></i>
@@ -56,14 +56,14 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
   </div>
   <div id="itinerary-nudge" class="alert <?= $new_spot ? 'd-flex' : 'd-none' ?> align-items-start gap-3 mb-4"
-       style="border-radius:var(--radius);background:var(--green-pale);border:1px solid var(--green-light);color:var(--green-dark)">
+       style="border-radius:var(--radius);background:var(--maroon-pale);border:1px solid var(--maroon-light);color:var(--maroon-dark)">
     <i class="bi bi-signpost-split-fill fs-4 flex-shrink-0"></i>
     <div>
       <div class="fw-bold mb-1">Added to your itinerary!</div>
       <?php if ($new_spot): ?>
       <div>The shop you ordered from is near <strong><?= e($new_spot) ?></strong> — we added it to your trip list.</div>
       <?php endif; ?>
-      <a href="explore.php" class="fw-bold" style="color:var(--green-dark)">Open My Itinerary →</a>
+      <a href="explore.php" class="fw-bold" style="color:var(--maroon-dark)">Open My Itinerary →</a>
     </div>
   </div>
   <?php endif; ?>
@@ -119,12 +119,12 @@ require_once __DIR__ . '/../includes/header.php';
               <?php if ($ord['pickup_date']): ?>
               <div class="small text-muted fw-600 mb-1">Pickup Schedule</div>
               <div class="small">
-                <i class="bi bi-calendar3 me-1 text-green"></i>
+                <i class="bi bi-calendar3 me-1 text-maroon"></i>
                 <?= date('D, M d Y', strtotime($ord['pickup_date'])) ?>
               </div>
               <?php if ($ord['pickup_time']): ?>
               <div class="small">
-                <i class="bi bi-clock me-1 text-green"></i>
+                <i class="bi bi-clock me-1 text-maroon"></i>
                 <?= date('g:i A', strtotime($ord['pickup_time'])) ?>
               </div>
               <?php endif; ?>
@@ -138,12 +138,12 @@ require_once __DIR__ . '/../includes/header.php';
             <!-- Pickup code + total -->
             <div class="col-sm-3 text-sm-end">
               <div class="small text-muted fw-600 mb-1">Total</div>
-              <div class="fw-bold fs-5" style="color:var(--green-dark)">₱<?= number_format($ord['total_amount'],2) ?></div>
+              <div class="fw-bold fs-5" style="color:var(--maroon-dark)">₱<?= number_format($ord['total_amount'],2) ?></div>
 
               <?php if ($ord['pickup_code'] && in_array($ord['status'],['confirmed','preparing','ready'])): ?>
               <div class="mt-2">
                 <div class="small text-muted fw-600 mb-1">Pickup Code</div>
-                <div style="background:var(--green-pale);color:var(--green-dark);padding:.4rem 1rem;border-radius:10px;font-family:monospace;font-size:1.3rem;font-weight:800;letter-spacing:.15em;display:inline-block">
+                <div style="background:var(--maroon-pale);color:var(--maroon-dark);padding:.4rem 1rem;border-radius:10px;font-family:monospace;font-size:1.3rem;font-weight:800;letter-spacing:.15em;display:inline-block">
                   <?= e($ord['pickup_code']) ?>
                 </div>
                 <div class="small text-muted mt-1">Show this to the shop</div>
@@ -152,7 +152,7 @@ require_once __DIR__ . '/../includes/header.php';
 
               <?php if ($ord['status'] === 'ready'): ?>
               <div class="mt-2">
-                <span class="badge p-2" style="background:var(--green-mid);font-size:.82rem">
+                <span class="badge p-2" style="background:var(--maroon-mid);font-size:.82rem">
                   <i class="bi bi-bag-check-fill me-1"></i>Ready! Go pick up your order
                 </span>
               </div>

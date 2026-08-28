@@ -147,7 +147,7 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
 
         <hr class="my-3" style="border-color:var(--border)">
-        <p class="small fw-bold mb-3" style="color:var(--green-dark)">
+        <p class="small fw-bold mb-3" style="color:var(--maroon-dark)">
           <i class="bi bi-clipboard-data me-1"></i>Tell us a bit about yourself
         </p>
 
@@ -210,7 +210,7 @@ require_once __DIR__ . '/../includes/header.php';
       <hr class="my-3" style="border-color:var(--border)">
       <p class="text-center text-muted small mb-0">
         Already have an account?
-        <a href="login.php" class="fw-bold text-green">Log in here</a>
+        <a href="login.php" class="fw-bold text-maroon">Log in here</a>
       </p>
       <hr class="my-3" style="border-color:var(--border)">
       <p class="text-center small mb-0" style="color:var(--text-muted)">

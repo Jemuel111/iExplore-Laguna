@@ -101,8 +101,8 @@ function spot_badge(string $category): string {
 <div class="container position-relative">
   <div class="hero-search-bar fade-up fade-up-2">
     <div class="d-flex align-items-center gap-2 mb-1">
-      <i class="bi bi-signpost-split text-green"></i>
-      <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--green-dark);font-size:.95rem">
+      <i class="bi bi-signpost-split text-maroon"></i>
+      <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--maroon-dark);font-size:.95rem">
         Quick Route Planner
       </h6>
     </div>
@@ -164,7 +164,7 @@ function spot_badge(string $category): string {
       ];
       foreach ($stats as [$num, $label, $icon]): ?>
       <div class="col-6 col-md-3 stat-item reveal">
-        <i class="bi <?= $icon ?> fs-3 text-green mb-2 d-block"></i>
+        <i class="bi <?= $icon ?> fs-3 text-maroon mb-2 d-block"></i>
         <div class="stat-num"><?= $num ?></div>
         <div class="stat-lbl"><?= $label ?></div>
       </div>
@@ -213,7 +213,7 @@ function spot_badge(string $category): string {
               <h5 class="card-title-app" style="color:var(--charcoal)"><?= e($spot['name']) ?></h5>
             </a>
             <div class="card-meta mb-2">
-              <i class="bi bi-geo-alt text-green"></i>
+              <i class="bi bi-geo-alt text-maroon"></i>
               <span><?= e($spot['city_name']) ?></span>
               <span>·</span>
               <span style="color:var(--sand-dark)"><?= str_repeat('★', round($spot['rating'])) ?></span>
@@ -246,7 +246,7 @@ function spot_badge(string $category): string {
 </section>
 
 <!-- ── HOW IT WORKS ─────────────────────────────────────────── -->
-<section class="py-4" style="background:var(--green-pale)">
+<section class="py-4" style="background:var(--maroon-pale)">
   <div class="container">
     <div class="row g-5 align-items-center">
       <div class="col-lg-5 reveal">
@@ -272,7 +272,7 @@ function spot_badge(string $category): string {
           <div class="step-row-line"></div>
           <div class="step-num"><?= $num ?></div>
           <div class="pt-1">
-            <div class="step-row-title"><i class="bi <?= $icon ?> text-green me-2"></i><?= $title ?></div>
+            <div class="step-row-title"><i class="bi <?= $icon ?> text-maroon me-2"></i><?= $title ?></div>
             <p class="text-muted small mb-0"><?= $desc ?></p>
           </div>
         </div>

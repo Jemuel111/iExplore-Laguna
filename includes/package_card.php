@@ -8,15 +8,15 @@
 function render_package_card(array $p): void {
 ?>
 <div class="card-app h-100">
-  <div class="card-img-placeholder" style="height:120px;font-size:2.4rem;background:var(--green-pale)">
+  <div class="card-img-placeholder" style="height:120px;font-size:2.4rem;background:var(--maroon-pale)">
     <i class="bi bi-suitcase-lg-fill"></i>
   </div>
   <div class="card-body-app d-flex flex-column">
     <div class="mb-1">
-      <span class="badge" style="background:var(--sand);color:var(--green-dark);font-size:.72rem">
+      <span class="badge" style="background:var(--sand);color:var(--maroon-dark);font-size:.72rem">
         <?php if ($p['scope'] === 'single_city'): ?><i class="bi bi-geo-alt me-1"></i><?= e($p['city_name']) ?><?php else: ?><i class="bi bi-map me-1"></i>Multiple Cities<?php endif; ?>
       </span>
-      <span class="badge" style="background:var(--green-pale);color:var(--green-dark);font-size:.72rem">
+      <span class="badge" style="background:var(--maroon-pale);color:var(--maroon-dark);font-size:.72rem">
         <?= (int)$p['days'] ?> day<?= $p['days']!=1?'s':'' ?>
       </span>
     </div>
@@ -36,7 +36,7 @@ function render_package_card(array $p): void {
     <div class="mt-auto">
       <div class="d-flex align-items-baseline justify-content-between mb-2">
         <span class="text-muted small">Est. total</span>
-        <span class="fw-bold fs-5" style="color:var(--green-dark)">₱<?= number_format($p['estimated_price'],0) ?></span>
+        <span class="fw-bold fs-5" style="color:var(--maroon-dark)">₱<?= number_format($p['estimated_price'],0) ?></span>
       </div>
       <a href="package.php?id=<?= $p['id'] ?>" class="btn btn-sm btn-primary-app w-100">
         <i class="bi bi-box-arrow-up-right me-1"></i>View Package

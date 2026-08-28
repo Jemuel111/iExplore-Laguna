@@ -29,7 +29,7 @@ $transport_labels = [
 ?>
 
 <!-- Page header -->
-<section class="py-4" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
+<section class="py-4" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container">
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-compass fs-2" style="color:var(--sand-dark)"></i>
@@ -50,8 +50,8 @@ $transport_labels = [
 
     <!-- Route Selector -->
     <div class="form-panel mb-3">
-      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
-        <i class="bi bi-signpost-split me-2" style="color:var(--green-light)"></i>Plan Your Route
+      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
+        <i class="bi bi-signpost-split me-2" style="color:var(--maroon-light)"></i>Plan Your Route
       </h6>
 
       <div class="mb-3">
@@ -140,16 +140,16 @@ $transport_labels = [
 
       <!-- Transport options -->
       <div class="form-panel mb-3">
-        <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
-          <i class="bi bi-bus-front me-2" style="color:var(--green-light)"></i>Transport Options
+        <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
+          <i class="bi bi-bus-front me-2" style="color:var(--maroon-light)"></i>Transport Options
         </h6>
         <div id="transport-list"></div>
       </div>
 
       <!-- Quick stats -->
       <div class="form-panel mb-3" id="route-stats-panel">
-        <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
-          <i class="bi bi-info-circle me-2" style="color:var(--green-light)"></i>Route Info
+        <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
+          <i class="bi bi-info-circle me-2" style="color:var(--maroon-light)"></i>Route Info
         </h6>
         <div id="route-stats"></div>
       </div>
@@ -161,7 +161,7 @@ $transport_labels = [
       <div class="d-flex gap-2 align-items-start">
         <i class="bi bi-map" style="color:var(--terracotta);flex-shrink:0;margin-top:.1rem"></i>
         <div>
-          <div class="fw-bold mb-1" style="color:var(--green-dark)">Approximate path shown</div>
+          <div class="fw-bold mb-1" style="color:var(--maroon-dark)">Approximate path shown</div>
           <span class="text-muted">No road route in database for this pair. Spots along the way are still accurate — road data can be added to the <code>routes</code> table.</span>
         </div>
       </div>
@@ -175,28 +175,25 @@ $transport_labels = [
     <!-- Map -->
     <div class="position-relative mb-2" id="map-wrapper">
             <div id="trip-map"></div>
-<div class="traffic-map-legend-item"><span class="traffic-map-dot traffic-free"></span>Free flow</div>
-    <div class="traffic-map-legend-item"><span class="traffic-map-dot traffic-moderate"></span>Moderate</div>
-    <div class="traffic-map-legend-item"><span class="traffic-map-dot traffic-heavy"></span>Heavy</div>
+
+      <div class="traffic-map-legend" id="traffic-map-legend" hidden>
+        <div class="traffic-map-legend-title">Live Traffic</div>
+        <div class="traffic-map-legend-item"><span class="traffic-map-dot traffic-free"></span>Free flow</div>
+        <div class="traffic-map-legend-item"><span class="traffic-map-dot traffic-moderate"></span>Moderate</div>
+        <div class="traffic-map-legend-item"><span class="traffic-map-dot traffic-heavy"></span>Heavy</div>
+      </div>
 
       <div class="planner-traffic-control" id="planner-traffic-control">
         <button type="button" id="traffic-toggle-btn" class="btn btn-sm btn-light planner-traffic-btn" aria-pressed="false">
           <i class="bi bi-traffic-cone me-1"></i>Traffic
         </button>
-        <div id="traffic-legend" class="planner-traffic-legend d-none">
-          <div class="fw-semibold mb-1">Live traffic</div>
-          <div><span class="traffic-dot traffic-green"></span> Normal</div>
-          <div><span class="traffic-dot traffic-yellow"></span> Moderate</div>
-          <div><span class="traffic-dot traffic-red"></span> Heavy</div>
-          <div class="traffic-updated" id="traffic-updated">Traffic data updates frequently</div>
-        </div>
       </div>
 
       <!-- Map spot count badge (top-right) -->
       <div id="map-spots-badge" class="position-absolute top-0 end-0 m-2 d-none"
            style="z-index:999">
         <span class="badge rounded-pill px-3 py-2"
-              style="background:var(--green-dark);color:#fff;font-size:.78rem;box-shadow:0 2px 8px rgba(0,0,0,.2)">
+              style="background:var(--maroon-dark);color:#fff;font-size:.78rem;box-shadow:0 2px 8px rgba(0,0,0,.2)">
           <i class="bi bi-geo-alt-fill me-1"></i>
           <span id="map-spots-badge-count">0</span> spots on map
         </span>
@@ -268,11 +265,11 @@ $transport_labels = [
     <!-- Spots along route -->
     <div id="spots-section" class="d-none">
       <div class="d-flex align-items-center justify-content-between mb-2">
-        <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
+        <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
           <i class="bi bi-geo-alt-fill me-2" style="color:var(--terracotta)"></i>
           Tourist Spots Along This Route
         </h6>
-        <span id="spots-count" class="badge rounded-pill" style="background:var(--green-pale);color:var(--green-dark)"></span>
+        <span id="spots-count" class="badge rounded-pill" style="background:var(--maroon-pale);color:var(--maroon-dark)"></span>
       </div>
 
       <!-- Category filter -->
@@ -290,7 +287,7 @@ $transport_labels = [
   <div class="col-lg-5 col-xl-5">
 
     <div id="right-panel-placeholder" class="form-panel text-center py-5" style="color:var(--text-muted)">
-      <i class="bi bi-map fs-1 d-block mb-3" style="color:var(--green-pale)"></i>
+      <i class="bi bi-map fs-1 d-block mb-3" style="color:var(--maroon-pale)"></i>
       <p class="mb-0 small">Select origin and destination<br>to see budget &amp; itinerary.</p>
     </div>
 
@@ -313,8 +310,8 @@ $transport_labels = [
     <!-- Itinerary Panel (hidden until searched) -->
     <div id="itinerary-panel" class="d-none">
       <div class="d-flex align-items-center justify-content-between mb-3">
-        <h5 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
-          <i class="bi bi-journal-bookmark me-2" style="color:var(--green-light)"></i>Suggested Itinerary
+        <h5 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
+          <i class="bi bi-journal-bookmark me-2" style="color:var(--maroon-light)"></i>Suggested Itinerary
         </h5>
         <button class="btn btn-sm btn-outline-app" id="save-itinerary-btn">
           <i class="bi bi-bookmark-plus me-1"></i>Save
@@ -362,7 +359,7 @@ let trafficEnabled = false;
 
 function setTrafficEnabled(enabled) {
   const btn = document.getElementById('traffic-toggle-btn');
-  const legend = document.getElementById('traffic-legend');
+  const legend = document.getElementById('traffic-map-legend');
 
   if (!TOMTOM_API_KEY) {
     IExploreApp.toast('Live traffic is not configured yet. Add your TomTom API key in includes/config.php.', 'info');
@@ -392,7 +389,7 @@ function setTrafficEnabled(enabled) {
       btn.setAttribute('aria-pressed', 'true');
       btn.innerHTML = '<i class=\"bi bi-traffic-cone me-1\"></i>Hide Traffic';
     }
-    if (legend) legend.classList.remove('d-none');
+    if (legend) legend.hidden = false;
   } else {
     if (trafficLayer && map.hasLayer(trafficLayer)) map.removeLayer(trafficLayer);
     if (btn) {
@@ -400,7 +397,7 @@ function setTrafficEnabled(enabled) {
       btn.setAttribute('aria-pressed', 'false');
       btn.innerHTML = '<i class=\"bi bi-traffic-cone me-1\"></i>Traffic';
     }
-    if (legend) legend.classList.add('d-none');
+    if (legend) legend.hidden = true;
   }
 }
 
@@ -469,6 +466,109 @@ function estimateTravelMinutes(km) {
 function distanceTimeLabel(km) {
   const mins = estimateTravelMinutes(km);
   return `${km < 10 ? km.toFixed(1) : Math.round(km)} km · ~${formatDuration(mins)}`;
+}
+
+// ── "Is this spot actually along the way?" corridor filter ──
+// A bounding box between origin and destination (what the backend uses to
+// fetch candidate spots) lets in anything inside that rectangle, including
+// spots far off to the side that the route never actually passes near. This
+// measures each spot's real distance to the drawn route line (the actual
+// road-following polyline when available, otherwise the straight
+// origin→destination line) and only keeps spots within a walkable/short
+// detour distance of it.
+const ROUTE_CORRIDOR_KM = 6;
+
+// Perpendicular distance (km) from point P to the segment A→B, using a
+// local flat-earth approximation. Laguna's whole span is under ~50km, so
+// the curvature error this introduces is negligible for filtering purposes.
+function pointToSegmentKm(lat, lng, aLat, aLng, bLat, bLng) {
+  const latRef = (aLat + bLat) / 2;
+  const kmPerDegLat = 110.574;
+  const kmPerDegLng = 111.320 * Math.cos(latRef * Math.PI / 180);
+
+  const toXY = (la, lo) => [(lo - aLng) * kmPerDegLng, (la - aLat) * kmPerDegLat];
+  const [px, py] = toXY(lat, lng);
+  const [bx, by] = toXY(bLat, bLng);
+
+  const segLenSq = bx * bx + by * by;
+  let t = segLenSq > 0 ? (px * bx + py * by) / segLenSq : 0;
+  t = Math.max(0, Math.min(1, t));
+  const dx = px - bx * t, dy = py - by * t;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+// Minimum distance (km) from a point to any segment of a multi-point route
+// line — i.e. "how far off the actual road path is this spot".
+function distanceToRouteKm(lat, lng, routeLine) {
+  if (!routeLine || routeLine.length < 2) return Infinity;
+  let min = Infinity;
+  for (let i = 0; i < routeLine.length - 1; i++) {
+    const [aLat, aLng] = routeLine[i];
+    const [bLat, bLng] = routeLine[i + 1];
+    const d = pointToSegmentKm(lat, lng, aLat, aLng, bLat, bLng);
+    if (d < min) min = d;
+  }
+  return min;
+}
+
+// ── Shared transport icon/label lookup (used in both the top-level
+// transport options list and per-leg fares inside the itinerary) ──
+const TRANSPORT_ICONS = {
+  jeepney: 'bi-truck-front', bus: 'bi-bus-front', tricycle: 'bi-bicycle',
+  private_car: 'bi-car-front', fx_uv: 'bi-minecart',
+};
+const TRANSPORT_LABELS = {
+  jeepney: 'Jeepney', bus: 'Bus', tricycle: 'Tricycle',
+  private_car: 'Private Car', fx_uv: 'FX / UV Express',
+};
+function transportIcon(type) { return TRANSPORT_ICONS[type] || 'bi-bus-front'; }
+function transportLabel(type) { return TRANSPORT_LABELS[type] || type; }
+
+// One-line "🚍 Jeepney · ₱25.00" style label for a transport_options row.
+function fareLabel(fare) {
+  const label = transportLabel(fare.transport_type);
+  const price = fare.fare_php > 0 ? `₱${parseFloat(fare.fare_php).toFixed(2)}` : 'Own vehicle';
+  return `<i class="bi ${transportIcon(fare.transport_type)} me-1"></i>${label} · ${price}`;
+}
+
+// Once you've actually arrived in a city/town, the hop from there to the
+// specific spot is a short local trip — walked or taken by tricycle, not
+// another long-haul ride booked like the jeepney/bus legs between towns.
+// This gives a first-time visitor a concrete, actionable suggestion
+// instead of just a raw distance number.
+function lastMileSuggestion(km) {
+  const mins = estimateTravelMinutes(km);
+  if (km <= 0.8) {
+    return `<i class="bi bi-person-walking me-1"></i>Walk (~${formatDuration(Math.max(mins, 5))})`;
+  }
+  if (km <= 3) {
+    return `<i class="bi bi-bicycle me-1"></i>Ride a tricycle (~₱15–20, ~${formatDuration(mins)})`;
+  }
+  return `<i class="bi bi-bicycle me-1"></i>Tricycle or multicab (~₱20–30, ~${formatDuration(mins)}, fare varies — confirm with the driver)`;
+}
+
+// Cache of city-pair → cheapest transport option, so repeated hops between
+// the same two cities within one itinerary don't refetch. Cleared each
+// time a fresh itinerary is built.
+let fareCache = new Map();
+
+async function getCityFare(originCityId, destCityId) {
+  if (!originCityId || !destCityId || originCityId === destCityId) return null;
+  const key = `${originCityId}-${destCityId}`;
+  if (fareCache.has(key)) return fareCache.get(key);
+
+  let cheapest = null;
+  try {
+    const res = await fetch(
+      API_BASE + `routes.php?action=route&origin=${originCityId}&dest=${destCityId}`
+    ).then(r => r.json());
+    const options = res.success ? res.data.transport_options : [];
+    cheapest = (options && options.length) ? options[0] : null; // backend sorts fare ASC
+  } catch (err) {
+    console.warn('Fare lookup failed for', key, err);
+  }
+  fareCache.set(key, cheapest);
+  return cheapest;
 }
 
 // ── Spot closure / availability helpers ─────────────────────
@@ -551,7 +651,22 @@ async function planRoute() {
     routeData = routeRes.data;
     allSpots  = spotsRes.success ? spotsRes.data : [];
 
-    drawRoute(routeData);
+    const routeLine = await drawRoute(routeData);
+
+    // Keep only spots genuinely along the way. The backend's bounding-box
+    // query is deliberately loose (fast, simple SQL) and can include spots
+    // that sit off to the side and are never actually passed — filter those
+    // out here against the real drawn route line.
+    const onRouteSpots = allSpots.filter(
+      s => distanceToRouteKm(parseFloat(s.latitude), parseFloat(s.longitude), routeLine) <= ROUTE_CORRIDOR_KM
+    );
+    if (onRouteSpots.length > 0) {
+      allSpots = onRouteSpots;
+    } else {
+      console.warn(`No spots found within ${ROUTE_CORRIDOR_KM}km of the route — showing all fetched spots instead.`);
+    }
+
+    fareCache = new Map(); // fresh fare lookups for this itinerary
     drawSpotMarkers(allSpots);
 
     renderTransportOptions(routeData.transport_options);
@@ -620,6 +735,9 @@ async function drawRoute(data) {
     map.fitBounds([startLatLng, endLatLng], { padding: [40, 40] });
     if (reason) console.warn('ORS routing unavailable, falling back to straight line:', reason);
     IExploreApp.toast('Using approximate route (road data unavailable).', 'info');
+    // Straight two-point line — used as the "corridor" for filtering
+    // nearby spots when we don't have a real road-following path.
+    return [[startLatLng.lat, startLatLng.lng], [endLatLng.lat, endLatLng.lng]];
   }
 
   try {
@@ -630,8 +748,7 @@ async function drawRoute(data) {
     ).then(r => r.json());
 
     if (!res.success || !res.data.coordinates || !res.data.coordinates.length) {
-      drawFallback(res.message || 'no coordinates returned');
-      return;
+      return drawFallback(res.message || 'no coordinates returned');
     }
 
     routeLayerGroup = L.layerGroup().addTo(map);
@@ -641,8 +758,9 @@ async function drawRoute(data) {
     }).addTo(routeLayerGroup);
     addEndpointMarkers(routeLayerGroup);
     map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40] });
+    return latlngs; // real road-following path, for corridor filtering
   } catch (err) {
-    drawFallback(err);
+    return drawFallback(err);
   }
 }
 
@@ -672,13 +790,13 @@ function drawSpotMarkers(spots) {
       className: 'spot-popup-rich',
       closeButton: true,
     }).setContent(`
-      <div class="popup-rich-header" style="background:var(--green-pale);padding:.75rem 1rem .5rem;margin:-.4rem -.4rem .5rem;border-radius:8px 8px 0 0;text-align:center;font-size:2rem;line-height:1">
-        <i class="bi ${catIcon(spot.category)}" style="color:var(--green-mid)"></i>
+      <div class="popup-rich-header" style="background:var(--maroon-pale);padding:.75rem 1rem .5rem;margin:-.4rem -.4rem .5rem;border-radius:8px 8px 0 0;text-align:center;font-size:2rem;line-height:1">
+        <i class="bi ${catIcon(spot.category)}" style="color:var(--maroon-mid)"></i>
       </div>
       <div style="padding:0 .25rem">
         <div class="popup-title" style="font-size:.95rem">${spot.name}</div>
         <div class="popup-meta mb-1">
-          <i class="bi bi-geo-alt" style="color:var(--green-mid)"></i>
+          <i class="bi bi-geo-alt" style="color:var(--maroon-mid)"></i>
           ${spot.city_name}
         </div>
         <div style="color:var(--sand-dark);font-size:.8rem;letter-spacing:.05em;margin-bottom:.35rem">${stars}
@@ -694,7 +812,7 @@ function drawSpotMarkers(spots) {
         </div>
         <a
           href="<?= APP_URL ?>/pages/spot-detail.php?id=${spot.id}"
-          style="display:block;width:100%;padding:.35rem;background:var(--green-dark);color:#fff;border:none;border-radius:6px;font-size:.8rem;cursor:pointer;font-family:'DM Sans',sans-serif;text-align:center;text-decoration:none">
+          style="display:block;width:100%;padding:.35rem;background:var(--maroon-dark);color:#fff;border:none;border-radius:6px;font-size:.8rem;cursor:pointer;font-family:'DM Sans',sans-serif;text-align:center;text-decoration:none">
           <i class="bi bi-images me-1"></i>See Full Details & Photos
         </a>
       </div>
@@ -719,7 +837,7 @@ function renderTransportOptions(options) {
   if (!options.length) {
     container.innerHTML = `
       <div class="text-center py-2">
-        <i class="bi bi-signpost-2 d-block mb-2" style="font-size:1.6rem;color:var(--green-pale)"></i>
+        <i class="bi bi-signpost-2 d-block mb-2" style="font-size:1.6rem;color:var(--maroon-pale)"></i>
         <p class="text-muted small mb-1 fw-500">No scheduled transport data</p>
         <p class="text-muted" style="font-size:.75rem;line-height:1.5">
           Try a <strong>private car</strong> or <strong>tricycle</strong> for this route.
@@ -729,31 +847,22 @@ function renderTransportOptions(options) {
     return;
   }
 
-  const icons = {
-    jeepney:'bi-truck-front', bus:'bi-bus-front', tricycle:'bi-bicycle',
-    private_car:'bi-car-front', fx_uv:'bi-minecart'
-  };
-  const labels = {
-    jeepney:'Jeepney', bus:'Bus', tricycle:'Tricycle',
-    private_car:'Private Car', fx_uv:'FX / UV Express'
-  };
-
   container.innerHTML = options.map((t, i) => `
     <div class="transport-option p-2 mb-2 rounded-2 ${i===0?'selected':''}"
          data-index="${i}"
-         style="border:1.5px solid ${i===0?'var(--green-light)':'var(--border)'};
-                background:${i===0?'var(--green-pale)':'#fff'};
+         style="border:1.5px solid ${i===0?'var(--maroon-light)':'var(--border)'};
+                background:${i===0?'var(--maroon-pale)':'#fff'};
                 cursor:pointer;transition:all .2s">
       <div class="d-flex align-items-center justify-content-between">
         <div class="d-flex align-items-center gap-2">
-          <i class="bi ${icons[t.transport_type]||'bi-truck'} fs-5 text-green"></i>
+          <i class="bi ${transportIcon(t.transport_type)} fs-5 text-maroon"></i>
           <div>
-            <div class="fw-bold small">${labels[t.transport_type]||t.transport_type}</div>
+            <div class="fw-bold small">${transportLabel(t.transport_type)}</div>
             <div style="font-size:.75rem;color:var(--text-muted)">${t.distance_km} km · ${formatDuration(t.duration_min)}</div>
           </div>
         </div>
         <div class="text-end">
-          <div class="fw-bold text-green small">
+          <div class="fw-bold text-maroon small">
             ${t.fare_php > 0 ? '₱ '+parseFloat(t.fare_php).toFixed(2) : 'Own vehicle'}
           </div>
           <div style="font-size:.7rem;color:var(--text-muted)">per person</div>
@@ -772,8 +881,8 @@ function renderTransportOptions(options) {
         e.style.borderColor = 'var(--border)';
         e.style.background  = '#fff';
       });
-      el.style.borderColor = 'var(--green-light)';
-      el.style.background  = 'var(--green-pale)';
+      el.style.borderColor = 'var(--maroon-light)';
+      el.style.background  = 'var(--maroon-pale)';
       selectedTransport = options[parseInt(el.dataset.index)];
     });
   });
@@ -811,9 +920,9 @@ function renderSpotsGrid(spots, filterCat = 'all') {
   filterBar.innerHTML = cats.map(cat => `
     <button class="btn btn-sm filter-btn ${cat === filterCat ? 'active' : ''}" data-cat="${cat}"
             style="border-radius:20px;font-size:.78rem;padding:.25rem .75rem;
-                   background:${cat===filterCat?'var(--green-mid)':'#fff'};
+                   background:${cat===filterCat?'var(--maroon-mid)':'#fff'};
                    color:${cat===filterCat?'#fff':'var(--charcoal)'};
-                   border:1.5px solid ${cat===filterCat?'var(--green-mid)':'var(--border)'}">
+                   border:1.5px solid ${cat===filterCat?'var(--maroon-mid)':'var(--border)'}">
       <i class="bi ${cat==='all'?'bi-grid':catIcon(cat)} me-1"></i>${cat === 'all' ? 'All' : catLabel(cat)}
     </button>
   `).join('');
@@ -865,12 +974,12 @@ function renderSpotsGrid(spots, filterCat = 'all') {
            style="border:1.5px solid ${closure && !closure.reopensBeforeTravel ? '#fca5a5' : 'var(--border)'};
                   cursor:pointer;transition:all .22s;scroll-margin-top:90px;
                   opacity:${closure && !closure.reopensBeforeTravel ? '.75' : '1'}"
-           onmouseenter="this.style.borderColor='var(--green-light)';this.style.background='var(--green-pale)'"
-           onmouseleave="this.style.borderColor=this.classList.contains('spot-card-active')?'var(--green-mid)':'${closure && !closure.reopensBeforeTravel ? '#fca5a5' : 'var(--border)'}';this.style.background=this.classList.contains('spot-card-active')?'#fbe4e4':'#fff'"
+           onmouseenter="this.style.borderColor='var(--maroon-light)';this.style.background='var(--maroon-pale)'"
+           onmouseleave="this.style.borderColor=this.classList.contains('spot-card-active')?'var(--maroon-mid)':'${closure && !closure.reopensBeforeTravel ? '#fca5a5' : 'var(--border)'}';this.style.background=this.classList.contains('spot-card-active')?'#fbe4e4':'#fff'"
            onclick="flyToSpot(${spot.id})">
-        <div style="width:52px;height:52px;border-radius:10px;background:var(--green-pale);
+        <div style="width:52px;height:52px;border-radius:10px;background:var(--maroon-pale);
                     display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0">
-          <i class="bi ${catIcon(spot.category)}" style="color:var(--green-mid)"></i>
+          <i class="bi ${catIcon(spot.category)}" style="color:var(--maroon-mid)"></i>
         </div>
         <div class="flex-grow-1 min-width-0">
           <div class="fw-bold small mb-1" style="color:var(--charcoal)">${spot.name}</div>
@@ -887,7 +996,7 @@ function renderSpotsGrid(spots, filterCat = 'all') {
           ${closureBanner}
         </div>
         <div class="d-flex flex-column align-items-end gap-1">
-          <i class="bi bi-map text-green small" title="Fly to on map"></i>
+          <i class="bi bi-map text-maroon small" title="Fly to on map"></i>
           <i class="bi bi-chevron-right text-muted small"></i>
         </div>
       </div>
@@ -1037,6 +1146,7 @@ async function renderItinerary(routeData, spots, days) {
     latitude:  parseFloat(routeData.origin.latitude),
     longitude: parseFloat(routeData.origin.longitude),
     cityName:  routeData.origin.name,
+    cityId:    routeData.origin.id,
   };
 
   for (let day = 1; day <= days; day++) {
@@ -1061,29 +1171,58 @@ async function renderItinerary(routeData, spots, days) {
     if (day === 1) {
       events.push({ t: 7*60, html: itineraryItem('7:00 AM', 'bi-sun', 'Start your day',
         'Pack your bags and get ready to explore.') });
+      events.push({ t: 7*60 + 15, html: itineraryItem('7:15 AM', 'bi-geo-alt', 'Depart from ' + routeData.origin.name,
+        'Your trip begins here — first stop coming up.') });
     }
 
     let time = dayTouringStart(day); // minutes since midnight
-    daySpots.forEach(spot => {
-      // Insert a travel step whenever the plan actually moves to a new
-      // city — whether that's right at the start of the day or mid-day
-      // once the previous city's spots are used up. This replaces the old
-      // fixed "Travel to destination at 8 AM" step, which fired even on
-      // days that never left the current city.
-      if (spot.city_name !== lastPoint.cityName) {
-        const hopKm = haversineKm(lastPoint.latitude, lastPoint.longitude, spot.latitude, spot.longitude);
+    for (const spot of daySpots) {
+      const crossingCity = spot.city_id !== lastPoint.cityId;
+
+      // Where does the "last mile to the spot" measurement start from?
+      // Normally the previous stop — but if we just crossed into a new
+      // city, it should start from that city's town proper/terminal, not
+      // from wherever we were in the last city (that distance was already
+      // covered by the inter-city ride above).
+      let lastMileLat = lastPoint.latitude, lastMileLng = lastPoint.longitude, lastMileFrom = 'the previous stop';
+
+      if (crossingCity) {
+        // Long-haul leg: board the actual jeepney/tricycle/bus that runs
+        // between these two towns, using real fare data when we have it.
+        const cityLat = parseFloat(spot.city_latitude), cityLng = parseFloat(spot.city_longitude);
+        const fare = await getCityFare(lastPoint.cityId, spot.city_id);
+        const interCityKm = fare && fare.distance_km
+          ? parseFloat(fare.distance_km)
+          : haversineKm(lastPoint.latitude, lastPoint.longitude, cityLat, cityLng);
+        const travelMins = fare && fare.duration_min ? fare.duration_min : estimateTravelMinutes(interCityKm);
+
+        const heading = fare ? `Board a ${transportLabel(fare.transport_type)} to ${spot.city_name}` : `Travel to ${spot.city_name}`;
+        const desc = fare
+          ? `${fare.fare_php > 0 ? '₱'+parseFloat(fare.fare_php).toFixed(2) : 'Own vehicle'} · ${fare.distance_km} km · ${formatDuration(fare.duration_min)} from ${lastPoint.cityName}`
+          : `${distanceTimeLabel(interCityKm)} from ${lastPoint.cityName} · no fixed fare on file — try tricycle/habal-habal and negotiate`;
+
         events.push({
           t: time,
-          html: itineraryItem(minutesToLabel(time), 'bi-bus-front', 'Travel to ' + spot.city_name,
-            `${distanceTimeLabel(hopKm)} from ${lastPoint.cityName}`)
+          html: itineraryItem(minutesToLabel(time), fare ? transportIcon(fare.transport_type) : 'bi-bus-front', heading, desc)
         });
-        time += estimateTravelMinutes(hopKm);
+        time += travelMins;
+
+        // Now "arrived" at the new city's town proper — the remaining
+        // distance to the spot itself is the short last-mile hop.
+        if (!isNaN(cityLat) && !isNaN(cityLng)) {
+          lastMileLat = cityLat;
+          lastMileLng = cityLng;
+        } else {
+          lastMileLat = spot.latitude;
+          lastMileLng = spot.longitude;
+        }
+        lastMileFrom = spot.city_name + ' town proper';
       }
 
       const timeStr = minutesToLabel(time);
-      const legKm = haversineKm(lastPoint.latitude, lastPoint.longitude, spot.latitude, spot.longitude);
-      const legLabel = `<i class="bi bi-car-front-fill me-1"></i>${distanceTimeLabel(legKm)} from previous stop`;
-      lastPoint = { latitude: spot.latitude, longitude: spot.longitude, cityName: spot.city_name };
+      const legKm = haversineKm(lastMileLat, lastMileLng, spot.latitude, spot.longitude);
+      const legLabel = `${lastMileSuggestion(legKm)} from ${lastMileFrom} (${legKm < 10 ? legKm.toFixed(1) : Math.round(legKm)} km)`;
+      lastPoint = { latitude: spot.latitude, longitude: spot.longitude, cityName: spot.city_name, cityId: spot.city_id };
 
       events.push({
         t: time,
@@ -1092,7 +1231,7 @@ async function renderItinerary(routeData, spots, days) {
           true)
       });
       time += 120; // 2 hours per stop
-    });
+    }
 
     events.push({ t: 12*60, html: itineraryItem('12:00 PM', 'bi-cup-hot', 'Lunch Break',
       'Try local Laguna specialties: buko pie, kesong puti, or fresh bangus.') });
@@ -1177,7 +1316,7 @@ function itineraryItem(time, icon, name, desc, isSpot = false) {
       <div class="item-time" style="min-width:68px;flex-shrink:0;white-space:nowrap">${time}</div>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:.45rem;flex-wrap:nowrap;margin-bottom:.25rem">
-          <i class="bi ${icon}" style="color:${isSpot?'var(--terracotta)':'var(--green-light)'};flex-shrink:0;font-size:1.05rem"></i>
+          <i class="bi ${icon}" style="color:${isSpot?'var(--terracotta)':'var(--maroon-light)'};flex-shrink:0;font-size:1.05rem"></i>
           <span class="item-name">${name}</span>
         </div>
         <div class="item-desc">${desc}</div>
@@ -1223,7 +1362,7 @@ window.openSpotPanel = function(spotId) {
     `<span class="badge-category badge-${spot.category}">${catLabel(spot.category)}</span>`;
   document.getElementById('msp-name').textContent  = spot.name;
   document.getElementById('msp-city').innerHTML    =
-    `<i class="bi bi-geo-alt-fill me-1" style="color:var(--green-mid)"></i>${spot.city_name}`;
+    `<i class="bi bi-geo-alt-fill me-1" style="color:var(--maroon-mid)"></i>${spot.city_name}`;
   document.getElementById('msp-rating').innerHTML  = starsHtml;
   document.getElementById('msp-chips').innerHTML   = `
     <span class="msp-chip"><i class="bi bi-ticket me-1"></i>${fee}</span>
@@ -1276,7 +1415,7 @@ function highlightSpotCard(spotId) {
   const card = document.getElementById(`spot-card-${spotId}`);
   if (card) {
     card.classList.add('spot-card-active');
-    card.style.borderColor = 'var(--green-mid)';
+    card.style.borderColor = 'var(--maroon-mid)';
     card.style.background  = '#fbe4e4';
     // Always scroll to center of viewport, even if technically "close enough" already —
     // otherwise clicking a marker can feel like it did nothing.
@@ -1301,7 +1440,7 @@ function catBg(cat) {
     hotspring:'#ffe4e6', museum:'#f3e8ff', religious:'#fff7ed',
     beach_lake:'#e0f2fe', adventure:'#fef9c3', food:'#fce7f3'
   };
-  return m[cat] || 'var(--green-pale)';
+  return m[cat] || 'var(--maroon-pale)';
 }
 
 // ── Save itinerary ──────────────────────────────────────────

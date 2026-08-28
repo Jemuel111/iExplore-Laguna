@@ -41,7 +41,7 @@ foreach ($spot_rows as $sp) { $byDay[$sp['day_number']][] = $sp; }
 ksort($byDay);
 ?>
 
-<section class="py-4" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
+<section class="py-4" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container">
     <div class="d-flex align-items-start gap-3 flex-wrap">
       <div style="width:64px;height:64px;background:rgba(255,255,255,.15);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:2.2rem;flex-shrink:0">
@@ -68,7 +68,7 @@ ksort($byDay);
 
   <!-- ── Day-by-day itinerary ─────────────────────────────── -->
   <div class="col-lg-7">
-    <h6 class="fw-bold mb-3 pb-2" style="color:var(--green-dark);border-bottom:2px solid var(--green-pale);font-family:'Playfair Display',serif">
+    <h6 class="fw-bold mb-3 pb-2" style="color:var(--maroon-dark);border-bottom:2px solid var(--maroon-pale);font-family:'Playfair Display',serif">
       What's Included
     </h6>
 
@@ -93,10 +93,10 @@ ksort($byDay);
     <?php else: ?>
       <?php foreach ($byDay as $dayNum => $spots): ?>
       <div class="mb-3">
-        <div class="fw-bold mb-2" style="font-family:'Playfair Display',serif;color:var(--green-dark)">Day <?= $dayNum ?></div>
+        <div class="fw-bold mb-2" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">Day <?= $dayNum ?></div>
         <?php foreach ($spots as $sp): ?>
         <div class="d-flex align-items-center gap-3 p-2 mb-1" style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm)">
-          <div style="width:36px;height:36px;background:var(--green-pale);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:var(--green-mid);flex-shrink:0"><i class="bi bi-geo-alt"></i></div>
+          <div style="width:36px;height:36px;background:var(--maroon-pale);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:var(--maroon-mid);flex-shrink:0"><i class="bi bi-geo-alt"></i></div>
           <div class="flex-grow-1 min-w-0">
             <div class="fw-bold" style="font-size:.86rem"><?= e($sp['name']) ?></div>
             <div class="small text-muted"><?= e($sp['city_name']) ?></div>
@@ -113,7 +113,7 @@ ksort($byDay);
   <div class="col-lg-5">
     <div style="position:sticky;top:80px">
       <div style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden">
-        <div class="p-3" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
+        <div class="p-3" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
           <div class="d-flex align-items-baseline justify-content-between">
             <h6 class="mb-0" style="font-family:'Playfair Display',serif">Book This Package</h6>
             <span class="fw-bold fs-4">₱<?= number_format($pkg['estimated_price'],0) ?></span>
@@ -153,14 +153,14 @@ ksort($byDay);
           </div>
 
           <button class="btn w-100" id="book-pkg-btn"
-                  style="background:var(--green-mid);color:#fff;border-radius:var(--radius-sm)"
+                  style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-sm)"
                   onclick="bookPackage(<?= $package_id ?>)" disabled>
             <i class="bi bi-box-seam-fill me-2"></i>Book This Package
           </button>
 
           <?php if (!is_logged_in()): ?>
           <p class="text-center small text-muted mt-2 mb-0">
-            <a href="login.php?redirect=<?= urlencode(APP_URL.'/pages/package.php?id='.$package_id) ?>" class="fw-bold text-green">Log in</a> to book
+            <a href="login.php?redirect=<?= urlencode(APP_URL.'/pages/package.php?id='.$package_id) ?>" class="fw-bold text-maroon">Log in</a> to book
           </p>
           <?php else: ?>
           <p class="text-center small text-muted mt-2 mb-0">
@@ -272,7 +272,7 @@ document.addEventListener('DOMContentLoaded', function() {
   pkgPoints.forEach((pt, i) => {
     pkgLatLngs.push([pt.lat, pt.lng]);
     const isHotel = pt.type === 'hotel';
-    const bg = isHotel ? '#8e2434' : 'var(--green-mid)';
+    const bg = isHotel ? '#8e2434' : 'var(--maroon-mid)';
     const label = isHotel ? '<i class="bi bi-building"></i>' : String(pt.day);
     const icon = L.divIcon({
       className: '',
@@ -288,7 +288,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   if (pkgLatLngs.length > 1) {
-    L.polyline(pkgLatLngs, { color: 'var(--green-mid)', weight: 3, opacity: 0.6, dashArray: '6,8' }).addTo(pkgMap);
+    L.polyline(pkgLatLngs, { color: 'var(--maroon-mid)', weight: 3, opacity: 0.6, dashArray: '6,8' }).addTo(pkgMap);
   }
   pkgMap.fitBounds(pkgLatLngs, { padding: [30, 30] });
   setTimeout(() => pkgMap.invalidateSize(), 200);

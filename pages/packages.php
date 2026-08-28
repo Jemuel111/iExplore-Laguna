@@ -22,7 +22,7 @@ $single_city = array_filter($packages, fn($p) => $p['scope'] === 'single_city');
 $multi_city  = array_filter($packages, fn($p) => $p['scope'] === 'multi_city');
 ?>
 
-<section class="py-4" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
+<section class="py-4" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container">
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-box-seam-fill fs-2" style="color:var(--sand-dark)"></i>
@@ -46,9 +46,9 @@ $multi_city  = array_filter($packages, fn($p) => $p['scope'] === 'multi_city');
 
   <!-- ── Single-City Packages ── -->
   <?php if (!empty($single_city)): ?>
-  <div class="d-flex align-items-center gap-2 mb-3 pb-2" style="border-bottom:2px solid var(--green-pale)">
-    <i class="bi bi-geo-alt-fill" style="color:var(--green-mid)"></i>
-    <h5 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--green-dark)">Single-City Packages</h5>
+  <div class="d-flex align-items-center gap-2 mb-3 pb-2" style="border-bottom:2px solid var(--maroon-pale)">
+    <i class="bi bi-geo-alt-fill" style="color:var(--maroon-mid)"></i>
+    <h5 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">Single-City Packages</h5>
   </div>
   <div class="row g-3 mb-5">
     <?php foreach ($single_city as $p): ?>
@@ -61,9 +61,9 @@ $multi_city  = array_filter($packages, fn($p) => $p['scope'] === 'multi_city');
 
   <!-- ── Multi-City Packages ── -->
   <?php if (!empty($multi_city)): ?>
-  <div class="d-flex align-items-center gap-2 mb-3 pb-2" style="border-bottom:2px solid var(--green-pale)">
-    <i class="bi bi-signpost-split-fill" style="color:var(--green-mid)"></i>
-    <h5 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--green-dark)">Multi-City Packages</h5>
+  <div class="d-flex align-items-center gap-2 mb-3 pb-2" style="border-bottom:2px solid var(--maroon-pale)">
+    <i class="bi bi-signpost-split-fill" style="color:var(--maroon-mid)"></i>
+    <h5 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">Multi-City Packages</h5>
   </div>
   <div class="row g-3">
     <?php foreach ($multi_city as $p): ?>

@@ -50,7 +50,7 @@ $shops = db_fetch_all(
 ?>
 
 <!-- Page hero -->
-<section class="py-3" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
+<section class="py-3" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
       <div class="d-flex align-items-center gap-3">
@@ -62,11 +62,11 @@ $shops = db_fetch_all(
       </div>
       <!-- Cart button — only needed where the sidebar isn't visible (below lg) -->
       <button class="btn d-flex align-items-center gap-2 d-lg-none" id="open-cart-btn"
-              style="background:var(--sand-dark);color:var(--green-dark);font-weight:700;border-radius:var(--radius-pill);padding:.5rem 1.2rem">
+              style="background:var(--sand-dark);color:var(--maroon-dark);font-weight:700;border-radius:var(--radius-pill);padding:.5rem 1.2rem">
         <i class="bi bi-basket3-fill"></i>
         My List
         <span id="cart-count-badge"
-              style="background:var(--green-dark);color:#fff;border-radius:50%;width:22px;height:22px;font-size:.75rem;display:inline-flex;align-items:center;justify-content:center;font-weight:700">
+              style="background:var(--maroon-dark);color:#fff;border-radius:50%;width:22px;height:22px;font-size:.75rem;display:inline-flex;align-items:center;justify-content:center;font-weight:700">
           0
         </span>
       </button>
@@ -126,7 +126,7 @@ $shops = db_fetch_all(
     <!-- Stats row -->
     <div class="d-flex align-items-center justify-content-between mb-3">
       <span class="text-muted small" id="results-label">
-        Showing <strong style="color:var(--green-dark)" id="results-count">0</strong> items
+        Showing <strong style="color:var(--maroon-dark)" id="results-count">0</strong> items
       </span>
       <div class="d-flex gap-2 align-items-center">
         <label class="form-check form-switch mb-0 d-flex align-items-center gap-2 small" style="cursor:pointer">
@@ -173,7 +173,7 @@ $shops = db_fetch_all(
               <a href="spot-detail.php?id=<?= $spot['id'] ?>" class="text-decoration-none" style="color:inherit"><?= e($spot['name']) ?></a>
             </h6>
             <div class="explore-card-meta">
-              <i class="bi bi-geo-alt text-green"></i>
+              <i class="bi bi-geo-alt text-maroon"></i>
               <span><?= e($spot['city_name']) ?></span>
               <span>·</span>
               <span style="color:var(--sand-dark)">★ <?= number_format($spot['rating'],1) ?></span>
@@ -221,7 +221,7 @@ $shops = db_fetch_all(
             </div>
             <h6 class="explore-card-title"><?= e($hotel['name']) ?></h6>
             <div class="explore-card-meta">
-              <i class="bi bi-geo-alt text-green"></i>
+              <i class="bi bi-geo-alt text-maroon"></i>
               <span><?= e($hotel['city_name']) ?></span>
             </div>
             <div class="explore-card-footer">
@@ -257,13 +257,13 @@ $shops = db_fetch_all(
           </div>
           <div class="explore-card-body">
             <div class="mb-1">
-              <span class="cat-badge" style="background:var(--green-pale);color:var(--green-dark)">
+              <span class="cat-badge" style="background:var(--maroon-pale);color:var(--maroon-dark)">
                 <i class="bi <?= shop_category_icon($shop['category']) ?> me-1"></i><?= shop_category_label($shop['category']) ?>
               </span>
             </div>
             <h6 class="explore-card-title"><?= e($shop['name']) ?></h6>
             <div class="explore-card-meta">
-              <i class="bi bi-geo-alt text-green"></i>
+              <i class="bi bi-geo-alt text-maroon"></i>
               <span><?= e($shop['city_name']) ?></span>
             </div>
             <?php if ($shop['open_time'] && $shop['close_time']): ?>
@@ -307,7 +307,7 @@ $shops = db_fetch_all(
 
 <!-- ── Cart Offcanvas (mobile) ────────────────────────────── -->
 <div class="offcanvas offcanvas-end" tabindex="-1" id="cart-offcanvas" style="width:100%;max-width:380px">
-  <div class="offcanvas-header" style="background:var(--green-dark);color:#fff">
+  <div class="offcanvas-header" style="background:var(--maroon-dark);color:#fff">
     <h5 class="offcanvas-title" style="font-family:'Playfair Display',serif">
       <i class="bi bi-basket3-fill me-2" style="color:var(--sand-dark)"></i>My List
     </h5>
@@ -322,7 +322,7 @@ $shops = db_fetch_all(
 <div class="modal fade" id="itinerary-modal" tabindex="-1">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content" style="border-radius:var(--radius);overflow:hidden">
-      <div class="modal-header" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff;border:none">
+      <div class="modal-header" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff;border:none">
         <h5 class="modal-title" style="font-family:'Playfair Display',serif">
           <i class="bi bi-calendar2-week me-2" style="color:var(--sand-dark)"></i>
           <span id="modal-title-text">Generated Itinerary</span>
@@ -334,11 +334,11 @@ $shops = db_fetch_all(
       </div>
       <div class="modal-footer" style="border-top:1px solid var(--border);background:var(--cream)">
         <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-        <button class="btn btn-sm" style="background:var(--green-mid);color:#fff"
+        <button class="btn btn-sm" style="background:var(--maroon-mid);color:#fff"
                 onclick="printItinerary()">
           <i class="bi bi-printer me-1"></i>Print
         </button>
-        <button class="btn btn-sm" style="background:var(--sand-dark);color:var(--green-dark);font-weight:700"
+        <button class="btn btn-sm" style="background:var(--sand-dark);color:var(--maroon-dark);font-weight:700"
                 id="save-itin-btn" onclick="saveItinerary()">
           <i class="bi bi-bookmark-check me-2"></i>Save This Itinerary
         </button>
@@ -362,10 +362,10 @@ $shops = db_fetch_all(
 .explore-card:hover {
   transform:translateY(-4px);
   box-shadow:var(--shadow-md);
-  border-color:var(--green-light);
+  border-color:var(--maroon-light);
 }
 .explore-card.in-cart {
-  border-color:var(--green-mid);
+  border-color:var(--maroon-mid);
   box-shadow:0 0 0 3px rgba(45,106,79,.15);
 }
 .explore-card-img {
@@ -385,7 +385,7 @@ $shops = db_fetch_all(
   border-radius:50%;
   border:none;
   background:rgba(255,255,255,.9);
-  color:var(--green-mid);
+  color:var(--maroon-mid);
   font-size:1rem;
   display:flex;
   align-items:center;
@@ -395,7 +395,7 @@ $shops = db_fetch_all(
   box-shadow:var(--shadow-sm);
 }
 .add-to-cart-btn:hover, .explore-card.in-cart .add-to-cart-btn {
-  background:var(--green-mid);
+  background:var(--maroon-mid);
   color:#fff;
 }
 .explore-card.in-cart .add-to-cart-btn i::before { content:"\F62B"; } /* bi-check-lg */
@@ -442,19 +442,19 @@ $shops = db_fetch_all(
   font-weight:600;
   padding:.28rem .75rem;
   border-radius:var(--radius-pill);
-  border:1.5px solid var(--green-mid);
-  color:var(--green-mid);
+  border:1.5px solid var(--maroon-mid);
+  color:var(--maroon-mid);
   background:transparent;
   cursor:pointer;
   transition:all .18s ease;
   white-space:nowrap;
 }
 .btn-add-list:hover {
-  background:var(--green-mid);
+  background:var(--maroon-mid);
   color:#fff;
 }
 .explore-card.in-cart .btn-add-list {
-  background:var(--green-mid);
+  background:var(--maroon-mid);
   color:#fff;
 }
 .explore-card.in-cart .btn-add-list i::before { content:"\F62B"; }
@@ -475,7 +475,7 @@ $shops = db_fetch_all(
 
 /* Cart panel (shared desktop + offcanvas) */
 .cart-header {
-  background:linear-gradient(135deg,var(--green-dark),var(--green-mid));
+  background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));
   color:#fff;
   padding:1rem 1.25rem .85rem;
 }
@@ -504,7 +504,7 @@ $shops = db_fetch_all(
   align-items:center;
   justify-content:center;
   font-size:1.1rem;
-  color: var(--green-dark);
+  color: var(--maroon-dark);
   flex-shrink:0;
 }
 .cart-item-info { flex:1; min-width:0; }
@@ -547,10 +547,10 @@ $shops = db_fetch_all(
 }
 .itinerary-day:last-child { border-bottom:none; }
 .itinerary-day-header {
-  background:var(--green-pale);
+  background:var(--maroon-pale);
   padding:.7rem 1.25rem;
   font-weight:700;
-  color:var(--green-dark);
+  color:var(--maroon-dark);
   font-family:'Playfair Display',serif;
   font-size:1rem;
 }
@@ -566,7 +566,7 @@ $shops = db_fetch_all(
   min-width:65px;
   font-size:.8rem;
   font-weight:700;
-  color:var(--green-mid);
+  color:var(--maroon-mid);
   padding-top:.1rem;
 }
 .itinerary-icon {
@@ -577,7 +577,7 @@ $shops = db_fetch_all(
   align-items:center;
   justify-content:center;
   font-size:1.15rem;
-  color: var(--green-dark);
+  color: var(--maroon-dark);
   flex-shrink:0;
 }
 .itinerary-info { flex:1; }
@@ -766,7 +766,7 @@ function renderCartPanel(panelId) {
         : (item.price > 0 ? '₱'+Number(item.price).toLocaleString() : 'Free');
       return `
         <div class="cart-item">
-          <div class="cart-item-icon" style="background:${item.type==='hotel'?'#e8f4f8':item.type==='shop'?'var(--sand)':'var(--green-pale)'}">
+          <div class="cart-item-icon" style="background:${item.type==='hotel'?'#e8f4f8':item.type==='shop'?'var(--sand)':'var(--maroon-pale)'}">
             <i class="bi ${iconClass}"></i>
           </div>
           <div class="cart-item-info">
@@ -858,7 +858,7 @@ function generateItinerary() {
     html += `
       <div class="itinerary-row">
         <div class="itinerary-time">7:00 AM</div>
-        <div class="itinerary-icon" style="background:var(--green-pale)"><i class="bi bi-sunrise"></i></div>
+        <div class="itinerary-icon" style="background:var(--maroon-pale)"><i class="bi bi-sunrise"></i></div>
         <div class="itinerary-info">
           <div class="itinerary-name">Depart for ${d.city}</div>
           <div class="itinerary-sub">Prepare your bags and head to the terminal early.</div>
@@ -872,7 +872,7 @@ function generateItinerary() {
       html += `
         <div class="itinerary-row">
           <div class="itinerary-time">${t}</div>
-          <div class="itinerary-icon" style="background:var(--green-pale)"><i class="bi bi-geo-alt"></i></div>
+          <div class="itinerary-icon" style="background:var(--maroon-pale)"><i class="bi bi-geo-alt"></i></div>
           <div class="itinerary-info">
             <div class="itinerary-name">${s.name}</div>
             <div class="itinerary-sub">${s.city}</div>
@@ -925,16 +925,16 @@ function generateItinerary() {
   // Summary footer
   const totalCost = cart.reduce((s,i) => s + (parseFloat(i.price)||0), 0);
   html += `
-    <div style="padding:1rem 1.25rem;background:var(--green-pale)">
+    <div style="padding:1rem 1.25rem;background:var(--maroon-pale)">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
-          <div style="font-size:.82rem;color:var(--green-dark);font-weight:600">
+          <div style="font-size:.82rem;color:var(--maroon-dark);font-weight:600">
             <i class="bi bi-info-circle me-1"></i>
             ${days.length} day${days.length>1?'s':''} · ${spots.length} spot${spots.length!==1?'s':''} · ${shops.length} shop${shops.length!==1?'s':''} · ${hotels.length} hotel${hotels.length!==1?'s':''}
           </div>
           <div style="font-size:.75rem;color:var(--text-muted)">Times are approximate. Allow buffer for travel.</div>
         </div>
-        <div style="font-weight:700;font-size:1.05rem;color:var(--green-dark)">
+        <div style="font-weight:700;font-size:1.05rem;color:var(--maroon-dark)">
           Est. Total: ₱${totalCost.toLocaleString()}
         </div>
       </div>

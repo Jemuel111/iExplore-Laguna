@@ -100,7 +100,7 @@ $base_qs = http_build_query(array_filter([
 ?>
 
 <!-- Page header -->
-<section class="py-3" style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));color:#fff">
+<section class="py-3" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container">
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-geo-alt-fill fs-2" style="color:var(--sand-dark)"></i>
@@ -167,8 +167,8 @@ $base_qs = http_build_query(array_filter([
   <!-- ── Filters sidebar ───────────────────────────────── -->
   <div class="col-lg-3">
     <div class="form-panel">
-      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--green-dark)">
-        <i class="bi bi-funnel me-2" style="color:var(--green-light)"></i>Filter Spots
+      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
+        <i class="bi bi-funnel me-2" style="color:var(--maroon-light)"></i>Filter Spots
       </h6>
 
       <form method="GET" action="">
@@ -233,7 +233,7 @@ $base_qs = http_build_query(array_filter([
 
     <!-- Results summary -->
     <div class="mt-3 p-3" style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:.83rem">
-      <div class="fw-bold mb-1" style="color:var(--green-dark)">
+      <div class="fw-bold mb-1" style="color:var(--maroon-dark)">
         <i class="bi bi-bar-chart-fill me-1"></i>Results
       </div>
       <div class="text-muted">
@@ -278,18 +278,18 @@ $base_qs = http_build_query(array_filter([
     <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
       <span class="text-muted small">Active:</span>
       <?php if ($filter_city): ?>
-        <span class="badge rounded-pill" style="background:var(--green-pale);color:var(--green-dark);padding:.35rem .85rem">
-          <i class="bi bi-geo-alt-fill me-1"></i><?= e($filter_city) ?> <a href="?<?= http_build_query(array_filter(['category'=>$filter_cat,'free'=>$filter_free,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>" class="text-decoration-none ms-1" style="color:var(--green-dark)">×</a>
+        <span class="badge rounded-pill" style="background:var(--maroon-pale);color:var(--maroon-dark);padding:.35rem .85rem">
+          <i class="bi bi-geo-alt-fill me-1"></i><?= e($filter_city) ?> <a href="?<?= http_build_query(array_filter(['category'=>$filter_cat,'free'=>$filter_free,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>" class="text-decoration-none ms-1" style="color:var(--maroon-dark)">×</a>
         </span>
       <?php endif; ?>
       <?php if ($filter_cat): ?>
-        <span class="badge rounded-pill" style="background:var(--green-pale);color:var(--green-dark);padding:.35rem .85rem">
-          <i class="bi <?= spot_category_icon($filter_cat) ?> me-1"></i><?= e(spot_category_label($filter_cat)) ?> <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'free'=>$filter_free,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>" class="text-decoration-none ms-1" style="color:var(--green-dark)">×</a>
+        <span class="badge rounded-pill" style="background:var(--maroon-pale);color:var(--maroon-dark);padding:.35rem .85rem">
+          <i class="bi <?= spot_category_icon($filter_cat) ?> me-1"></i><?= e(spot_category_label($filter_cat)) ?> <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'free'=>$filter_free,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>" class="text-decoration-none ms-1" style="color:var(--maroon-dark)">×</a>
         </span>
       <?php endif; ?>
       <?php if ($filter_free): ?>
-        <span class="badge rounded-pill" style="background:var(--green-pale);color:var(--green-dark);padding:.35rem .85rem">
-          <i class="bi bi-check-circle-fill me-1"></i>Free Entry <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'category'=>$filter_cat,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>" class="text-decoration-none ms-1" style="color:var(--green-dark)">×</a>
+        <span class="badge rounded-pill" style="background:var(--maroon-pale);color:var(--maroon-dark);padding:.35rem .85rem">
+          <i class="bi bi-check-circle-fill me-1"></i>Free Entry <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'category'=>$filter_cat,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>" class="text-decoration-none ms-1" style="color:var(--maroon-dark)">×</a>
         </span>
       <?php endif; ?>
     </div>
@@ -324,7 +324,7 @@ $base_qs = http_build_query(array_filter([
               <h5 class="card-title-app mb-1" style="font-size:1rem;color:var(--charcoal)"><?= e($spot['name']) ?></h5>
             </a>
             <div class="card-meta mb-2">
-              <i class="bi bi-geo-alt text-green"></i>
+              <i class="bi bi-geo-alt text-maroon"></i>
               <span><?= e($spot['city_name']) ?></span>
               <span>·</span>
               <span style="color:var(--sand-dark)">★</span>
@@ -375,7 +375,7 @@ $base_qs = http_build_query(array_filter([
                 </a>
               </h6>
               <div class="card-meta mt-1" style="font-size:.78rem">
-                <i class="bi bi-geo-alt text-green"></i>
+                <i class="bi bi-geo-alt text-maroon"></i>
                 <span><?= e($spot['city_name']) ?></span>
                 <span>·</span>
                 <span style="color:var(--sand-dark)">★ <?= number_format($spot['rating'],1) ?></span>
@@ -490,7 +490,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const icon = L.divIcon({
       className: '',
       html: `<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;
-               background:var(--green-mid,#a61c1c);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
+               background:var(--maroon-mid,#a61c1c);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
                transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
                <i class="bi ${iconClass}" style="transform:rotate(45deg);font-size:14px;color:#fff"></i></div>`,
       iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30],
@@ -504,7 +504,7 @@ document.addEventListener('DOMContentLoaded', function() {
           <span style="color:#e9c46a">★ ${parseFloat(s.rating).toFixed(1)}</span><br>
           <span style="font-size:.85rem;color:#666">${s.city_name} · ${fee}</span><br>
           <a href="<?= APP_URL ?>/pages/spot-detail.php?id=${s.id}"
-             style="display:inline-block;margin-top:.4rem;padding:.25rem .7rem;background:var(--green-mid,#a61c1c);color:#fff;
+             style="display:inline-block;margin-top:.4rem;padding:.25rem .7rem;background:var(--maroon-mid,#a61c1c);color:#fff;
                     border-radius:6px;font-size:.78rem;text-decoration:none">View Details</a>
         </div>
       `);

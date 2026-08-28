@@ -220,7 +220,7 @@ $reviews = attach_review_photos($reviews, 'hotel');
         <p class="text-muted">Check back soon!</p>
       </div>
     <?php else: ?>
-      <h6 class="fw-bold mb-3 pb-2" style="color:var(--green-dark);border-bottom:2px solid var(--green-pale);font-family:'Playfair Display',serif">
+      <h6 class="fw-bold mb-3 pb-2" style="color:var(--maroon-dark);border-bottom:2px solid var(--maroon-pale);font-family:'Playfair Display',serif">
         Room Types
       </h6>
       <div class="d-flex flex-column gap-2">
@@ -260,7 +260,7 @@ $reviews = attach_review_photos($reviews, 'hotel');
     <!-- Location mini-map -->
     <?php if ($hotel['latitude'] && $hotel['longitude']): ?>
     <div class="hotel-detail-section">
-      <h6 class="fw-bold mb-2 pb-2" style="color:var(--green-dark);border-bottom:2px solid var(--green-pale);font-family:'Playfair Display',serif">
+      <h6 class="fw-bold mb-2 pb-2" style="color:var(--maroon-dark);border-bottom:2px solid var(--maroon-pale);font-family:'Playfair Display',serif">
         <i class="bi bi-pin-map-fill me-2" style="color:#8e2434"></i>Location
       </h6>
       <div id="mini-map" style="height:220px;border-radius:10px;overflow:hidden"></div>
@@ -511,7 +511,7 @@ $reviews = attach_review_photos($reviews, 'hotel');
           </div>
           <div class="d-flex justify-content-between fw-bold mb-3">
             <span>Total</span>
-            <span style="color:var(--green-dark)" id="booking-total">₱0.00</span>
+            <span style="color:var(--maroon-dark)" id="booking-total">₱0.00</span>
           </div>
 
           <button class="btn w-100" id="book-btn" style="background:#8e2434;color:#fff;border-radius:var(--radius-sm)"
@@ -521,7 +521,7 @@ $reviews = attach_review_photos($reviews, 'hotel');
 
           <?php if (!is_logged_in()): ?>
           <p class="text-center small text-muted mt-2 mb-0">
-            <a href="login.php?redirect=<?= urlencode(APP_URL.'/pages/hotel.php?id='.$hotel_id) ?>" class="fw-bold text-green">
+            <a href="login.php?redirect=<?= urlencode(APP_URL.'/pages/hotel.php?id='.$hotel_id) ?>" class="fw-bold text-maroon">
               Log in</a> to reserve
           </p>
           <?php endif; ?>
