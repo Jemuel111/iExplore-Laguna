@@ -801,15 +801,26 @@ require_once __DIR__ . '/../includes/header.php';
       <div class="d-flex align-items-center gap-2 mt-5 mb-3 pb-2" style="border-bottom:2px solid var(--maroon-pale)">
         <i class="bi bi-patch-check-fill" style="color:var(--maroon-mid)"></i>
         <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
-          Verified Shops (<?= count($verified_shops) ?>)
+          Verified Shops
         </h6>
+        <span class="badge border text-body" style="background:#fff;border-color:var(--border)!important">
+          <span id="shops-visible-count"><?= count($verified_shops) ?></span> / <?= count($verified_shops) ?> shown
+        </span>
       </div>
       <?php if (empty($verified_shops)): ?>
         <p class="text-muted small">No verified shops yet.</p>
       <?php else: ?>
-        <div class="d-flex flex-column gap-2">
-          <?php foreach ($verified_shops as $s): ?>
-          <div class="d-flex align-items-center justify-content-between gap-3 p-3"
+        <div class="input-group mb-3">
+          <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+          <input type="text" id="shops-search" class="form-control"
+                 placeholder="Search by shop name, city, or owner…">
+        </div>
+        <div class="d-flex flex-column gap-2" id="shops-list-body">
+          <?php foreach ($verified_shops as $s):
+            $shopSearchBlob = strtolower($s['name'].' '.$s['city_name'].' '.$s['owner_name'].' '.$s['category']);
+          ?>
+          <div class="d-flex align-items-center justify-content-between gap-3 p-3 admin-list-row"
+               data-search="<?= e($shopSearchBlob) ?>"
                style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
             <div class="min-w-0">
               <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -831,6 +842,54 @@ require_once __DIR__ . '/../includes/header.php';
           </div>
           <?php endforeach; ?>
         </div>
+        <div class="text-center mt-3">
+          <button type="button" id="shops-show-more" class="btn btn-outline-secondary btn-sm">
+            Show more <i class="bi bi-chevron-down ms-1"></i>
+          </button>
+          <div id="shops-no-results" class="text-muted small py-3 d-none">
+            <i class="bi bi-search me-1"></i>No shops match "<span id="shops-no-results-query"></span>".
+          </div>
+        </div>
+        <script>
+        (function () {
+          const PAGE_SIZE = 15;
+          const rows = Array.from(document.querySelectorAll('#shops-list-body .admin-list-row'));
+          const searchInput = document.getElementById('shops-search');
+          const showMoreBtn = document.getElementById('shops-show-more');
+          const visibleCountEl = document.getElementById('shops-visible-count');
+          const noResultsEl = document.getElementById('shops-no-results');
+          const noResultsQueryEl = document.getElementById('shops-no-results-query');
+          let shownCount = PAGE_SIZE;
+
+          function renderPaged() {
+            rows.forEach((row, i) => { row.style.display = i < shownCount ? '' : 'none'; });
+            visibleCountEl.textContent = Math.min(shownCount, rows.length);
+            showMoreBtn.classList.toggle('d-none', shownCount >= rows.length);
+            noResultsEl.classList.add('d-none');
+          }
+          function renderSearch(query) {
+            let matches = 0;
+            rows.forEach(row => {
+              const isMatch = row.dataset.search.includes(query);
+              row.style.display = isMatch ? '' : 'none';
+              if (isMatch) matches++;
+            });
+            visibleCountEl.textContent = matches;
+            showMoreBtn.classList.add('d-none');
+            noResultsEl.classList.toggle('d-none', matches > 0);
+            noResultsQueryEl.textContent = query;
+          }
+          showMoreBtn.addEventListener('click', () => {
+            shownCount = Math.min(shownCount + PAGE_SIZE, rows.length);
+            renderPaged();
+          });
+          searchInput.addEventListener('input', () => {
+            const query = searchInput.value.trim().toLowerCase();
+            if (query) renderSearch(query); else { shownCount = PAGE_SIZE; renderPaged(); }
+          });
+          renderPaged();
+        })();
+        </script>
       <?php endif; ?>
     </div>
 
@@ -892,15 +951,26 @@ require_once __DIR__ . '/../includes/header.php';
       <div class="d-flex align-items-center gap-2 mt-5 mb-3 pb-2" style="border-bottom:2px solid var(--maroon-pale)">
         <i class="bi bi-patch-check-fill" style="color:var(--maroon-mid)"></i>
         <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
-          Verified Hotels (<?= count($verified_hotels) ?>)
+          Verified Hotels
         </h6>
+        <span class="badge border text-body" style="background:#fff;border-color:var(--border)!important">
+          <span id="hotels-visible-count"><?= count($verified_hotels) ?></span> / <?= count($verified_hotels) ?> shown
+        </span>
       </div>
       <?php if (empty($verified_hotels)): ?>
         <p class="text-muted small">No verified hotels yet.</p>
       <?php else: ?>
-        <div class="d-flex flex-column gap-2">
-          <?php foreach ($verified_hotels as $h): ?>
-          <div class="d-flex align-items-center justify-content-between gap-3 p-3"
+        <div class="input-group mb-3">
+          <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+          <input type="text" id="hotels-search" class="form-control"
+                 placeholder="Search by hotel name, city, or owner…">
+        </div>
+        <div class="d-flex flex-column gap-2" id="hotels-list-body">
+          <?php foreach ($verified_hotels as $h):
+            $hotelSearchBlob = strtolower($h['name'].' '.$h['city_name'].' '.($h['owner_name']??''));
+          ?>
+          <div class="d-flex align-items-center justify-content-between gap-3 p-3 admin-list-row"
+               data-search="<?= e($hotelSearchBlob) ?>"
                style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
             <div class="min-w-0">
               <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -926,6 +996,54 @@ require_once __DIR__ . '/../includes/header.php';
           </div>
           <?php endforeach; ?>
         </div>
+        <div class="text-center mt-3">
+          <button type="button" id="hotels-show-more" class="btn btn-outline-secondary btn-sm">
+            Show more <i class="bi bi-chevron-down ms-1"></i>
+          </button>
+          <div id="hotels-no-results" class="text-muted small py-3 d-none">
+            <i class="bi bi-search me-1"></i>No hotels match "<span id="hotels-no-results-query"></span>".
+          </div>
+        </div>
+        <script>
+        (function () {
+          const PAGE_SIZE = 15;
+          const rows = Array.from(document.querySelectorAll('#hotels-list-body .admin-list-row'));
+          const searchInput = document.getElementById('hotels-search');
+          const showMoreBtn = document.getElementById('hotels-show-more');
+          const visibleCountEl = document.getElementById('hotels-visible-count');
+          const noResultsEl = document.getElementById('hotels-no-results');
+          const noResultsQueryEl = document.getElementById('hotels-no-results-query');
+          let shownCount = PAGE_SIZE;
+
+          function renderPaged() {
+            rows.forEach((row, i) => { row.style.display = i < shownCount ? '' : 'none'; });
+            visibleCountEl.textContent = Math.min(shownCount, rows.length);
+            showMoreBtn.classList.toggle('d-none', shownCount >= rows.length);
+            noResultsEl.classList.add('d-none');
+          }
+          function renderSearch(query) {
+            let matches = 0;
+            rows.forEach(row => {
+              const isMatch = row.dataset.search.includes(query);
+              row.style.display = isMatch ? '' : 'none';
+              if (isMatch) matches++;
+            });
+            visibleCountEl.textContent = matches;
+            showMoreBtn.classList.add('d-none');
+            noResultsEl.classList.toggle('d-none', matches > 0);
+            noResultsQueryEl.textContent = query;
+          }
+          showMoreBtn.addEventListener('click', () => {
+            shownCount = Math.min(shownCount + PAGE_SIZE, rows.length);
+            renderPaged();
+          });
+          searchInput.addEventListener('input', () => {
+            const query = searchInput.value.trim().toLowerCase();
+            if (query) renderSearch(query); else { shownCount = PAGE_SIZE; renderPaged(); }
+          });
+          renderPaged();
+        })();
+        </script>
       <?php endif; ?>
     </div>
 

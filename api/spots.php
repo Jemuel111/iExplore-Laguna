@@ -18,6 +18,38 @@ $spot_id = (int) input('id', 'get', 0);
 
 switch ($action) {
 
+    // ── Spots in a set of cities (for the Trip Builder page) ─
+    case 'by_city':
+        $city_ids_raw = input('cities', 'get', '');
+        $city_ids = array_filter(array_map('intval', explode(',', $city_ids_raw)));
+        if (!$city_ids) {
+            json_error('At least one city ID required.', 400);
+        }
+        $placeholders = implode(',', array_fill(0, count($city_ids), '?'));
+
+        $spots = db_fetch_all(
+            "SELECT s.id, s.name, s.slug, s.category, s.latitude, s.longitude,
+                    s.entrance_fee, s.operating_hours, s.rating,
+                    s.is_closed, s.closure_reason, s.closed_until,
+                    c.name AS city_name, c.id AS city_id,
+                    (SELECT url FROM spot_photos WHERE spot_id = s.id AND photo_type = 'main' LIMIT 1) AS main_photo_url
+             FROM tourist_spots s
+             JOIN cities c ON s.city_id = c.id
+             WHERE s.is_active = 1 AND s.city_id IN ($placeholders)
+             ORDER BY c.name ASC, s.rating DESC, s.name ASC",
+            $city_ids
+        );
+
+        foreach ($spots as &$s) {
+            $s['latitude']     = (float) $s['latitude'];
+            $s['longitude']    = (float) $s['longitude'];
+            $s['entrance_fee'] = (float) $s['entrance_fee'];
+            $s['rating']       = (float) $s['rating'];
+        }
+
+        json_ok($spots);
+        break;
+
     // ── Full spot detail ──────────────────────────────────
     case 'detail':
         if (!$spot_id) json_error('Spot ID required.', 400);

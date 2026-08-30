@@ -10,7 +10,7 @@ require_once __DIR__ . '/../includes/header.php';
 
 // Fetch all cities for filter
 ensure_all_laguna_cities();
-$cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
+$cities = db_fetch_all("SELECT id, name, slug, latitude, longitude FROM cities ORDER BY name");
 
 // Fetch all active spots
 $spots = db_fetch_all(
@@ -74,6 +74,87 @@ $shops = db_fetch_all(
   </div>
 </section>
 
+<!-- ══════════════ Route-based city discovery (new) ══════════════
+     For visitors who don't know Laguna at all: pick a start and end
+     point, see every town actually along that route, choose which
+     to include, then the grid below narrows to just those cities. ── -->
+<section class="py-3" id="route-picker-section" style="background:var(--sand)">
+  <div class="container">
+
+    <!-- Step 1: pick origin/destination -->
+    <div id="rp-step-1" class="form-panel mx-auto" style="max-width:640px">
+      <h6 class="fw-bold mb-2" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
+        <i class="bi bi-signpost-split me-2" style="color:var(--maroon-light)"></i>New to Laguna? Plan by route.
+      </h6>
+      <p class="small text-muted mb-3">Pick a starting city and a destination — we'll show every town you'll actually pass through, so you know what to expect before picking spots.</p>
+      <div class="row g-2 align-items-end">
+        <div class="col-sm-5">
+          <label class="form-label small mb-1">Starting City</label>
+          <select class="form-select form-select-sm" id="rp-origin-select">
+            <option value="">— Select —</option>
+            <?php foreach ($cities as $c): ?>
+              <option value="<?= $c['id'] ?>" data-lat="<?= $c['latitude'] ?>" data-lng="<?= $c['longitude'] ?>" data-name="<?= e($c['name']) ?>"><?= e($c['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col-sm-2 text-center">
+          <button class="btn btn-sm btn-outline-secondary rounded-pill" id="rp-swap-btn" title="Swap">
+            <i class="bi bi-arrow-down-up"></i>
+          </button>
+        </div>
+        <div class="col-sm-5">
+          <label class="form-label small mb-1">Destination City</label>
+          <select class="form-select form-select-sm" id="rp-dest-select">
+            <option value="">— Select —</option>
+            <?php foreach ($cities as $c): ?>
+              <option value="<?= $c['id'] ?>" data-lat="<?= $c['latitude'] ?>" data-lng="<?= $c['longitude'] ?>" data-name="<?= e($c['name']) ?>"><?= e($c['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+      </div>
+      <div class="d-flex gap-2 mt-3">
+        <button class="btn btn-primary-app flex-grow-1" id="rp-find-btn">
+          <i class="bi bi-search me-2"></i>Show Towns Along This Route
+        </button>
+        <button class="btn btn-outline-secondary" id="rp-skip-btn">
+          Skip, show me everything
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 2: map + city checklist -->
+    <div id="rp-step-2" class="d-none">
+      <div class="row g-3">
+        <div class="col-lg-5">
+          <div class="form-panel mb-3">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
+                <i class="bi bi-map me-2" style="color:var(--maroon-light)"></i>Towns you'll pass through
+              </h6>
+              <button class="btn btn-sm btn-outline-secondary" id="rp-edit-route-btn">
+                <i class="bi bi-pencil me-1"></i>Edit
+              </button>
+            </div>
+            <p class="small text-muted mb-3">Your start and destination are always included — check any others you'd like to explore too.</p>
+            <div id="rp-city-list"></div>
+          </div>
+          <button class="btn btn-primary-app w-100" id="rp-continue-btn">
+            Explore Spots in These Cities <i class="bi bi-arrow-right ms-2"></i>
+          </button>
+        </div>
+        <div class="col-lg-7">
+          <div class="form-panel p-0 overflow-hidden" style="height:420px">
+            <div id="rp-map" style="height:100%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<div id="explore-main-content" class="d-none">
+
 <!-- Tab + filter toolbar -->
 <div class="spots-toolbar sticky-top" style="top:56px;z-index:100">
   <div class="container">
@@ -98,7 +179,7 @@ $shops = db_fetch_all(
       </div>
 
       <div class="ms-auto d-flex gap-2 align-items-center flex-wrap">
-        <!-- City filter -->
+        <!-- City filter — repopulated to just the chosen route cities once a route is picked -->
         <select id="city-filter" class="form-select form-select-sm" style="width:auto;font-size:.8rem">
           <option value="">All Cities</option>
           <?php foreach ($cities as $c): ?>
@@ -305,6 +386,8 @@ $shops = db_fetch_all(
 </div>
 </div>
 
+</div><!-- /#explore-main-content -->
+
 <!-- ── Cart Offcanvas (mobile) ────────────────────────────── -->
 <div class="offcanvas offcanvas-end" tabindex="-1" id="cart-offcanvas" style="width:100%;max-width:380px">
   <div class="offcanvas-header" style="background:var(--maroon-dark);color:#fff">
@@ -349,6 +432,17 @@ $shops = db_fetch_all(
 
 <!-- ── Styles ─────────────────────────────────────────────── -->
 <style>
+/* Route picker (city checklist rows) */
+.tb-city-row {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .6rem .7rem; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  margin-bottom: .5rem; cursor: pointer; transition: all .15s;
+}
+.tb-city-row:hover { background: var(--sand); }
+.tb-city-row.locked { background: var(--sand); opacity: .85; cursor: default; }
+.tb-city-row .tb-city-name { font-weight: 600; }
+.tb-city-row .tb-city-tag { font-size: .7rem; color: var(--text-muted); margin-left: auto; }
+
 /* Cards */
 .explore-card {
   background:#fff;
@@ -603,6 +697,240 @@ $shops = db_fetch_all(
 let cart = JSON.parse(localStorage.getItem('iexplore_cart') || '[]');
 let lastGeneratedItinerary = null;
 
+// ── Route picker state ───────────────────────────────────────
+// When set (via the route picker below), the grid narrows to only these
+// city IDs and Save Itinerary uses the real chosen endpoints instead of
+// guessing a "primary city" from whichever cities ended up in the cart.
+let includedCityIds = null; // null = no route chosen yet, show everything
+let rpOrigin = null, rpDest = null;
+let rpRouteLine = null, rpMap = null, rpMapMarkers = [];
+let rpCityOrder = []; // city IDs in actual travel order, for grouping the spot grid
+
+const ALL_CITIES_RP = <?= json_encode(array_map(function($c){
+  return ['id'=>(int)$c['id'],'name'=>$c['name'],'latitude'=>(float)$c['latitude'],'longitude'=>(float)$c['longitude']];
+}, $cities)) ?>;
+const CITY_CORRIDOR_KM_RP = 10;
+
+function haversineKmRP(lat1, lon1, lat2, lon2) {
+  const R = 6371, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+function pointToSegmentKmRP(lat, lng, aLat, aLng, bLat, bLng) {
+  const latRef = (aLat + bLat) / 2;
+  const kmPerDegLat = 110.574, kmPerDegLng = 111.320 * Math.cos(latRef * Math.PI / 180);
+  const toXY = (la, lo) => [(lo - aLng) * kmPerDegLng, (la - aLat) * kmPerDegLat];
+  const [px, py] = toXY(lat, lng), [bx, by] = toXY(bLat, bLng);
+  const segLenSq = bx*bx + by*by;
+  let t = segLenSq > 0 ? (px*bx + py*by) / segLenSq : 0;
+  t = Math.max(0, Math.min(1, t));
+  const dx = px - bx*t, dy = py - by*t;
+  return Math.sqrt(dx*dx + dy*dy);
+}
+function distanceToRouteKmRP(lat, lng, routeLine) {
+  if (!routeLine || routeLine.length < 2) return Infinity;
+  let min = Infinity;
+  for (let i = 0; i < routeLine.length - 1; i++) {
+    const d = pointToSegmentKmRP(lat, lng, routeLine[i][0], routeLine[i][1], routeLine[i+1][0], routeLine[i+1][1]);
+    if (d < min) min = d;
+  }
+  return min;
+}
+
+document.getElementById('rp-swap-btn').addEventListener('click', () => {
+  const o = document.getElementById('rp-origin-select');
+  const d = document.getElementById('rp-dest-select');
+  [o.value, d.value] = [d.value, o.value];
+});
+
+document.getElementById('rp-skip-btn').addEventListener('click', () => {
+  includedCityIds = null;
+  document.getElementById('route-picker-section').classList.add('d-none');
+  document.getElementById('explore-main-content').classList.remove('d-none');
+  filterItems();
+});
+
+document.getElementById('rp-edit-route-btn').addEventListener('click', () => {
+  document.getElementById('rp-step-1').classList.remove('d-none');
+  document.getElementById('rp-step-2').classList.add('d-none');
+});
+
+document.getElementById('rp-find-btn').addEventListener('click', async () => {
+  const oOpt = document.getElementById('rp-origin-select').selectedOptions[0];
+  const dOpt = document.getElementById('rp-dest-select').selectedOptions[0];
+  if (!oOpt.value || !dOpt.value) {
+    IExploreApp.toast('Please select both a starting city and a destination.', 'warning');
+    return;
+  }
+  if (oOpt.value === dOpt.value) {
+    IExploreApp.toast('Starting city and destination must be different.', 'warning');
+    return;
+  }
+
+  rpOrigin = { id: parseInt(oOpt.value), name: oOpt.dataset.name, latitude: parseFloat(oOpt.dataset.lat), longitude: parseFloat(oOpt.dataset.lng) };
+  rpDest   = { id: parseInt(dOpt.value), name: dOpt.dataset.name, latitude: parseFloat(dOpt.dataset.lat), longitude: parseFloat(dOpt.dataset.lng) };
+
+  const btn = document.getElementById('rp-find-btn');
+  IExploreApp.setLoading(btn, true);
+
+  try {
+    const res = await fetch(
+      `<?= APP_URL ?>/api/routes.php?action=directions&origin_lat=${rpOrigin.latitude}&origin_lng=${rpOrigin.longitude}&dest_lat=${rpDest.latitude}&dest_lng=${rpDest.longitude}`
+    ).then(r => r.json());
+    rpRouteLine = (res.success && res.data.coordinates && res.data.coordinates.length)
+      ? res.data.coordinates
+      : [[rpOrigin.latitude, rpOrigin.longitude], [rpDest.latitude, rpDest.longitude]];
+  } catch (err) {
+    rpRouteLine = [[rpOrigin.latitude, rpOrigin.longitude], [rpDest.latitude, rpDest.longitude]];
+  }
+
+  const alongRouteUnsorted = ALL_CITIES_RP.filter(c => {
+    if (c.id === rpOrigin.id || c.id === rpDest.id) return true;
+    return distanceToRouteKmRP(c.latitude, c.longitude, rpRouteLine) <= CITY_CORRIDOR_KM_RP;
+  });
+
+  // Order cities the way a traveler actually encounters them — projected
+  // position along the origin→destination line — rather than the
+  // alphabetical order they came from the database in. This is what makes
+  // the grouped spot sections below read as "start → ... → destination"
+  // instead of a random shuffle.
+  const routeDx = rpDest.longitude - rpOrigin.longitude;
+  const routeDy = rpDest.latitude  - rpOrigin.latitude;
+  const routeLenSq = routeDx*routeDx + routeDy*routeDy;
+  function projectAlongRoute(c) {
+    if (routeLenSq === 0) return 0;
+    const dx = c.longitude - rpOrigin.longitude, dy = c.latitude - rpOrigin.latitude;
+    return (dx*routeDx + dy*routeDy) / routeLenSq;
+  }
+  const alongRoute = [...alongRouteUnsorted].sort((a, b) => projectAlongRoute(a) - projectAlongRoute(b));
+
+  includedCityIds = new Set(alongRoute.map(c => c.id)); // pre-select all found
+  rpCityOrder = alongRoute.map(c => c.id); // travel order, used to group the spot grid later
+
+  renderRpCityList(alongRoute);
+  document.getElementById('rp-step-1').classList.add('d-none');
+  document.getElementById('rp-step-2').classList.remove('d-none');
+
+  // Leaflet must initialize (or at least recompute its size) only once
+  // its container is actually visible — doing it beforehand produces a
+  // blank/broken map confined to the wrong dimensions. rAF ensures the
+  // d-none removal above has actually been painted first.
+  requestAnimationFrame(() => renderRpMap(alongRoute));
+
+  IExploreApp.setLoading(btn, false);
+});
+
+function renderRpCityList(alongRoute) {
+  const container = document.getElementById('rp-city-list');
+  container.innerHTML = alongRoute.map(c => {
+    const isEndpoint = c.id === rpOrigin.id || c.id === rpDest.id;
+    const tag = c.id === rpOrigin.id ? 'Starting city' : c.id === rpDest.id ? 'Destination' : 'Along the way';
+    return `
+      <div class="tb-city-row ${isEndpoint ? 'locked' : ''}" data-city-id="${c.id}">
+        <input type="checkbox" class="form-check-input" ${includedCityIds.has(c.id) ? 'checked' : ''} ${isEndpoint ? 'disabled' : ''}>
+        <span class="tb-city-name">${c.name}</span>
+        <span class="tb-city-tag">${tag}</span>
+      </div>`;
+  }).join('');
+
+  container.querySelectorAll('.tb-city-row:not(.locked)').forEach(row => {
+    row.addEventListener('click', () => {
+      const cb = row.querySelector('input');
+      cb.checked = !cb.checked;
+      const cityId = parseInt(row.dataset.cityId);
+      if (cb.checked) includedCityIds.add(cityId); else includedCityIds.delete(cityId);
+      updateRpMarkerStyle(cityId, cb.checked);
+    });
+  });
+}
+
+function renderRpMap(alongRoute) {
+  if (rpMap) { rpMap.remove(); rpMap = null; }
+  rpMap = L.map('rp-map', { zoomControl: true }).setView([rpOrigin.latitude, rpOrigin.longitude], 10);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 18 }).addTo(rpMap);
+  L.polyline(rpRouteLine, { color: '#6b0f14', weight: 4, opacity: 0.8 }).addTo(rpMap);
+
+  rpMapMarkers = [];
+  const bounds = [];
+  alongRoute.forEach(c => {
+    const isEndpoint = c.id === rpOrigin.id || c.id === rpDest.id;
+    const marker = L.circleMarker([c.latitude, c.longitude], {
+      radius: isEndpoint ? 10 : 8,
+      fillColor: isEndpoint ? '#6b0f14' : (includedCityIds.has(c.id) ? '#e2574c' : '#c9c2b4'),
+      color: '#fff', weight: 2, fillOpacity: 1,
+    }).addTo(rpMap).bindPopup(`<strong>${c.name}</strong>`);
+    marker._cityId = c.id;
+    rpMapMarkers.push(marker);
+    bounds.push([c.latitude, c.longitude]);
+  });
+  if (bounds.length) rpMap.fitBounds(bounds, { padding: [30, 30] });
+  // Belt-and-suspenders: some browsers still miscalculate tile bounds on
+  // the very first paint even after the rAF above.
+  setTimeout(() => rpMap.invalidateSize(), 150);
+}
+
+function updateRpMarkerStyle(cityId, included) {
+  const marker = rpMapMarkers.find(m => m._cityId === cityId);
+  if (marker) marker.setStyle({ fillColor: included ? '#e2574c' : '#c9c2b4' });
+}
+
+document.getElementById('rp-continue-btn').addEventListener('click', () => {
+  if (!includedCityIds.size) {
+    IExploreApp.toast('Select at least one city to continue.', 'warning');
+    return;
+  }
+
+  // Narrow the existing city-filter dropdown to just the chosen cities,
+  // instead of showing all ~15 Laguna towns when only a few are relevant.
+  const cityFilterEl = document.getElementById('city-filter');
+  const includedCities = ALL_CITIES_RP.filter(c => includedCityIds.has(c.id));
+  cityFilterEl.innerHTML = '<option value="">All Selected Cities</option>' +
+    includedCities.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  activeCity = '';
+
+  groupGridByCity();
+
+  document.getElementById('route-picker-section').classList.add('d-none');
+  document.getElementById('explore-main-content').classList.remove('d-none');
+  filterItems();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+// Re-arranges the existing spot/hotel/shop cards (already rendered
+// server-side, sorted by rating) into sections headed by city name, in
+// actual travel order — so a first-time visitor can see at a glance
+// which spots are in which town, instead of one flat mixed grid with
+// only a dropdown to tell them apart.
+function groupGridByCity() {
+  const grid = document.getElementById('explore-grid');
+
+  // Remove any headers from a previous grouping (e.g. picking a
+  // different route without a full page reload).
+  grid.querySelectorAll('.explore-city-header').forEach(h => h.remove());
+
+  const cityNameById = {};
+  ALL_CITIES_RP.forEach(c => { cityNameById[c.id] = c.name; });
+
+  rpCityOrder.forEach(cityId => {
+    const items = Array.from(grid.querySelectorAll(`.explore-item[data-city="${cityId}"]`));
+    if (!items.length) return; // no spots/hotels/shops on file for this city
+
+    const header = document.createElement('div');
+    header.className = 'col-12 explore-city-header';
+    header.dataset.city = cityId;
+    header.innerHTML = `
+      <div class="d-flex align-items-center gap-2 mt-2 mb-1 pb-2" style="border-bottom:2px solid var(--maroon-pale)">
+        <i class="bi bi-geo-alt-fill" style="color:var(--maroon-light)"></i>
+        <h5 class="mb-0" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">${cityNameById[cityId] || ''}</h5>
+        <span class="small text-muted explore-city-header-count"></span>
+      </div>`;
+
+    grid.appendChild(header);
+    items.forEach(item => grid.appendChild(item)); // moves, not clones — filters/onclick stay intact
+  });
+}
+
+
 // City name → id, needed to save the itinerary (API stores origin/dest as city IDs)
 const CITY_NAME_TO_ID = <?= json_encode(array_column($cities, 'id', 'name')) ?>;
 
@@ -678,19 +1006,34 @@ function filterItems() {
     const name = el.dataset.name;
     const cn   = el.dataset.cityname;
 
-    const matchTab  = activeTab === 'all' || t === activeTab;
-    const matchCat  = !activeCat  || cat === activeCat;
-    const matchCity = !activeCity || city === activeCity;
-    const matchFree = !freeOnly   || fee === 0;
-    const matchQ    = !searchQ    || name.includes(searchQ) || cn.includes(searchQ);
+    const matchTab    = activeTab === 'all' || t === activeTab;
+    const matchCat    = !activeCat  || cat === activeCat;
+    const matchCity   = !activeCity || city === activeCity;
+    const matchRoute  = !includedCityIds || includedCityIds.has(parseInt(city));
+    const matchFree   = !freeOnly   || fee === 0;
+    const matchQ      = !searchQ    || name.includes(searchQ) || cn.includes(searchQ);
 
-    const show = matchTab && matchCat && matchCity && matchFree && matchQ;
+    const show = matchTab && matchCat && matchCity && matchRoute && matchFree && matchQ;
     el.style.display = show ? '' : 'none';
     if (show) visible++;
   });
 
   document.getElementById('results-count').textContent = visible;
   document.getElementById('empty-state').classList.toggle('d-none', visible > 0);
+
+  // Keep city section headers in sync — hide a city's header entirely if
+  // every item under it just got filtered out (e.g. switching to the
+  // "Hotels" tab when a city only has spots on file), and show a live
+  // count of what's actually visible in each section.
+  document.querySelectorAll('.explore-city-header').forEach(header => {
+    const cityId = header.dataset.city;
+    const cityItems = document.querySelectorAll(`.explore-item[data-city="${cityId}"]`);
+    let visibleInCity = 0;
+    cityItems.forEach(el => { if (el.style.display !== 'none') visibleInCity++; });
+    header.style.display = visibleInCity > 0 ? '' : 'none';
+    const countEl = header.querySelector('.explore-city-header-count');
+    if (countEl) countEl.textContent = visibleInCity + (visibleInCity === 1 ? ' item' : ' items');
+  });
 }
 
 // ── Cart: toggle add/remove ───────────────────────────────────
@@ -967,14 +1310,25 @@ function saveItinerary() {
 
   const { days, hotels, totalCost } = lastGeneratedItinerary;
 
-  // Pick the most-visited city as the "destination" (origin defaults to the same,
-  // since this cart-built trip isn't a point-A-to-point-B route like the Trip Planner)
-  const cityCounts = {};
-  days.forEach(d => { cityCounts[d.city] = (cityCounts[d.city] || 0) + 1; });
-  const primaryCity = Object.keys(cityCounts).sort((a,b) => cityCounts[b]-cityCounts[a])[0] || Object.keys(CITY_NAME_TO_ID)[0];
-  const cityId = CITY_NAME_TO_ID[primaryCity];
+  // If the person picked an actual route up front, use those real
+  // endpoints — far more accurate than guessing an origin/destination
+  // from whichever cities happened to end up in the cart.
+  let originId, destId, titleCity;
+  if (rpOrigin && rpDest) {
+    originId  = rpOrigin.id;
+    destId    = rpDest.id;
+    titleCity = rpDest.name;
+  } else {
+    // Fallback (no route picked, e.g. "Skip, show me everything"):
+    // use the most-visited city as a stand-in for both origin/destination.
+    const cityCounts = {};
+    days.forEach(d => { cityCounts[d.city] = (cityCounts[d.city] || 0) + 1; });
+    const primaryCity = Object.keys(cityCounts).sort((a,b) => cityCounts[b]-cityCounts[a])[0] || Object.keys(CITY_NAME_TO_ID)[0];
+    originId = destId = CITY_NAME_TO_ID[primaryCity];
+    titleCity = primaryCity;
+  }
 
-  if (!cityId) {
+  if (!originId || !destId) {
     IExploreApp.toast('Could not determine a city for this itinerary.', 'danger');
     return;
   }
@@ -986,15 +1340,15 @@ function saveItinerary() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN },
     body: JSON.stringify({
-      origin_id: cityId,
-      dest_id:   cityId,
+      origin_id: originId,
+      dest_id:   destId,
       days:      days.length,
       persons:   1,
       budget_level: 'midrange',
       transport_pref: 'any',
       total_budget: totalCost,
       itinerary_json: days,
-      title: `My ${primaryCity} Trip (${days.length}d)`,
+      title: `My ${titleCity} Trip (${days.length}d)`,
     })
   })
   .then(r => r.json())

@@ -554,22 +554,66 @@ let fareCache = new Map();
 
 async function getCityFare(originCityId, destCityId) {
   if (!originCityId || !destCityId || originCityId === destCityId) return null;
-  const key = `${originCityId}-${destCityId}`;
+  // Cache key includes the currently preferred transport type, so
+  // switching transport options in the sidebar doesn't return a stale
+  // fare cached under a different preference.
+  const preferredType = selectedTransport?.transport_type || '';
+  const key = `${originCityId}-${destCityId}-${preferredType}`;
   if (fareCache.has(key)) return fareCache.get(key);
 
-  let cheapest = null;
+  let chosen = null;
   try {
     const res = await fetch(
       API_BASE + `routes.php?action=route&origin=${originCityId}&dest=${destCityId}`
     ).then(r => r.json());
     const options = res.success ? res.data.transport_options : [];
-    cheapest = (options && options.length) ? options[0] : null; // backend sorts fare ASC
+    if (options && options.length) {
+      // Prefer whichever mode the traveler picked in Transport Options,
+      // when this specific leg actually offers it — otherwise fall back
+      // to the cheapest available (options are backend-sorted fare ASC).
+      chosen = (preferredType && options.find(o => o.transport_type === preferredType)) || options[0];
+    }
   } catch (err) {
     console.warn('Fare lookup failed for', key, err);
   }
-  fareCache.set(key, cheapest);
-  return cheapest;
+  fareCache.set(key, chosen);
+  return chosen;
 }
+
+// Cache of city → food shops, so multiple lunches landing in the same
+// city (e.g. across different days) don't refetch.
+let foodShopCache = new Map();
+
+// Finds the closest real food shop (restaurant/cafe/street food/bakery/
+// milk tea) to a specific point, so "Lunch Break" can name an actual
+// place instead of a generic "try local specialties" line disconnected
+// from where the traveler actually is.
+async function getNearbyFood(cityId, lat, lng) {
+  if (!cityId) return null;
+  if (!foodShopCache.has(cityId)) {
+    try {
+      const res = await fetch(API_BASE + `shops.php?action=nearby_food&city=${cityId}`).then(r => r.json());
+      foodShopCache.set(cityId, res.success ? res.data : []);
+    } catch (err) {
+      console.warn('Nearby food lookup failed for city', cityId, err);
+      foodShopCache.set(cityId, []);
+    }
+  }
+  const shops = foodShopCache.get(cityId);
+  if (!shops || !shops.length) return null;
+
+  let nearest = null, nearestKm = Infinity;
+  for (const shop of shops) {
+    const km = haversineKm(lat, lng, shop.latitude, shop.longitude);
+    if (km < nearestKm) { nearestKm = km; nearest = shop; }
+  }
+  return nearest ? { ...nearest, distance_km: nearestKm } : null;
+}
+
+const SHOP_CATEGORY_LABELS = {
+  restaurant: 'Restaurant', cafe: 'Café', street_food: 'Street food stall',
+  bakery: 'Bakery', milktea: 'Milk tea shop',
+};
 
 // ── Spot closure / availability helpers ─────────────────────
 function todayStr() {
@@ -884,13 +928,32 @@ function renderTransportOptions(options) {
       el.style.borderColor = 'var(--maroon-light)';
       el.style.background  = 'var(--maroon-pale)';
       selectedTransport = options[parseInt(el.dataset.index)];
+
+      // Previously this selection only got used later, silently, when
+      // saving the itinerary — clicking a card had no visible effect on
+      // Route Info, Budget, or the itinerary's per-leg fares, which just
+      // felt broken. Now all three re-render immediately with the chosen
+      // mode's actual fare/time. Itinerary must run first since it
+      // repopulates includedSpotIds, which Budget's totals depend on.
+      if (routeData) {
+        fareCache = new Map(); // stale fares were cached under the old preference
+        const days    = parseInt(document.getElementById('days-select').value);
+        const persons = parseInt(document.getElementById('persons-select').value);
+        const budget  = document.getElementById('budget-select').value;
+        renderItinerary(routeData, allSpots, days).then(() => {
+          renderRouteStats(routeData);
+          renderBudget(routeData, allSpots.filter(s => includedSpotIds.includes(s.id)), days, persons, budget);
+        });
+      }
     });
   });
 }
 
 // ── Render route stats ──────────────────────────────────────
+// Reflects whichever transport option is currently selected (defaults to
+// the cheapest, options[0], until the person clicks a different one).
 function renderRouteStats(data) {
-  const t = data.transport_options[0] || {};
+  const t = selectedTransport || data.transport_options[0] || {};
   const distVal  = t.distance_km  ? `${t.distance_km} km`        : '<span style="color:var(--text-muted);font-size:.85rem">Estimating…</span>';
   const timeVal  = t.duration_min ? formatDuration(t.duration_min): '<span style="color:var(--text-muted);font-size:.85rem">Varies</span>';
   const fareVal  = t.fare_php > 0 ? '₱ ' + parseFloat(t.fare_php).toFixed(2)
@@ -1009,9 +1072,15 @@ function renderSpotsGrid(spots, filterCat = 'all') {
 async function renderBudget(routeData, spots, days, persons, budgetLevel) {
   const origin_id = routeData.origin.id;
   const dest_id   = routeData.destination.id;
+  // Respect whichever transport option the person actually clicked in the
+  // Transport Options list, instead of silently recomputing a different
+  // "assumed" mode from the budget level alone.
+  const transportParam = selectedTransport?.transport_type
+    ? `&transport=${encodeURIComponent(selectedTransport.transport_type)}`
+    : '';
 
   const res = await fetch(
-    API_BASE + `budget.php?action=estimate&origin=${origin_id}&dest=${dest_id}&days=${days}&persons=${persons}&level=${budgetLevel}`
+    API_BASE + `budget.php?action=estimate&origin=${origin_id}&dest=${dest_id}&days=${days}&persons=${persons}&level=${budgetLevel}${transportParam}`
   ).then(r => r.json());
 
   if (!res.success) return;
@@ -1176,6 +1245,8 @@ async function renderItinerary(routeData, spots, days) {
     }
 
     let time = dayTouringStart(day); // minutes since midnight
+    let lunchInserted = false;
+    const LUNCH_START_MIN = 12 * 60; // don't schedule lunch before noon
     for (const spot of daySpots) {
       const crossingCity = spot.city_id !== lastPoint.cityId;
 
@@ -1231,10 +1302,39 @@ async function renderItinerary(routeData, spots, days) {
           true)
       });
       time += 120; // 2 hours per stop
+
+      // Insert lunch right after whichever stop the traveler has actually
+      // just finished once the clock crosses noon — anchored to that real
+      // spot, not a fixed, disconnected 12:00 PM slot that could land
+      // before, after, or on top of an unrelated stop. Named after an
+      // actual nearby food shop when one exists on file, instead of a
+      // generic "try local specialties" line.
+      if (!lunchInserted && time >= LUNCH_START_MIN) {
+        const nearbyFood = await getNearbyFood(spot.city_id, spot.latitude, spot.longitude);
+        const lunchDesc = nearbyFood
+          ? `${SHOP_CATEGORY_LABELS[nearbyFood.category] || 'Eatery'} <strong>${nearbyFood.name}</strong> is about ${nearbyFood.distance_km < 1 ? Math.round(nearbyFood.distance_km*1000)+'m' : nearbyFood.distance_km.toFixed(1)+' km'} from ${spot.name} — good spot for lunch.`
+          : `No listed eateries near ${spot.name} yet — ask locally, or try Laguna specialties like buko pie, kesong puti, or fresh bangus.`;
+
+        events.push({
+          t: time,
+          html: itineraryItem(minutesToLabel(time), 'bi-cup-hot', 'Lunch Break', lunchDesc)
+        });
+        time += LUNCH_MIN;
+        lunchInserted = true;
+      }
     }
 
-    events.push({ t: 12*60, html: itineraryItem('12:00 PM', 'bi-cup-hot', 'Lunch Break',
-      'Try local Laguna specialties: buko pie, kesong puti, or fresh bangus.') });
+    // Edge case: if the day ends before noon is ever reached (e.g. very
+    // few stops), still surface a lunch suggestion tied to wherever the
+    // day's last stop was, rather than skipping it entirely.
+    if (!lunchInserted && daySpots.length > 0) {
+      const nearbyFood = await getNearbyFood(lastPoint.cityId, lastPoint.latitude, lastPoint.longitude);
+      const lunchDesc = nearbyFood
+        ? `${SHOP_CATEGORY_LABELS[nearbyFood.category] || 'Eatery'} <strong>${nearbyFood.name}</strong> is about ${nearbyFood.distance_km < 1 ? Math.round(nearbyFood.distance_km*1000)+'m' : nearbyFood.distance_km.toFixed(1)+' km'} away — good spot for lunch.`
+        : `No listed eateries nearby yet — ask locally, or try Laguna specialties like buko pie, kesong puti, or fresh bangus.`;
+      events.push({ t: time, html: itineraryItem(minutesToLabel(time), 'bi-cup-hot', 'Lunch Break', lunchDesc) });
+      time += LUNCH_MIN;
+    }
 
     // Overnight stay — only when there's a next day to prep for. Picks
     // whichever verified hotel is closest to *tomorrow's* first stop, so
@@ -1454,7 +1554,7 @@ document.getElementById('save-itinerary-btn').addEventListener('click', async ()
     IExploreApp.setLoading(btn, true);
     const res = await fetch(API_BASE + 'itineraries.php?action=save', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN },
       body: JSON.stringify({
         origin_id:      routeData.origin.id,
         dest_id:        routeData.destination.id,

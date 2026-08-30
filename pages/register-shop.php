@@ -41,11 +41,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 1) {
     $phone    = trim(input('phone',    'post', ''));
     $password = input('password', 'post', '');
     $confirm  = input('confirm',  'post', '');
+    $privacy_consent = input('privacy_consent', 'post', '') === 'on';
 
     if (strlen($name) < 2)                           $errors[] = 'Name must be at least 2 characters.';
     if (!filter_var($email, FILTER_VALIDATE_EMAIL))  $errors[] = 'Invalid email address.';
     if (strlen($password) < 8)                       $errors[] = 'Password must be at least 8 characters.';
     if ($password !== $confirm)                      $errors[] = 'Passwords do not match.';
+    if (!$privacy_consent)                           $errors[] = 'Please agree to the Privacy Policy to continue.';
 
     if (empty($errors)) {
         $existing = db_fetch_one("SELECT id FROM users WHERE email = ?", [$email]);
@@ -205,6 +207,14 @@ $auth_photo = db_fetch_one(
             <i class="bi bi-lock-fill"></i>
             <input type="password" class="form-control" name="confirm" placeholder="Repeat password" required>
           </div>
+        </div>
+        <div class="mb-3 form-check">
+          <input type="checkbox" class="form-check-input" name="privacy_consent" id="privacy_consent" required>
+          <label class="form-check-label small" for="privacy_consent">
+            I have read and agree to the
+            <a href="<?= APP_URL ?>/pages/privacy-policy.php" target="_blank" style="color:var(--maroon-mid)">Privacy Policy</a>,
+            and consent to my personal and business information being collected and used as described.
+          </label>
         </div>
         <button type="submit" class="btn btn-primary-app w-100 py-2">
           <i class="bi bi-arrow-right-circle me-2"></i>Continue to Shop Setup

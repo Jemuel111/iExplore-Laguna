@@ -11,6 +11,39 @@ $action = input('action', 'get', '');
 
 switch ($action) {
 
+    case 'nearby_food':
+        // Used by the trip planner to suggest a real, specific place to
+        // eat near wherever the itinerary actually has the traveler at
+        // lunchtime, instead of a generic "try local specialties" line
+        // with no connection to where they are.
+        $city_id = (int) input('city', 'get');
+        if (!$city_id) {
+            json_error('City required.', 400);
+        }
+
+        $food_categories = ['restaurant', 'cafe', 'street_food', 'bakery', 'milktea'];
+        $placeholders = implode(',', array_fill(0, count($food_categories), '?'));
+
+        $shops = db_fetch_all(
+            "SELECT s.id, s.name, s.category,
+                    COALESCE(s.latitude, c.latitude)   AS latitude,
+                    COALESCE(s.longitude, c.longitude) AS longitude
+             FROM shops s
+             JOIN cities c ON s.city_id = c.id
+             WHERE s.city_id = ? AND s.is_active = 1 AND s.is_verified = 1
+               AND s.category IN ($placeholders)
+             LIMIT 30",
+            array_merge([$city_id], $food_categories)
+        );
+
+        foreach ($shops as &$s) {
+            $s['latitude']  = (float) $s['latitude'];
+            $s['longitude'] = (float) $s['longitude'];
+        }
+
+        json_ok($shops);
+        break;
+
     case 'review':
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             json_error('POST method required.', 405);

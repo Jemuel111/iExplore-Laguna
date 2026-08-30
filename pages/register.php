@@ -29,6 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nationality  = trim(input('nationality', 'post', ''));
     $province     = trim(input('province',    'post', ''));
     $city         = trim(input('city',        'post', ''));
+    $privacy_consent = input('privacy_consent', 'post', '') === 'on';
 
     if (strlen($name) < 2)                          $errors[] = 'Name must be at least 2 characters.';
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Invalid email address.';
@@ -54,6 +55,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($city === '')     $errors[] = 'Please enter your city/municipality.';
     } elseif ($tourist_type === 'international') {
         if ($nationality === '') $errors[] = 'Please enter your nationality.';
+    }
+    if (!$privacy_consent) {
+        $errors[] = 'Please agree to the Privacy Policy to create an account.';
     }
 
     if (empty($errors)) {
@@ -200,6 +204,16 @@ require_once __DIR__ . '/../includes/header.php';
           <label class="form-label">Nationality</label>
           <input type="text" class="form-control" name="nationality"
                  value="<?= e($nationality) ?>" placeholder="e.g. American, Korean, Japanese">
+        </div>
+
+        <div class="mb-3 form-check">
+          <input type="checkbox" class="form-check-input" name="privacy_consent" id="privacy_consent"
+                 <?= isset($privacy_consent) && $privacy_consent ? 'checked' : '' ?> required>
+          <label class="form-check-label small" for="privacy_consent">
+            I have read and agree to the
+            <a href="<?= APP_URL ?>/pages/privacy-policy.php" target="_blank" style="color:var(--maroon-mid)">Privacy Policy</a>,
+            and consent to my personal information being collected and used as described.
+          </label>
         </div>
 
         <button type="submit" class="btn btn-primary-app w-100 py-2">
