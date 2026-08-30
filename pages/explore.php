@@ -15,7 +15,8 @@ $cities = db_fetch_all("SELECT id, name, slug, latitude, longitude FROM cities O
 // Fetch all active spots
 $spots = db_fetch_all(
     "SELECT s.id, s.name, s.category, s.rating, s.entrance_fee, s.description,
-            s.operating_hours, c.name AS city_name, c.id AS city_id, 'spot' AS item_type,
+            s.operating_hours, s.latitude, s.longitude,
+            c.name AS city_name, c.id AS city_id, 'spot' AS item_type,
             (SELECT url FROM spot_photos WHERE spot_id = s.id AND photo_type = 'main' LIMIT 1) AS main_photo_url
      FROM tourist_spots s
      JOIN cities c ON s.city_id = c.id
@@ -26,7 +27,8 @@ $spots = db_fetch_all(
 // Fetch all active hotels
 $hotels = db_fetch_all(
     "SELECT h.id, h.name, h.star_rating, h.price_min, h.price_max,
-            h.address, h.phone, c.name AS city_name, c.id AS city_id, 'hotel' AS item_type
+            h.address, h.phone, h.latitude, h.longitude,
+            c.name AS city_name, c.id AS city_id, 'hotel' AS item_type
      FROM hotels h
      JOIN cities c ON h.city_id = c.id
      WHERE h.is_active = 1 AND h.is_verified = 1
@@ -36,6 +38,8 @@ $hotels = db_fetch_all(
 // Fetch all active shops
 $shops = db_fetch_all(
     "SELECT s.id, s.name, s.category, s.description, s.address, s.open_time, s.close_time,
+            COALESCE(s.latitude, c.latitude)   AS latitude,
+            COALESCE(s.longitude, c.longitude) AS longitude,
             c.name AS city_name, c.id AS city_id, 'shop' AS item_type
      FROM shops s
      JOIN cities c ON s.city_id = c.id
@@ -239,7 +243,7 @@ $shops = db_fetch_all(
             <span class="explore-emoji"><i class="bi <?= $catMeta['icon'] ?>"></i></span>
             <?php endif; ?>
             <!-- Add to cart btn -->
-            <button class="add-to-cart-btn" onclick="toggleCart('spot',<?= $spot['id'] ?>,'<?= e(addslashes($spot['name'])) ?>','<?= e($spot['city_name']) ?>',<?= (float)$spot['entrance_fee'] ?>,'spot')"
+            <button class="add-to-cart-btn" onclick="toggleCart('spot',<?= $spot['id'] ?>,'<?= e(addslashes($spot['name'])) ?>','<?= e($spot['city_name']) ?>',<?= (float)$spot['entrance_fee'] ?>,<?= $spot['city_id'] ?>,<?= (float)$spot['latitude'] ?>,<?= (float)$spot['longitude'] ?>)"
                     data-key="spot-<?= $spot['id'] ?>" title="Add to My List">
               <i class="bi bi-plus-lg"></i>
             </button>
@@ -269,7 +273,7 @@ $shops = db_fetch_all(
               <span class="explore-price <?= $spot['entrance_fee'] > 0 ? 'paid' : 'free' ?>">
                 <?= $spot['entrance_fee'] > 0 ? '₱'.number_format($spot['entrance_fee'],0) : 'Free' ?>
               </span>
-              <button class="btn-add-list" onclick="toggleCart('spot',<?= $spot['id'] ?>,'<?= e(addslashes($spot['name'])) ?>','<?= e($spot['city_name']) ?>',<?= (float)$spot['entrance_fee'] ?>,'spot')"
+              <button class="btn-add-list" onclick="toggleCart('spot',<?= $spot['id'] ?>,'<?= e(addslashes($spot['name'])) ?>','<?= e($spot['city_name']) ?>',<?= (float)$spot['entrance_fee'] ?>,<?= $spot['city_id'] ?>,<?= (float)$spot['latitude'] ?>,<?= (float)$spot['longitude'] ?>)"
                       data-key="spot-<?= $spot['id'] ?>">
                 <i class="bi bi-plus-lg me-1"></i><span class="btn-add-label">Add</span>
               </button>
@@ -291,7 +295,7 @@ $shops = db_fetch_all(
         <div class="explore-card h-100" data-id="hotel-<?= $hotel['id'] ?>">
           <div class="explore-card-img" style="background:#e8f4f8">
             <span class="explore-emoji"><i class="bi bi-building"></i></span>
-            <button class="add-to-cart-btn" onclick="toggleCart('hotel',<?= $hotel['id'] ?>,'<?= e(addslashes($hotel['name'])) ?>','<?= e($hotel['city_name']) ?>',<?= (float)$hotel['price_min'] ?>,'hotel')"
+            <button class="add-to-cart-btn" onclick="toggleCart('hotel',<?= $hotel['id'] ?>,'<?= e(addslashes($hotel['name'])) ?>','<?= e($hotel['city_name']) ?>',<?= (float)$hotel['price_min'] ?>,<?= $hotel['city_id'] ?>,<?= (float)$hotel['latitude'] ?>,<?= (float)$hotel['longitude'] ?>)"
                     data-key="hotel-<?= $hotel['id'] ?>" title="Add to My List">
               <i class="bi bi-plus-lg"></i>
             </button>
@@ -309,7 +313,7 @@ $shops = db_fetch_all(
               <span class="explore-price paid">
                 ₱<?= number_format($hotel['price_min'],0) ?><span style="font-size:.7rem;color:var(--text-muted)">/night</span>
               </span>
-              <button class="btn-add-list" onclick="toggleCart('hotel',<?= $hotel['id'] ?>,'<?= e(addslashes($hotel['name'])) ?>','<?= e($hotel['city_name']) ?>',<?= (float)$hotel['price_min'] ?>,'hotel')"
+              <button class="btn-add-list" onclick="toggleCart('hotel',<?= $hotel['id'] ?>,'<?= e(addslashes($hotel['name'])) ?>','<?= e($hotel['city_name']) ?>',<?= (float)$hotel['price_min'] ?>,<?= $hotel['city_id'] ?>,<?= (float)$hotel['latitude'] ?>,<?= (float)$hotel['longitude'] ?>)"
                       data-key="hotel-<?= $hotel['id'] ?>">
                 <i class="bi bi-plus-lg me-1"></i><span class="btn-add-label">Add</span>
               </button>
@@ -331,7 +335,7 @@ $shops = db_fetch_all(
         <div class="explore-card h-100" data-id="shop-<?= $shop['id'] ?>">
           <div class="explore-card-img" style="background:var(--sand)">
             <span class="explore-emoji"><i class="bi <?= shop_category_icon($shop['category']) ?>"></i></span>
-            <button class="add-to-cart-btn" onclick="toggleCart('shop',<?= $shop['id'] ?>,'<?= e(addslashes($shop['name'])) ?>','<?= e($shop['city_name']) ?>',0,'shop')"
+            <button class="add-to-cart-btn" onclick="toggleCart('shop',<?= $shop['id'] ?>,'<?= e(addslashes($shop['name'])) ?>','<?= e($shop['city_name']) ?>',0,<?= $shop['city_id'] ?>,<?= (float)$shop['latitude'] ?>,<?= (float)$shop['longitude'] ?>)"
                     data-key="shop-<?= $shop['id'] ?>" title="Add to My List">
               <i class="bi bi-plus-lg"></i>
             </button>
@@ -355,7 +359,7 @@ $shops = db_fetch_all(
             <?php endif; ?>
             <div class="explore-card-footer">
               <span class="explore-price free"><i class="bi bi-shop me-1"></i>Order there</span>
-              <button class="btn-add-list" onclick="toggleCart('shop',<?= $shop['id'] ?>,'<?= e(addslashes($shop['name'])) ?>','<?= e($shop['city_name']) ?>',0,'shop')"
+              <button class="btn-add-list" onclick="toggleCart('shop',<?= $shop['id'] ?>,'<?= e(addslashes($shop['name'])) ?>','<?= e($shop['city_name']) ?>',0,<?= $shop['city_id'] ?>,<?= (float)$shop['latitude'] ?>,<?= (float)$shop['longitude'] ?>)"
                       data-key="shop-<?= $shop['id'] ?>">
                 <i class="bi bi-plus-lg me-1"></i><span class="btn-add-label">Add</span>
               </button>
@@ -1037,13 +1041,13 @@ function filterItems() {
 }
 
 // ── Cart: toggle add/remove ───────────────────────────────────
-function toggleCart(type, id, name, city, price, icon) {
+function toggleCart(type, id, name, city, price, cityId, lat, lng) {
   const key = type + '-' + id;
   const idx = cart.findIndex(i => i.key === key);
   if (idx >= 0) {
     cart.splice(idx, 1);
   } else {
-    cart.push({ key, type, id, name, city, price });
+    cart.push({ key, type, id, name, city, price, cityId, lat, lng });
   }
   saveCart();
   restoreCartUI();
@@ -1116,7 +1120,7 @@ function renderCartPanel(panelId) {
             <div class="cart-item-name">${item.name}</div>
             <div class="cart-item-sub">${item.city} · ${priceStr}</div>
           </div>
-          <button class="cart-item-remove" onclick="toggleCart('${item.type}',${item.id},'${item.name.replace(/'/g,"\\'")}','${item.city}',${item.price},'${item.type}')" title="Remove">
+          <button class="cart-item-remove" onclick="toggleCart('${item.type}',${item.id},'${item.name.replace(/'/g,"\\'")}','${item.city}',${item.price},${item.cityId},${item.lat},${item.lng})" title="Remove">
             <i class="bi bi-x-lg"></i>
           </button>
         </div>`;
@@ -1130,12 +1134,81 @@ function renderCartPanel(panelId) {
   if (totalEl) totalEl.textContent = total > 0 ? '₱' + total.toLocaleString() : '—';
 }
 
+// ── Real fare / last-mile / lunch helpers ───────────────────────
+// Same approach as the Trip Planner's itinerary builder — reused here
+// (rather than shared via a module, to avoid a riskier cross-file
+// refactor) so a cart-built itinerary reads with the same quality
+// instead of vague, unpriced placeholder text.
+function estimateTravelMinutesGI(km) { return Math.round(km / 30 * 60) + 10; }
+function formatDurationGI(mins) {
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+const TRANSPORT_LABELS_GI = { jeepney:'Jeepney', bus:'Bus', tricycle:'Tricycle', private_car:'Private Car', fx_uv:'FX / UV Express' };
+const TRANSPORT_ICONS_GI  = { jeepney:'bi-truck-front', bus:'bi-bus-front', tricycle:'bi-bicycle', private_car:'bi-car-front', fx_uv:'bi-minecart' };
+function transportLabelGI(t) { return TRANSPORT_LABELS_GI[t] || t; }
+function transportIconGI(t)  { return TRANSPORT_ICONS_GI[t] || 'bi-bus-front'; }
+
+let fareCacheGI = new Map();
+async function getCityFareGI(originCityId, destCityId) {
+  if (!originCityId || !destCityId || originCityId === destCityId) return null;
+  const key = `${originCityId}-${destCityId}`;
+  if (fareCacheGI.has(key)) return fareCacheGI.get(key);
+  let cheapest = null;
+  try {
+    const res = await fetch(`<?= APP_URL ?>/api/routes.php?action=route&origin=${originCityId}&dest=${destCityId}`).then(r => r.json());
+    const options = res.success ? res.data.transport_options : [];
+    cheapest = (options && options.length) ? options[0] : null;
+  } catch (err) { console.warn('Fare lookup failed', key, err); }
+  fareCacheGI.set(key, cheapest);
+  return cheapest;
+}
+
+let foodCacheGI = new Map();
+const SHOP_CATEGORY_LABELS_GI = { restaurant:'Restaurant', cafe:'Café', street_food:'Street food stall', bakery:'Bakery', milktea:'Milk tea shop' };
+async function getNearbyFoodGI(cityId, lat, lng) {
+  if (!cityId) return null;
+  if (!foodCacheGI.has(cityId)) {
+    try {
+      const res = await fetch(`<?= APP_URL ?>/api/shops.php?action=nearby_food&city=${cityId}`).then(r => r.json());
+      foodCacheGI.set(cityId, res.success ? res.data : []);
+    } catch (err) { foodCacheGI.set(cityId, []); }
+  }
+  const shops = foodCacheGI.get(cityId);
+  if (!shops || !shops.length) return null;
+  let nearest = null, nearestKm = Infinity;
+  for (const shop of shops) {
+    const km = haversineKmRP(lat, lng, shop.latitude, shop.longitude);
+    if (km < nearestKm) { nearestKm = km; nearest = shop; }
+  }
+  return nearest ? { ...nearest, distance_km: nearestKm } : null;
+}
+
+function lastMileSuggestionGI(km) {
+  const mins = estimateTravelMinutesGI(km);
+  if (km <= 0.8) return `<i class="bi bi-person-walking me-1"></i>Walk (~${formatDurationGI(Math.max(mins, 5))})`;
+  if (km <= 3)   return `<i class="bi bi-bicycle me-1"></i>Ride a tricycle (~₱15–20, ~${formatDurationGI(mins)})`;
+  return `<i class="bi bi-bicycle me-1"></i>Tricycle or multicab (~₱20–30, ~${formatDurationGI(mins)}, fare varies)`;
+}
+
+function minutesToLabelGI(mins) {
+  let h = Math.floor(mins / 60) % 24, m = mins % 60;
+  const ap = h >= 12 ? 'PM' : 'AM';
+  h = h % 12; if (h === 0) h = 12;
+  return `${h}:${String(m).padStart(2,'0')} ${ap}`;
+}
+
+const CITY_LOOKUP_GI = {};
+ALL_CITIES_RP.forEach(c => { CITY_LOOKUP_GI[c.id] = c; });
+
 // ── Generate Itinerary ────────────────────────────────────────
-function generateItinerary() {
+async function generateItinerary(btn) {
   if (cart.length === 0) {
     alert('Add at least one spot or hotel to your list first!');
     return;
   }
+  if (btn) IExploreApp.setLoading(btn, true);
 
   // Separate spots, shops, and hotels
   const spots  = cart.filter(i => i.type === 'spot');
@@ -1143,35 +1216,41 @@ function generateItinerary() {
   const hotels = cart.filter(i => i.type === 'hotel');
 
   // Group spots + shops by city for logical day ordering
-  // (shops are placed after the spots in the same city, since you'd
-  // typically sightsee first, then grab food/drinks nearby)
   const cityGroups = {};
   spots.forEach(s => {
-    if (!cityGroups[s.city]) cityGroups[s.city] = { spots: [], shops: [] };
+    if (!cityGroups[s.city]) cityGroups[s.city] = { spots: [], shops: [], cityId: s.cityId };
     cityGroups[s.city].spots.push(s);
   });
   shops.forEach(s => {
-    if (!cityGroups[s.city]) cityGroups[s.city] = { spots: [], shops: [] };
+    if (!cityGroups[s.city]) cityGroups[s.city] = { spots: [], shops: [], cityId: s.cityId };
     cityGroups[s.city].shops.push(s);
   });
 
-  // Build days — max 3 spots per day, shops tag along on the same day as their city's spots
+  // Order cities the way a traveler would actually encounter them if a
+  // route was picked upfront; otherwise fall back to the order they were
+  // added to the list.
+  let cityList = Object.keys(cityGroups);
+  if (rpCityOrder.length) {
+    const nameById = {};
+    ALL_CITIES_RP.forEach(c => { nameById[c.id] = c.name; });
+    const orderedNames = rpCityOrder.map(id => nameById[id]).filter(n => cityList.includes(n));
+    const remaining = cityList.filter(n => !orderedNames.includes(n));
+    cityList = [...orderedNames, ...remaining];
+  }
+
+  // Build days — max 3 spots per day, shops tag along on the first chunk
   const days = [];
   let dayNum = 1;
-  const cityList = Object.keys(cityGroups);
-
   cityList.forEach(city => {
     const citySpots = cityGroups[city].spots;
     const cityShops = cityGroups[city].shops;
-    // chunk spots into groups of 3; shops for this city all ride along on the first chunk
+    const cityId    = cityGroups[city].cityId;
     if (citySpots.length === 0) {
-      // city has only shops, no spots — still give it its own day
-      days.push({ day: dayNum++, city, spots: [], shops: cityShops, hotel: null });
+      days.push({ day: dayNum++, city, cityId, spots: [], shops: cityShops, hotel: null });
     } else {
       for (let i = 0; i < citySpots.length; i += 3) {
         days.push({
-          day: dayNum++,
-          city,
+          day: dayNum++, city, cityId,
           spots: citySpots.slice(i, i + 3),
           shops: i === 0 ? cityShops : [],
           hotel: null,
@@ -1180,55 +1259,111 @@ function generateItinerary() {
     }
   });
 
-  // Assign hotels — last hotel on the last day of each city if available
   if (hotels.length) {
-    hotels.forEach((h, idx) => {
-      if (days[idx]) days[idx].hotel = h;
-    });
+    hotels.forEach((h, idx) => { if (days[idx]) days[idx].hotel = h; });
   }
 
-  // Build modal HTML
-  const startTimes = ['8:00 AM','9:30 AM','11:00 AM','1:00 PM','2:30 PM','4:00 PM'];
+  // Build modal HTML — now with a real running clock per day so travel
+  // time, fares, and lunch actually land at sensible, non-overlapping
+  // times instead of picking from a fixed array of guessed slots.
   let html = '';
+  let lastCityId = null, lastLat = null, lastLng = null;
 
-  days.forEach(d => {
+  for (const d of days) {
     html += `<div class="itinerary-day">
       <div class="itinerary-day-header">
         <i class="bi bi-calendar3 me-2"></i>Day ${d.day} — ${d.city}
       </div>`;
 
-    // Depart
-    html += `
-      <div class="itinerary-row">
-        <div class="itinerary-time">7:00 AM</div>
-        <div class="itinerary-icon" style="background:var(--maroon-pale)"><i class="bi bi-sunrise"></i></div>
-        <div class="itinerary-info">
-          <div class="itinerary-name">Depart for ${d.city}</div>
-          <div class="itinerary-sub">Prepare your bags and head to the terminal early.</div>
-        </div>
-        <div class="itinerary-cost">—</div>
-      </div>`;
+    let time = 8 * 60; // 8:00 AM
+    const cityInfo = CITY_LOOKUP_GI[d.cityId];
 
-    d.spots.forEach((s, idx) => {
-      const t = startTimes[idx + 1] || startTimes[startTimes.length - 1];
-      const cost = parseFloat(s.price) > 0 ? '₱'+Number(s.price).toLocaleString()+' entrance' : 'Free entry';
+    // Inter-city travel — only when this day's city differs from the
+    // last place we were (skips this on day 1, and on consecutive days
+    // spent chunking through the same city).
+    if (d.cityId && lastCityId && d.cityId !== lastCityId) {
+      const fare = await getCityFareGI(lastCityId, d.cityId);
+      const hopKm = fare && fare.distance_km ? parseFloat(fare.distance_km)
+        : (cityInfo ? haversineKmRP(lastLat, lastLng, cityInfo.latitude, cityInfo.longitude) : 0);
+      const travelMins = fare && fare.duration_min ? fare.duration_min : estimateTravelMinutesGI(hopKm);
+      const heading = fare ? `Board a ${transportLabelGI(fare.transport_type)} to ${d.city}` : `Travel to ${d.city}`;
+      const desc = fare
+        ? `${fare.fare_php > 0 ? '₱'+parseFloat(fare.fare_php).toFixed(2) : 'Own vehicle'} · ${fare.distance_km} km · ${formatDurationGI(fare.duration_min)}`
+        : `${hopKm.toFixed(1)} km · no fixed fare on file — try tricycle/habal-habal and negotiate`;
       html += `
         <div class="itinerary-row">
-          <div class="itinerary-time">${t}</div>
+          <div class="itinerary-time">${minutesToLabelGI(time)}</div>
+          <div class="itinerary-icon" style="background:var(--maroon-pale)"><i class="bi ${fare ? transportIconGI(fare.transport_type) : 'bi-bus-front'}"></i></div>
+          <div class="itinerary-info">
+            <div class="itinerary-name">${heading}</div>
+            <div class="itinerary-sub">${desc}</div>
+          </div>
+          <div class="itinerary-cost">${fare && fare.fare_php > 0 ? '₱'+parseFloat(fare.fare_php).toFixed(2) : '—'}</div>
+        </div>`;
+      time += travelMins;
+    } else if (d.day === 1) {
+      html += `
+        <div class="itinerary-row">
+          <div class="itinerary-time">${minutesToLabelGI(time)}</div>
+          <div class="itinerary-icon" style="background:var(--maroon-pale)"><i class="bi bi-sunrise"></i></div>
+          <div class="itinerary-info">
+            <div class="itinerary-name">Start your day in ${d.city}</div>
+            <div class="itinerary-sub">Pack your bags and get ready to explore.</div>
+          </div>
+          <div class="itinerary-cost">—</div>
+        </div>`;
+      time += 15;
+    }
+
+    let lunchInserted = false;
+    for (const s of d.spots) {
+      // Last-mile hop from wherever we just were to this specific spot.
+      const fromLat = lastLat ?? (cityInfo ? cityInfo.latitude : s.lat);
+      const fromLng = lastLng ?? (cityInfo ? cityInfo.longitude : s.lng);
+      const legKm = haversineKmRP(fromLat, fromLng, s.lat, s.lng);
+      const legLabel = lastMileSuggestionGI(legKm);
+      const cost = parseFloat(s.price) > 0 ? '₱'+Number(s.price).toLocaleString()+' entrance' : 'Free entry';
+
+      html += `
+        <div class="itinerary-row">
+          <div class="itinerary-time">${minutesToLabelGI(time)}</div>
           <div class="itinerary-icon" style="background:var(--maroon-pale)"><i class="bi bi-geo-alt"></i></div>
           <div class="itinerary-info">
             <div class="itinerary-name">${s.name}</div>
-            <div class="itinerary-sub">${s.city}</div>
+            <div class="itinerary-sub">${s.city} · ${legLabel} (${legKm.toFixed(1)} km)</div>
           </div>
           <div class="itinerary-cost">${cost}</div>
         </div>`;
-    });
+      time += 120;
+      lastLat = s.lat; lastLng = s.lng; lastCityId = s.cityId;
 
-    d.shops.forEach((sh, idx) => {
-      const t = startTimes[d.spots.length + idx + 1] || startTimes[startTimes.length - 1];
+      // Real lunch suggestion once the clock crosses noon, anchored to
+      // whichever spot the traveler just finished — same logic as the
+      // Trip Planner, instead of a generic unlocated food mention.
+      if (!lunchInserted && time >= 12 * 60) {
+        const nearbyFood = await getNearbyFoodGI(s.cityId, s.lat, s.lng);
+        const lunchDesc = nearbyFood
+          ? `${SHOP_CATEGORY_LABELS_GI[nearbyFood.category] || 'Eatery'} <strong>${nearbyFood.name}</strong> is about ${nearbyFood.distance_km < 1 ? Math.round(nearbyFood.distance_km*1000)+'m' : nearbyFood.distance_km.toFixed(1)+' km'} from ${s.name}.`
+          : `No listed eateries near ${s.name} yet — ask locally, or try Laguna specialties like buko pie, kesong puti, or fresh bangus.`;
+        html += `
+          <div class="itinerary-row">
+            <div class="itinerary-time">${minutesToLabelGI(time)}</div>
+            <div class="itinerary-icon" style="background:var(--sand)"><i class="bi bi-cup-hot"></i></div>
+            <div class="itinerary-info">
+              <div class="itinerary-name">Lunch Break</div>
+              <div class="itinerary-sub">${lunchDesc}</div>
+            </div>
+            <div class="itinerary-cost">—</div>
+          </div>`;
+        time += 60;
+        lunchInserted = true;
+      }
+    }
+
+    d.shops.forEach(sh => {
       html += `
         <div class="itinerary-row">
-          <div class="itinerary-time">${t}</div>
+          <div class="itinerary-time">${minutesToLabelGI(time)}</div>
           <div class="itinerary-icon" style="background:var(--sand)"><i class="bi bi-shop"></i></div>
           <div class="itinerary-info">
             <div class="itinerary-name">Stop by ${sh.name}</div>
@@ -1236,6 +1371,7 @@ function generateItinerary() {
           </div>
           <div class="itinerary-cost">—</div>
         </div>`;
+      time += 30;
     });
 
     if (d.hotel) {
@@ -1263,7 +1399,7 @@ function generateItinerary() {
     }
 
     html += `</div>`;
-  });
+  }
 
   // Summary footer
   const totalCost = cart.reduce((s,i) => s + (parseFloat(i.price)||0), 0);
@@ -1275,7 +1411,7 @@ function generateItinerary() {
             <i class="bi bi-info-circle me-1"></i>
             ${days.length} day${days.length>1?'s':''} · ${spots.length} spot${spots.length!==1?'s':''} · ${shops.length} shop${shops.length!==1?'s':''} · ${hotels.length} hotel${hotels.length!==1?'s':''}
           </div>
-          <div style="font-size:.75rem;color:var(--text-muted)">Times are approximate. Allow buffer for travel.</div>
+          <div style="font-size:.75rem;color:var(--text-muted)">Times reflect real travel estimates where fare data is available.</div>
         </div>
         <div style="font-weight:700;font-size:1.05rem;color:var(--maroon-dark)">
           Est. Total: ₱${totalCost.toLocaleString()}
@@ -1286,7 +1422,9 @@ function generateItinerary() {
   document.getElementById('modal-title-text').textContent =
     `Your ${days.length}-Day Laguna Itinerary`;
   document.getElementById('itinerary-modal-body').innerHTML = html;
+  if (btn) IExploreApp.setLoading(btn, false);
   new bootstrap.Modal(document.getElementById('itinerary-modal')).show();
+
 
   // Keep this around so the Save button can persist it
   lastGeneratedItinerary = { days, spots, shops, hotels, totalCost };

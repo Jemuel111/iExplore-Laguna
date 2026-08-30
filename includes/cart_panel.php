@@ -45,7 +45,7 @@ $pid = $cart_include_count === 1 ? 'cart-panel-desktop' : 'cart-panel-offcanvas'
     <div class="d-grid gap-2">
       <button class="btn btn-sm w-100"
               style="background:linear-gradient(135deg,var(--maroon-mid),var(--maroon-dark));color:#fff;font-weight:600;border-radius:var(--radius-pill)"
-              onclick="generateItinerary()">
+              onclick="generateItinerary(this)">
         <i class="bi bi-magic me-2"></i>Generate Itinerary
       </button>
       <a href="<?= APP_URL ?>/pages/planner.php" class="btn btn-sm btn-outline-secondary w-100" style="border-radius:var(--radius-pill);font-size:.82rem">
