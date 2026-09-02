@@ -9,6 +9,112 @@
 require_once __DIR__ . '/../includes/helpers.php';
 set_api_headers();
 
+// ── Routing provider helpers ────────────────────────────────
+// Both return ['coordinates'=>[[lat,lng],...], 'distance_km'=>.., 'duration_min'=>..]
+// on success, or null on failure (with $error set to a human-readable reason).
+
+function fetch_tomtom_route(float $oLat, float $oLng, float $dLat, float $dLng, ?string &$error = null): ?array {
+    // TomTom's format is lat,lon (not lon,lat like ORS/GeoJSON) and
+    // colon-separated waypoints in a single path segment.
+    $url = 'https://api.tomtom.com/routing/1/calculateRoute/'
+         . $oLat . ',' . $oLng . ':' . $dLat . ',' . $dLng . '/json'
+         . '?key=' . urlencode(TOMTOM_API_KEY)
+         . '&routeType=fastest&travelMode=car';
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 8,
+    ]);
+    $raw      = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr  = curl_error($ch);
+    curl_close($ch);
+
+    if ($raw === false || $httpCode !== 200) {
+        $body = $raw !== false ? json_decode($raw, true) : null;
+        $msg  = $body['error']['description'] ?? null;
+        error_log(sprintf(
+            '[TomTom directions] curl_error=%s http_code=%s body=%s',
+            $curlErr ?: '(none)', $httpCode, $raw === false ? '(no response)' : substr($raw, 0, 500)
+        ));
+        $error = $curlErr ?: ($msg ?: "HTTP {$httpCode}");
+        return null;
+    }
+
+    $data   = json_decode($raw, true);
+    $points = $data['routes'][0]['legs'][0]['points'] ?? null;
+    $summary = $data['routes'][0]['summary'] ?? null;
+
+    if (!$points) {
+        $error = 'No route found between these points.';
+        return null;
+    }
+
+    $latlngs = array_map(fn($p) => [(float)$p['latitude'], (float)$p['longitude']], $points);
+
+    return [
+        'coordinates'  => $latlngs,
+        'distance_km'  => isset($summary['lengthInMeters']) ? round($summary['lengthInMeters'] / 1000, 1) : null,
+        'duration_min' => isset($summary['travelTimeInSeconds']) ? round($summary['travelTimeInSeconds'] / 60) : null,
+        'provider'     => 'tomtom',
+    ];
+}
+
+function fetch_ors_route(float $oLat, float $oLng, float $dLat, float $dLng, ?string &$error = null): ?array {
+    $url = 'https://api.openrouteservice.org/v2/directions/driving-car'
+         . '?api_key=' . urlencode(ORS_API_KEY)
+         . '&start=' . $oLng . ',' . $oLat
+         . '&end='   . $dLng . ',' . $dLat;
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 8,
+        CURLOPT_HTTPHEADER     => ['Accept: application/json, application/geo+json'],
+    ]);
+    $raw      = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr  = curl_error($ch);
+    curl_close($ch);
+
+    // Log the real reason server-side so it shows up in php-error.log
+    // instead of being silently swallowed. ORS error bodies look like
+    // {"error":{"code":...,"message":"..."}} — surface that message.
+    if ($raw === false || $httpCode !== 200) {
+        $orsMsg = null;
+        if ($raw !== false) {
+            $errBody = json_decode($raw, true);
+            $orsMsg = $errBody['error']['message'] ?? $errBody['error'] ?? null;
+        }
+        error_log(sprintf(
+            '[ORS directions] curl_error=%s http_code=%s body=%s',
+            $curlErr ?: '(none)', $httpCode, $raw === false ? '(no response)' : substr($raw, 0, 500)
+        ));
+        $error = $curlErr ?: ($orsMsg ?: "HTTP {$httpCode}");
+        return null;
+    }
+
+    $data    = json_decode($raw, true);
+    $coords  = $data['features'][0]['geometry']['coordinates'] ?? null;
+    $summary = $data['features'][0]['properties']['summary'] ?? null;
+
+    if (!$coords) {
+        $error = 'No route found between these points.';
+        return null;
+    }
+
+    // ORS returns [lng, lat] pairs — flip to [lat, lng] for Leaflet
+    $latlngs = array_map(fn($c) => [(float)$c[1], (float)$c[0]], $coords);
+
+    return [
+        'coordinates'  => $latlngs,
+        'distance_km'  => isset($summary['distance']) ? round($summary['distance'] / 1000, 1) : null,
+        'duration_min' => isset($summary['duration']) ? round($summary['duration'] / 60) : null,
+        'provider'     => 'ors',
+    ];
+}
+
 $action = input('action', 'get', 'cities');
 
 switch ($action) {
@@ -277,61 +383,37 @@ switch ($action) {
         if (!$oLat || !$oLng || !$dLat || !$dLng) {
             json_error('Origin and destination coordinates are required.', 400);
         }
-        if (!ORS_API_KEY) {
-            json_error('ORS API key not configured.', 501);
+
+        // TomTom uses its own commercial map dataset (not OpenStreetMap,
+        // which is what OpenRouteService is built on) — genuinely
+        // different underlying road data, tried first since it's often
+        // more accurate/current. Falls back to ORS automatically if
+        // TomTom isn't configured or the request fails for any reason,
+        // so nothing that already worked stops working.
+        $result = null;
+        $tomtomError = null;
+        if (defined('TOMTOM_API_KEY') && TOMTOM_API_KEY) {
+            $result = fetch_tomtom_route($oLat, $oLng, $dLat, $dLng, $tomtomError);
         }
 
-        $url = 'https://api.openrouteservice.org/v2/directions/driving-car'
-             . '?api_key=' . urlencode(ORS_API_KEY)
-             . '&start=' . $oLng . ',' . $oLat
-             . '&end='   . $dLng . ',' . $dLat;
-
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 8,
-            CURLOPT_HTTPHEADER     => ['Accept: application/json, application/geo+json'],
-        ]);
-        $raw     = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlErr  = curl_error($ch);
-        curl_close($ch);
-
-        // Log the real reason server-side so it shows up in php-error.log
-        // instead of being silently swallowed. ORS error bodies look like
-        // {"error":{"code":...,"message":"..."}} — surface that message.
-        if ($raw === false || $httpCode !== 200) {
-            $orsMsg = null;
-            if ($raw !== false) {
-                $errBody = json_decode($raw, true);
-                $orsMsg = $errBody['error']['message'] ?? $errBody['error'] ?? null;
+        $orsError = null;
+        if (!$result) {
+            if ($tomtomError) {
+                error_log("[TomTom directions] falling back to ORS: {$tomtomError}");
             }
-            error_log(sprintf(
-                '[ORS directions] curl_error=%s http_code=%s body=%s',
-                $curlErr ?: '(none)',
-                $httpCode,
-                $raw === false ? '(no response)' : substr($raw, 0, 500)
-            ));
-            $reason = $curlErr ?: ($orsMsg ?: "HTTP {$httpCode}");
+            if (!ORS_API_KEY) {
+                json_error($tomtomError ?: 'No routing provider configured.', 501);
+            }
+            $result = fetch_ors_route($oLat, $oLng, $dLat, $dLng, $orsError);
+        }
+
+        if (!$result) {
+            error_log(sprintf('[directions] both providers failed. tomtom=%s ors=%s', $tomtomError ?: '(not tried)', $orsError ?: '(unknown)'));
+            $reason = $orsError ?: $tomtomError ?: 'No route found between these points.';
             json_error("Could not reach routing service: {$reason}", 502);
         }
 
-        $data = json_decode($raw, true);
-        $coords = $data['features'][0]['geometry']['coordinates'] ?? null;
-        $summary = $data['features'][0]['properties']['summary'] ?? null;
-
-        if (!$coords) {
-            json_error('No route found between these points.', 404);
-        }
-
-        // ORS returns [lng, lat] pairs — flip to [lat, lng] for Leaflet
-        $latlngs = array_map(fn($c) => [(float)$c[1], (float)$c[0]], $coords);
-
-        json_ok([
-            'coordinates'  => $latlngs,
-            'distance_km'  => isset($summary['distance']) ? round($summary['distance'] / 1000, 1) : null,
-            'duration_min' => isset($summary['duration']) ? round($summary['duration'] / 60) : null,
-        ]);
+        json_ok($result);
         break;
 
     default:

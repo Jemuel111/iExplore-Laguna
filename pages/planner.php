@@ -13,6 +13,11 @@ $pre_dest    = (int) input('destination', 'get', 0);
 $pre_days    = (int) input('days',        'get', 1);
 $pre_budget  = input('budget_level', 'get', 'midrange');
 $pre_persons = (int) input('persons',     'get', 1);
+// Comma-separated list of spot IDs from a previously saved itinerary
+// (via "Re-plan" on My Itineraries) — when present, the exact saved
+// spots are restored into the itinerary instead of letting the page
+// auto-pick a fresh set of top-rated spots along the route.
+$pre_spot_ids = array_filter(array_map('intval', explode(',', input('spot_ids', 'get', ''))));
 
 // Load all cities for dropdowns
 $cities = db_fetch_all("SELECT id, name, slug, latitude, longitude FROM cities ORDER BY name");
@@ -655,6 +660,12 @@ document.getElementById('swap-btn').addEventListener('click', () => {
 setTimeout(planRoute, 500);
 <?php endif; ?>
 
+// When restoring a saved itinerary via "Re-plan", these exact spot IDs
+// take priority over auto-selecting fresh top-rated spots. Cleared after
+// first use so a later manual re-search doesn't keep restoring stale
+// spots the person may have already moved past.
+let restoreSpotIds = <?= json_encode(array_values($pre_spot_ids)) ?>;
+
 // ── Main plan function ──────────────────────────────────────
 async function planRoute() {
   const origin  = document.getElementById('origin-select').value;
@@ -716,10 +727,32 @@ async function planRoute() {
     renderTransportOptions(routeData.transport_options);
     renderRouteStats(routeData);
     renderSpotsGrid(allSpots);
+
+    // Restoring a saved itinerary ("Re-plan")? Use the exact spots that
+    // were actually saved, not a freshly auto-picked set — otherwise
+    // "Re-plan" silently discards whatever the person specifically chose
+    // and hand them a different trip instead.
+    let itinerarySpots = allSpots;
+    if (restoreSpotIds.length) {
+      try {
+        const res = await fetch(API_BASE + `spots.php?action=by_ids&ids=${restoreSpotIds.join(',')}`).then(r => r.json());
+        if (res.success && res.data.length) {
+          itinerarySpots = res.data;
+        } else {
+          IExploreApp.toast('Could not restore your saved spots — showing a fresh selection instead.', 'warning');
+        }
+      } catch (err) {
+        console.warn('Failed to restore saved spot_ids', err);
+        IExploreApp.toast('Could not restore your saved spots — showing a fresh selection instead.', 'warning');
+      }
+      restoreSpotIds = []; // one-time use — don't re-apply on a later manual search
+    }
+
     // Itinerary first — it decides which spots actually get scheduled
     // (includedSpotIds), so the budget total below can match what's shown.
-    await renderItinerary(routeData, allSpots, days);
-    renderBudget(routeData, allSpots.filter(s => includedSpotIds.includes(s.id)), days, persons, budget);
+    const isRestoring = itinerarySpots !== allSpots; // true only when we just substituted in the saved spot list above
+    await renderItinerary(routeData, itinerarySpots, days, isRestoring);
+    renderBudget(routeData, itinerarySpots.filter(s => includedSpotIds.includes(s.id)), days, persons, budget);
 
     document.getElementById('route-summary').classList.remove('d-none');
     document.getElementById('spots-section').classList.remove('d-none');
@@ -1177,7 +1210,7 @@ async function findNearestHotel(anchorSpot) {
   }
 }
 
-async function renderItinerary(routeData, spots, days) {
+async function renderItinerary(routeData, spots, days, forceIncludeAll = false) {
   const container = document.getElementById('itinerary-days');
 
   // Closed spots (that won't reopen before travel) are never scheduled.
@@ -1191,19 +1224,38 @@ async function renderItinerary(routeData, spots, days) {
   // stops stay in one base city before moving to the next.
   const ordered = orderSpotsAlongRoute(openSpots, routeData);
 
-  // Slice into days up-front (capacity-limited), so each day already knows
-  // what the *next* day's first spot is — needed to pick a same-direction
-  // hotel for tonight's check-in.
+  // Slice into days up-front, so each day already knows what the *next*
+  // day's first spot is — needed to pick a same-direction hotel for
+  // tonight's check-in.
+  //
+  // Two modes:
+  // - Normal (auto-planning): capacity-limited per day, since we're
+  //   choosing from a large pool of candidates and shouldn't cram in
+  //   more than a day can reasonably hold.
+  // - forceIncludeAll (restoring a saved itinerary via "Re-plan"): the
+  //   person already committed to this exact set of spots — silently
+  //   dropping some because a capacity formula says "too many for one
+  //   day" would contradict the whole point of restoring their saved
+  //   trip. Spread everything evenly across the given day count instead.
   const daySlices = [];
   let cursor = 0;
-  for (let day = 1; day <= days; day++) {
-    const capacity = dayCapacity(day);
-    const daySpots = ordered.slice(cursor, cursor + capacity);
-    cursor += daySpots.length;
-    daySlices.push(daySpots);
+  if (forceIncludeAll) {
+    const perDay = Math.max(1, Math.ceil(ordered.length / days));
+    for (let day = 1; day <= days; day++) {
+      const daySpots = ordered.slice(cursor, cursor + perDay);
+      cursor += daySpots.length;
+      daySlices.push(daySpots);
+    }
+  } else {
+    for (let day = 1; day <= days; day++) {
+      const capacity = dayCapacity(day);
+      const daySpots = ordered.slice(cursor, cursor + capacity);
+      cursor += daySpots.length;
+      daySlices.push(daySpots);
+    }
   }
   const scheduledSpots = ordered.slice(0, cursor);
-  const timeCutSpots = ordered.slice(cursor);
+  const timeCutSpots = forceIncludeAll ? [] : ordered.slice(cursor);
   includedSpotIds = scheduledSpots.map(s => s.id);
 
   let html = '';

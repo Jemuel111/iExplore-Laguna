@@ -6,10 +6,10 @@
 
 /* ── CSS Variables ─────────────────────────────────────────── */
 :root {
-  --maroon-dark:   #6b0f14;
-  --maroon-mid:    #a61c1c;
-  --maroon-light:  #e2574c;
-  --maroon-pale:   #fbdede;
+  --maroon-dark:   #B0281C;
+  --maroon-mid:    #D9481F;
+  --maroon-light:  #FF7A45;
+  --maroon-pale:   #FFE3D2;
   --sand:         #f5ebe0;
   --sand-dark:    #e9c46a;
   --terracotta:   #c77c48;
@@ -1552,7 +1552,7 @@ section .card-app:hover {
    floating "Traffic" toggle button itself, positioned as a map control.) */
 .planner-traffic-control {
   position: absolute;
-  bottom: 12px;
+  top: 12px;
   right: 12px;
   z-index: 1000;
 }
@@ -1571,105 +1571,12 @@ section .card-app:hover {
   color: #fff;
 }
 
-/* ── Map spot detail slide-in panel ──────────────────────────
-   Was wired up in JS (open/close, populate fields) but never
-   had any CSS — rendered as a bare close button with no card,
-   no slide animation, no styling on any inner element. ──────── */
-.map-spot-panel {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: min(320px, 88%);
-  background: #fff;
-  box-shadow: var(--shadow-lg);
-  border-left: 1px solid var(--border);
-  transform: translateX(100%);
-  transition: transform .28s cubic-bezier(.4,0,.2,1);
-  z-index: 1001;
-  overflow-y: auto;
-}
-
-.map-spot-panel.open {
-  transform: translateX(0);
-}
-
-.map-spot-panel-close {
-  position: absolute;
-  top: .6rem;
-  right: .6rem;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255,255,255,.9);
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
-  cursor: pointer;
-  color: var(--charcoal);
-  transition: background var(--transition);
-}
-
-.map-spot-panel-close:hover {
-  background: var(--sand);
-}
-
-.msp-emoji-header {
-  height: 120px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2.4rem;
-  color: #fff;
-}
-
-.msp-name {
-  font-family: 'Playfair Display', serif;
-  color: var(--maroon-dark);
-}
-
-.msp-meta {
-  font-size: .85rem;
-  color: var(--text-muted);
-}
-
-.msp-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .5rem;
-}
-
-.msp-chip {
-  display: inline-flex;
-  align-items: center;
-  background: var(--sand);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  padding: .3rem .7rem;
-  font-size: .78rem;
-  color: var(--charcoal);
-}
-
-.msp-desc {
-  font-size: .88rem;
-  color: var(--charcoal);
-  line-height: 1.55;
-}
-
 /* ── Live traffic legend ──────────────────────────────────────
    Added for the Route Guide TomTom traffic layer.
    Kept separate from the existing .map-legend styles.
    ──────────────────────────────────────────────────────────── */
 #trip-map {
   position: relative;
-}
-
-#map-wrapper {
-  overflow: hidden;
-  border-radius: var(--radius);
 }
 
 .traffic-map-legend {

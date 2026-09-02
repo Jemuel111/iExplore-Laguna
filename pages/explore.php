@@ -806,7 +806,19 @@ document.getElementById('rp-find-btn').addEventListener('click', async () => {
     const dx = c.longitude - rpOrigin.longitude, dy = c.latitude - rpOrigin.latitude;
     return (dx*routeDx + dy*routeDy) / routeLenSq;
   }
-  const alongRoute = [...alongRouteUnsorted].sort((a, b) => projectAlongRoute(a) - projectAlongRoute(b));
+  const alongRouteMiddle = alongRouteUnsorted.filter(c => c.id !== rpOrigin.id && c.id !== rpDest.id);
+  alongRouteMiddle.sort((a, b) => projectAlongRoute(a) - projectAlongRoute(b));
+  // Origin and destination are forced to the two ends regardless of their
+  // own projection values. Without this, a town whose projection happens
+  // to fall outside the 0–1 range (behind the start, or past the end —
+  // both are geometrically possible for a town that's still within the
+  // curved road corridor but off to the side of the straight start→end
+  // line) could bump the actual start/destination out of first/last
+  // place, which looks obviously wrong in the checklist even though the
+  // sort itself is doing exactly what it was told to.
+  const originCity = alongRouteUnsorted.find(c => c.id === rpOrigin.id);
+  const destCity    = alongRouteUnsorted.find(c => c.id === rpDest.id);
+  const alongRoute = [originCity, ...alongRouteMiddle, destCity].filter(Boolean);
 
   includedCityIds = new Set(alongRoute.map(c => c.id)); // pre-select all found
   rpCityOrder = alongRoute.map(c => c.id); // travel order, used to group the spot grid later

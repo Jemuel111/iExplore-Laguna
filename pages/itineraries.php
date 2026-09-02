@@ -34,6 +34,7 @@ $itineraries = db_fetch_all(
 foreach ($itineraries as &$it) {
     $it['closure_warnings'] = [];
     $spotIds = parse_spot_ids($it['spot_ids'] ?? null);
+    $it['spot_ids_parsed'] = $spotIds; // kept for the "Re-plan" link below
     if (!$spotIds) continue;
 
     $placeholders = implode(',', array_fill(0, count($spotIds), '?'));
@@ -138,7 +139,7 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
             <?php endif; ?>
             <div class="d-flex gap-2">
-              <a href="planner.php?origin=<?= $it['origin_city_id'] ?>&destination=<?= $it['dest_city_id'] ?>&days=<?= $it['num_days'] ?>&persons=<?= $it['num_persons'] ?>&budget_level=<?= $it['budget_level'] ?><?= $it['travel_date'] ? '&travel_date=' . urlencode($it['travel_date']) : '' ?>"
+              <a href="planner.php?origin=<?= $it['origin_city_id'] ?>&destination=<?= $it['dest_city_id'] ?>&days=<?= $it['num_days'] ?>&persons=<?= $it['num_persons'] ?>&budget_level=<?= $it['budget_level'] ?><?= $it['travel_date'] ? '&travel_date=' . urlencode($it['travel_date']) : '' ?><?= !empty($it['spot_ids_parsed']) ? '&spot_ids=' . implode(',', $it['spot_ids_parsed']) : '' ?>"
                  class="btn btn-sm btn-primary-app flex-grow-1">
                 <i class="bi bi-compass me-1"></i>Re-plan
               </a>
