@@ -212,6 +212,8 @@ $auth_photo = db_fetch_one(
           <input type="checkbox" class="form-check-input" name="privacy_consent" id="privacy_consent" required>
           <label class="form-check-label small" for="privacy_consent">
             I have read and agree to the
+            <a href="<?= APP_URL ?>/pages/terms-of-service.php" target="_blank" style="color:var(--maroon-mid)">Terms of Service</a>
+            and
             <a href="<?= APP_URL ?>/pages/privacy-policy.php" target="_blank" style="color:var(--maroon-mid)">Privacy Policy</a>,
             and consent to my personal and business information being collected and used as described.
           </label>

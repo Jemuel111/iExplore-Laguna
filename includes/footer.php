@@ -97,6 +97,8 @@
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
       <p class="small mb-0" style="color:rgba(255,255,255,.45)">
         &copy; <?= date('Y') ?> <em>i</em>Explore Laguna &mdash;
+        <a href="<?= APP_URL ?>/pages/terms-of-service.php" class="footer-link" style="color:rgba(255,255,255,.45);text-decoration:underline">Terms of Service</a>
+        &middot;
         <a href="<?= APP_URL ?>/pages/privacy-policy.php" class="footer-link" style="color:rgba(255,255,255,.45);text-decoration:underline">Privacy Policy</a>
       </p>
       <p class="small mb-0" style="color:rgba(255,255,255,.45)">

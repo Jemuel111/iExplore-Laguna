@@ -211,6 +211,8 @@ require_once __DIR__ . '/../includes/header.php';
                  <?= isset($privacy_consent) && $privacy_consent ? 'checked' : '' ?> required>
           <label class="form-check-label small" for="privacy_consent">
             I have read and agree to the
+            <a href="<?= APP_URL ?>/pages/terms-of-service.php" target="_blank" style="color:var(--maroon-mid)">Terms of Service</a>
+            and
             <a href="<?= APP_URL ?>/pages/privacy-policy.php" target="_blank" style="color:var(--maroon-mid)">Privacy Policy</a>,
             and consent to my personal information being collected and used as described.
           </label>
