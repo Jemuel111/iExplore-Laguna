@@ -12,7 +12,7 @@ define('DB_CHARSET','utf8mb4');
 
 // ── App ───────────────────────────────────────────────────────
 define('APP_NAME',  'IExplore Laguna');
-define('APP_URL',   'http://localhost/iexplore-laguna');
+define('APP_URL', 'https://iexplorelaguna.online');
 define('APP_VERSION','1.0.0');
 
 // ── Session ───────────────────────────────────────────────────
