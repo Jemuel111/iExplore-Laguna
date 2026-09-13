@@ -33,6 +33,27 @@ if ($user && ($user['role'] ?? '') === 'admin') {
         exit;
     }
 }
+
+// Same treatment for shop and hotel owners — they run a business here,
+// not browse as tourists. Hiding the nav links (done further below) isn't
+// real access control on its own, since someone could still type the URL
+// directly — this is the actual enforcement.
+if ($user && ($user['role'] ?? '') === 'shop_owner') {
+    $__owner_allowed = ['shop-dashboard.php', 'logout.php'];
+    $__current_page  = basename($_SERVER['SCRIPT_NAME'] ?? '');
+    if (!in_array($__current_page, $__owner_allowed, true)) {
+        header('Location: ' . APP_URL . '/pages/shop-dashboard.php');
+        exit;
+    }
+}
+if ($user && ($user['role'] ?? '') === 'hotel_owner') {
+    $__owner_allowed = ['hotel-dashboard.php', 'logout.php'];
+    $__current_page  = basename($_SERVER['SCRIPT_NAME'] ?? '');
+    if (!in_array($__current_page, $__owner_allowed, true)) {
+        header('Location: ' . APP_URL . '/pages/hotel-dashboard.php');
+        exit;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -116,6 +137,51 @@ if ($user && ($user['role'] ?? '') === 'admin') {
             <i class="bi bi-bar-chart-line me-1"></i>Analytics
           </a>
         </li>
+
+        <?php elseif ($user && ($user['role'] ?? '') === 'shop_owner'): ?>
+        <!-- Shop owners run a business here, not browse as tourists — same
+             "locked to their own area" treatment admins already get above,
+             instead of showing the full tourist navbar (Trip Planner,
+             Explore, Budget, etc.) that has nothing to do with running
+             their shop. -->
+        <li class="nav-item">
+          <a class="nav-link active" href="<?= APP_URL ?>/pages/shop-dashboard.php">
+            <i class="bi bi-shop me-1"></i>My Shop Dashboard
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="<?= APP_URL ?>/pages/shop-dashboard.php#orders">
+            <i class="bi bi-receipt me-1"></i>Orders
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="<?= APP_URL ?>/pages/shop-dashboard.php#products">
+            <i class="bi bi-grid me-1"></i>Products
+          </a>
+        </li>
+
+        <?php elseif ($user && ($user['role'] ?? '') === 'hotel_owner'): ?>
+        <li class="nav-item">
+          <a class="nav-link active" href="<?= APP_URL ?>/pages/hotel-dashboard.php">
+            <i class="bi bi-building me-1"></i>My Hotel Dashboard
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="<?= APP_URL ?>/pages/hotel-dashboard.php#bookings">
+            <i class="bi bi-calendar-check me-1"></i>Bookings
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="<?= APP_URL ?>/pages/hotel-dashboard.php#rooms">
+            <i class="bi bi-door-open me-1"></i>Rooms
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="<?= APP_URL ?>/pages/hotel-dashboard.php#photos">
+            <i class="bi bi-images me-1"></i>Photos
+          </a>
+        </li>
+
         <?php else: ?>
         <li class="nav-item">
           <a class="nav-link <?= $active_page === 'home'      ? 'active' : '' ?>"
