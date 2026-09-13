@@ -27,6 +27,15 @@ $rooms = db_fetch_all(
     [$hotel_id]
 );
 
+// Full photo galleries per room, for the "browse photos" lightbox —
+// grouped by room_id so each card can look up just its own photos.
+$room_photos_raw = db_fetch_all(
+    "SELECT rp.* FROM room_photos rp JOIN hotel_rooms r ON rp.room_id=r.id
+     WHERE r.hotel_id = ? ORDER BY rp.sort_order", [$hotel_id]
+);
+$room_photos = [];
+foreach ($room_photos_raw as $rp) { $room_photos[$rp['room_id']][] = $rp['url']; }
+
 // The top-rated tourist spot in this hotel's city — used to nudge the
 // itinerary builder ("this hotel is near X, add it to your trip?")
 $nearby_spot = db_fetch_one(
@@ -157,6 +166,31 @@ $reviews = attach_review_photos($reviews, 'hotel');
 </div>
 <?php endif; ?>
 
+<!-- Separate, independent lightbox just for room photo galleries — kept
+     apart from the hotel-level lightbox above so its own state/keyboard
+     handling can't interfere with the hero gallery's. -->
+<div class="modal fade" id="photoGalleryModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content" style="background:#000;border:none">
+      <div class="modal-header border-0">
+        <h6 class="modal-title text-white" id="photoGalleryTitle"></h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div id="photoGalleryCarousel" class="carousel slide">
+          <div class="carousel-inner" id="photoGalleryInner"></div>
+          <button class="carousel-control-prev" type="button" data-bs-target="#photoGalleryCarousel" data-bs-slide="prev">
+            <span class="carousel-control-prev-icon"></span>
+          </button>
+          <button class="carousel-control-next" type="button" data-bs-target="#photoGalleryCarousel" data-bs-slide="next">
+            <span class="carousel-control-next-icon"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="container py-4">
 <div class="row g-4">
 
@@ -229,9 +263,16 @@ $reviews = attach_review_photos($reviews, 'hotel');
              data-room-name="<?= e($r['room_type']) ?>" data-room-price="<?= $r['price_per_night'] ?>"
              style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:border-color .2s">
           <div class="d-flex align-items-center gap-3">
-            <div style="width:52px;height:52px;background:#f7dde1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:#8e2434;flex-shrink:0">
-              <i class="bi bi-door-closed"></i>
-            </div>
+            <?php $rPhotos = $room_photos[$r['id']] ?? []; ?>
+            <?php if (!empty($r['image_url'])): ?>
+              <img src="<?= e($r['image_url']) ?>" alt="<?= e($r['room_type']) ?>"
+                   style="width:52px;height:52px;object-fit:cover;border-radius:10px;flex-shrink:0<?= count($rPhotos) > 1 ? ';cursor:pointer' : '' ?>"
+                   <?= count($rPhotos) > 1 ? 'onclick="event.stopPropagation(); openPhotoGallery('.htmlspecialchars(json_encode($rPhotos)).', '.htmlspecialchars(json_encode($r['room_type'])).')"' : '' ?>>
+            <?php else: ?>
+              <div style="width:52px;height:52px;background:#f7dde1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:#8e2434;flex-shrink:0">
+                <i class="bi bi-door-closed"></i>
+              </div>
+            <?php endif; ?>
             <div class="flex-grow-1 min-w-0">
               <div class="fw-bold" style="font-size:.95rem"><?= e($r['room_type']) ?></div>
               <div class="text-muted small">
@@ -642,6 +683,17 @@ $reviews = attach_review_photos($reviews, 'hotel');
 </style>
 
 <script>
+// ── Room photo gallery (independent from the hotel-level lightbox below) ──
+function openPhotoGallery(photoUrls, itemName) {
+  document.getElementById('photoGalleryTitle').textContent = itemName;
+  document.getElementById('photoGalleryInner').innerHTML = photoUrls.map((url, i) => `
+    <div class="carousel-item ${i === 0 ? 'active' : ''}">
+      <img src="${url}" class="d-block w-100" style="max-height:70vh;object-fit:contain">
+    </div>
+  `).join('');
+  new bootstrap.Modal(document.getElementById('photoGalleryModal')).show();
+}
+
 // ── Hotel photo lightbox ────────────────────────────────────────
 const HOTEL_PHOTOS = <?= json_encode(array_values($hotel_photos)) ?>;
 let hlbIndex = 0;

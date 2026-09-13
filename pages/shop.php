@@ -30,6 +30,15 @@ $products = db_fetch_all(
     [$shop_id]
 );
 
+// Full photo galleries per product, for the "browse photos" lightbox —
+// grouped by product_id so each card can look up just its own photos.
+$product_photos_raw = db_fetch_all(
+    "SELECT pp.* FROM product_photos pp JOIN shop_products p ON pp.product_id=p.id
+     WHERE p.shop_id = ? ORDER BY pp.sort_order", [$shop_id]
+);
+$product_photos = [];
+foreach ($product_photos_raw as $pp) { $product_photos[$pp['product_id']][] = $pp['url']; }
+
 // The top-rated tourist spot in this shop's city — used to nudge the
 // itinerary builder ("this shop is near X, add it to your trip?")
 $nearby_spot = db_fetch_one(
@@ -141,9 +150,16 @@ require_once __DIR__ . '/../includes/header.php';
           <?php foreach ($items as $p): ?>
           <div class="d-flex align-items-center gap-3 p-3"
                style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);transition:border-color .2s">
-            <div style="width:52px;height:52px;background:var(--maroon-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:var(--maroon-mid);flex-shrink:0">
-              <i class="bi bi-bag"></i>
-            </div>
+            <?php $pPhotos = $product_photos[$p['id']] ?? []; ?>
+            <?php if (!empty($p['image_url'])): ?>
+              <img src="<?= e($p['image_url']) ?>" alt="<?= e($p['name']) ?>"
+                   style="width:52px;height:52px;object-fit:cover;border-radius:10px;flex-shrink:0<?= count($pPhotos) > 1 ? ';cursor:pointer' : '' ?>"
+                   <?= count($pPhotos) > 1 ? 'onclick="openPhotoGallery('.htmlspecialchars(json_encode($pPhotos)).', '.htmlspecialchars(json_encode($p['name'])).')"' : '' ?>>
+            <?php else: ?>
+              <div style="width:52px;height:52px;background:var(--maroon-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:var(--maroon-mid);flex-shrink:0">
+                <i class="bi bi-bag"></i>
+              </div>
+            <?php endif; ?>
             <div class="flex-grow-1 min-w-0">
               <div class="fw-bold" style="font-size:.95rem"><?= e($p['name']) ?></div>
               <?php if ($p['description']): ?>
@@ -322,6 +338,29 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 </div>
 
+<!-- Shared photo-browsing lightbox — one modal, populated per product on click -->
+<div class="modal fade" id="photoGalleryModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content" style="background:#000;border:none">
+      <div class="modal-header border-0">
+        <h6 class="modal-title text-white" id="photoGalleryTitle"></h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div id="photoGalleryCarousel" class="carousel slide">
+          <div class="carousel-inner" id="photoGalleryInner"></div>
+          <button class="carousel-control-prev" type="button" data-bs-target="#photoGalleryCarousel" data-bs-slide="prev">
+            <span class="carousel-control-prev-icon"></span>
+          </button>
+          <button class="carousel-control-next" type="button" data-bs-target="#photoGalleryCarousel" data-bs-slide="next">
+            <span class="carousel-control-next-icon"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 let orderCart = {};
 
@@ -346,6 +385,16 @@ function addToItineraryCart(item) {
   try { cart = JSON.parse(localStorage.getItem('iexplore_cart') || '[]'); } catch (e) { cart = []; }
   if (!cart.some(i => i.key === item.key)) cart.push(item);
   localStorage.setItem('iexplore_cart', JSON.stringify(cart));
+}
+
+function openPhotoGallery(photoUrls, itemName) {
+  document.getElementById('photoGalleryTitle').textContent = itemName;
+  document.getElementById('photoGalleryInner').innerHTML = photoUrls.map((url, i) => `
+    <div class="carousel-item ${i === 0 ? 'active' : ''}">
+      <img src="${url}" class="d-block w-100" style="max-height:70vh;object-fit:contain">
+    </div>
+  `).join('');
+  new bootstrap.Modal(document.getElementById('photoGalleryModal')).show();
 }
 
 function changeQty(pid, delta, name, price) {

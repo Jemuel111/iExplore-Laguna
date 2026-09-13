@@ -35,14 +35,150 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $count = (int) input('room_count', 'post', 1);
         $desc  = trim(input('description', 'post', ''));
         if ($rtype && $price > 0) {
+            try {
+                $photoUrl = handle_image_upload('photo', 'rooms');
+            } catch (RuntimeException $e) {
+                $_SESSION['flash']['error'] = $e->getMessage();
+                header('Location: ' . APP_URL . '/pages/hotel-dashboard.php#rooms'); exit;
+            }
             db_execute(
-                "INSERT INTO hotel_rooms (hotel_id, owner_id, room_type, description, capacity, bed_type, room_count, price_per_night)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                [$hid, $u['id'], $rtype, $desc, $cap ?: 2, $bed, $count ?: 1, $price]
+                "INSERT INTO hotel_rooms (hotel_id, owner_id, room_type, description, image_url, capacity, bed_type, room_count, price_per_night)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [$hid, $u['id'], $rtype, $desc, $photoUrl, $cap ?: 2, $bed, $count ?: 1, $price]
             );
+            $newRoomId = db_last_id();
+            if ($photoUrl && $newRoomId) {
+                db_execute("INSERT INTO room_photos (room_id, url, sort_order) VALUES (?,?,0)", [$newRoomId, $photoUrl]);
+            }
             $_SESSION['flash']['success'] = "Room type \"{$rtype}\" added!";
         }
         header('Location: ' . APP_URL . '/pages/hotel-dashboard.php#rooms'); exit;
+    }
+
+    // ── Room gallery: upload one or more photos ─────────────────
+    if ($action === 'upload_room_photos') {
+        $rid = (int) input('room_id', 'post', 0);
+        $owns = db_fetch_one("SELECT id FROM hotel_rooms WHERE id=? AND hotel_id=?", [$rid, $hid]);
+        if (!$owns) { header('Location: ' . APP_URL . '/pages/hotel-dashboard.php#rooms'); exit; }
+
+        $uploaded = 0;
+        $failed   = [];
+        if (!empty($_FILES['photos']) && is_array($_FILES['photos']['name'])) {
+            $fileCount = count($_FILES['photos']['name']);
+            for ($i = 0; $i < $fileCount; $i++) {
+                if ($_FILES['photos']['error'][$i] === UPLOAD_ERR_NO_FILE) continue;
+                $_FILES['__single_photo'] = [
+                    'name' => $_FILES['photos']['name'][$i], 'type' => $_FILES['photos']['type'][$i],
+                    'tmp_name' => $_FILES['photos']['tmp_name'][$i], 'error' => $_FILES['photos']['error'][$i],
+                    'size' => $_FILES['photos']['size'][$i],
+                ];
+                try {
+                    $url = handle_image_upload('__single_photo', 'rooms');
+                    if ($url) {
+                        $sortOrder = db_fetch_one("SELECT COALESCE(MAX(sort_order),0)+1 AS n FROM room_photos WHERE room_id=?", [$rid])['n'] ?? 0;
+                        db_execute("INSERT INTO room_photos (room_id, url, sort_order) VALUES (?,?,?)", [$rid, $url, $sortOrder]);
+                        $hasCover = db_fetch_one("SELECT image_url FROM hotel_rooms WHERE id=?", [$rid]);
+                        if (empty($hasCover['image_url'])) {
+                            db_execute("UPDATE hotel_rooms SET image_url=? WHERE id=?", [$url, $rid]);
+                        }
+                        $uploaded++;
+                    }
+                } catch (RuntimeException $e) {
+                    $failed[] = $_FILES['photos']['name'][$i] . ': ' . $e->getMessage();
+                }
+            }
+        }
+        if ($uploaded > 0) $_SESSION['flash']['success'] = "Uploaded {$uploaded} photo" . ($uploaded!=1?'s':'') . "!";
+        if (!empty($failed)) $_SESSION['flash']['error'] = 'Some files failed: ' . implode('; ', $failed);
+        header('Location: ' . APP_URL . '/pages/hotel-dashboard.php#rooms'); exit;
+    }
+
+    // ── Room gallery: set a photo as the cover shown on cards ────
+    if ($action === 'set_main_room_photo') {
+        $photoId = (int) input('photo_id', 'post', 0);
+        $photo = db_fetch_one(
+            "SELECT rp.url FROM room_photos rp JOIN hotel_rooms r ON rp.room_id=r.id
+             WHERE rp.id=? AND r.hotel_id=?", [$photoId, $hid]
+        );
+        if ($photo) {
+            $rid = (int) input('room_id', 'post', 0);
+            db_execute("UPDATE hotel_rooms SET image_url=? WHERE id=? AND hotel_id=?", [$photo['url'], $rid, $hid]);
+        }
+        header('Location: ' . APP_URL . '/pages/hotel-dashboard.php#rooms'); exit;
+    }
+
+    // ── Room gallery: delete a photo ─────────────────────────────
+    if ($action === 'delete_room_photo') {
+        $photoId = (int) input('photo_id', 'post', 0);
+        $photo = db_fetch_one(
+            "SELECT rp.url, rp.room_id FROM room_photos rp JOIN hotel_rooms r ON rp.room_id=r.id
+             WHERE rp.id=? AND r.hotel_id=?", [$photoId, $hid]
+        );
+        if ($photo) {
+            db_execute("DELETE FROM room_photos WHERE id=?", [$photoId]);
+            $room = db_fetch_one("SELECT image_url FROM hotel_rooms WHERE id=?", [$photo['room_id']]);
+            if ($room && $room['image_url'] === $photo['url']) {
+                $next = db_fetch_one("SELECT url FROM room_photos WHERE room_id=? ORDER BY sort_order LIMIT 1", [$photo['room_id']]);
+                db_execute("UPDATE hotel_rooms SET image_url=? WHERE id=?", [$next['url'] ?? null, $photo['room_id']]);
+            }
+        }
+        header('Location: ' . APP_URL . '/pages/hotel-dashboard.php#rooms'); exit;
+    }
+
+    // ── Hotel gallery: upload one or more photos ────────────────
+    // Always scoped to this owner's own $hid — never a submitted hotel_id,
+    // so an owner can't modify another hotel's gallery by tampering with
+    // the form.
+    if ($action === 'upload_hotel_photos') {
+        ensure_hotel_photos_table();
+        $uploaded = 0;
+        $failed   = [];
+        if (!empty($_FILES['photos']) && is_array($_FILES['photos']['name'])) {
+            $fileCount = count($_FILES['photos']['name']);
+            for ($i = 0; $i < $fileCount; $i++) {
+                if ($_FILES['photos']['error'][$i] === UPLOAD_ERR_NO_FILE) continue;
+                $_FILES['__single_photo'] = [
+                    'name'     => $_FILES['photos']['name'][$i],
+                    'type'     => $_FILES['photos']['type'][$i],
+                    'tmp_name' => $_FILES['photos']['tmp_name'][$i],
+                    'error'    => $_FILES['photos']['error'][$i],
+                    'size'     => $_FILES['photos']['size'][$i],
+                ];
+                try {
+                    $url = handle_image_upload('__single_photo', 'hotels');
+                    if ($url) {
+                        $sortOrder = db_fetch_one("SELECT COALESCE(MAX(sort_order),0)+1 AS n FROM hotel_photos WHERE hotel_id=?", [$hid])['n'] ?? 0;
+                        db_execute(
+                            "INSERT INTO hotel_photos (hotel_id, url, caption, photo_type, sort_order) VALUES (?,?,?,?,?)",
+                            [$hid, $url, input('caption','post',''), 'gallery', $sortOrder]
+                        );
+                        $uploaded++;
+                    }
+                } catch (RuntimeException $e) {
+                    $failed[] = $_FILES['photos']['name'][$i] . ': ' . $e->getMessage();
+                }
+            }
+        }
+        if ($uploaded > 0) $_SESSION['flash']['success'] = "Uploaded {$uploaded} photo" . ($uploaded!=1?'s':'') . "!";
+        if (!empty($failed)) $_SESSION['flash']['error'] = 'Some files failed: ' . implode('; ', $failed);
+        if ($uploaded === 0 && empty($failed)) $_SESSION['flash']['error'] = 'No files were selected.';
+        header('Location: ' . APP_URL . '/pages/hotel-dashboard.php#photos'); exit;
+    }
+
+    // ── Hotel gallery: set a photo as the main hero photo ───────
+    if ($action === 'set_main_hotel_photo') {
+        $photoId = (int) input('photo_id', 'post', 0);
+        db_execute("UPDATE hotel_photos SET photo_type='gallery' WHERE hotel_id=? AND photo_type='main'", [$hid]);
+        db_execute("UPDATE hotel_photos SET photo_type='main' WHERE id=? AND hotel_id=?", [$photoId, $hid]);
+        header('Location: ' . APP_URL . '/pages/hotel-dashboard.php#photos'); exit;
+    }
+
+    // ── Hotel gallery: delete a photo ────────────────────────────
+    if ($action === 'delete_hotel_photo') {
+        $photoId = (int) input('photo_id', 'post', 0);
+        db_execute("DELETE FROM hotel_photos WHERE id=? AND hotel_id=?", [$photoId, $hid]);
+        $_SESSION['flash']['success'] = 'Photo removed.';
+        header('Location: ' . APP_URL . '/pages/hotel-dashboard.php#photos'); exit;
     }
 
     // ── Toggle room availability ──────────────────────────────
@@ -147,6 +283,20 @@ $rooms = db_fetch_all(
     [$hid]
 );
 
+ensure_hotel_photos_table();
+$hotel_photos = db_fetch_all(
+    "SELECT * FROM hotel_photos WHERE hotel_id = ? ORDER BY photo_type='main' DESC, sort_order",
+    [$hid]
+);
+
+// Per-room photo galleries, grouped by room_id for easy lookup in the cards below.
+$room_photos_raw = db_fetch_all(
+    "SELECT rp.* FROM room_photos rp JOIN hotel_rooms r ON rp.room_id=r.id
+     WHERE r.hotel_id = ? ORDER BY rp.sort_order", [$hid]
+);
+$room_photos = [];
+foreach ($room_photos_raw as $rp) { $room_photos[$rp['room_id']][] = $rp; }
+
 $bookings = db_fetch_all(
     "SELECT b.*, u.name AS tourist_name, u.phone AS tourist_phone, r.room_type
      FROM bookings b
@@ -247,6 +397,11 @@ require_once __DIR__ . '/../includes/header.php';
     <li class="nav-item">
       <a class="nav-link" data-bs-toggle="tab" href="#rooms" style="font-weight:600">
         <i class="bi bi-door-open me-1"></i>Room Types
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" data-bs-toggle="tab" href="#photos" style="font-weight:600">
+        <i class="bi bi-images me-1"></i>Photos
       </a>
     </li>
     <li class="nav-item">
@@ -381,11 +536,16 @@ require_once __DIR__ . '/../includes/header.php';
             <h6 class="fw-bold mb-3" style="color:var(--maroon-dark);font-family:'Playfair Display',serif">
               <i class="bi bi-plus-circle me-2" style="color:#8e2434"></i>Add Room Type
             </h6>
-            <form method="POST"><?= csrf_field() ?>
+            <form method="POST" enctype="multipart/form-data"><?= csrf_field() ?>
               <input type="hidden" name="action" value="add_room">
               <div class="mb-3">
                 <label class="form-label">Room Type Name <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" name="room_type" placeholder="e.g. Deluxe Twin" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Photo</label>
+                <input type="file" class="form-control" name="photo" accept="image/jpeg,image/png,image/webp">
+                <div class="form-text">JPG, PNG, or WEBP. Max 3MB. Optional, but rooms with photos get booked more.</div>
               </div>
               <div class="mb-3">
                 <label class="form-label">Price per Night (₱) <span class="text-danger">*</span></label>
@@ -427,47 +587,175 @@ require_once __DIR__ . '/../includes/header.php';
           </div>
           <?php else: ?>
           <div class="d-flex flex-column gap-2">
-            <?php foreach ($rooms as $r): ?>
-            <div class="d-flex align-items-center gap-3 p-3"
-                 style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);
+            <?php foreach ($rooms as $r): $rPhotos = $room_photos[$r['id']] ?? []; ?>
+            <div style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;
                         opacity:<?= $r['is_available'] ? '1' : '.55' ?>">
-              <div style="width:44px;height:44px;background:#f7dde1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:#8e2434;flex-shrink:0">
-                <i class="bi bi-door-closed"></i>
-              </div>
-              <div class="flex-grow-1 min-w-0">
-                <div class="fw-bold" style="font-size:.93rem"><?= e($r['room_type']) ?></div>
-                <div class="text-muted small">
-                  <?= e($r['bed_type'] ?: '—') ?> · Sleeps <?= $r['capacity'] ?> ·
-                  <?= $r['room_count'] ?> room<?= $r['room_count']!=1?'s':'' ?>
+              <div class="d-flex align-items-center gap-3 p-3">
+                <?php if (!empty($r['image_url'])): ?>
+                  <img src="<?= e($r['image_url']) ?>" alt="<?= e($r['room_type']) ?>"
+                       style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex-shrink:0">
+                <?php else: ?>
+                  <div style="width:44px;height:44px;background:#f7dde1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:#8e2434;flex-shrink:0">
+                    <i class="bi bi-door-closed"></i>
+                  </div>
+                <?php endif; ?>
+                <div class="flex-grow-1 min-w-0">
+                  <div class="fw-bold" style="font-size:.93rem"><?= e($r['room_type']) ?></div>
+                  <div class="text-muted small">
+                    <?= e($r['bed_type'] ?: '—') ?> · Sleeps <?= $r['capacity'] ?> ·
+                    <?= $r['room_count'] ?> room<?= $r['room_count']!=1?'s':'' ?>
+                  </div>
+                </div>
+                <div class="fw-bold" style="color:#8e2434;font-size:1rem;white-space:nowrap">
+                  ₱<?= number_format($r['price_per_night'],2) ?>/night
+                </div>
+                <div class="d-flex gap-2 flex-shrink-0">
+                  <!-- Manage photos toggle -->
+                  <button type="button" class="btn btn-sm btn-outline-secondary gallery-toggle-btn"
+                          style="border-radius:var(--radius-pill);font-size:.75rem;padding:.28rem .7rem"
+                          data-target="#room-gallery-<?= $r['id'] ?>">
+                    <i class="bi bi-images me-1"></i>Photos<?= count($rPhotos) ? ' ('.count($rPhotos).')' : '' ?>
+                  </button>
+                  <!-- Toggle availability -->
+                  <form method="POST"><?= csrf_field() ?>
+                    <input type="hidden" name="action"   value="toggle_room">
+                    <input type="hidden" name="room_id"  value="<?= $r['id'] ?>">
+                    <button class="btn btn-sm <?= $r['is_available'] ? 'btn-outline-secondary' : 'btn-outline-success' ?>"
+                            style="border-radius:var(--radius-pill);font-size:.75rem;padding:.28rem .75rem"
+                            title="<?= $r['is_available'] ? 'Hide room type' : 'Show room type' ?>">
+                      <i class="bi <?= $r['is_available'] ? 'bi-eye-slash' : 'bi-eye' ?> me-1"></i><?= $r['is_available'] ? 'Hide' : 'Show' ?>
+                    </button>
+                  </form>
+                  <!-- Delete -->
+                  <form method="POST" onsubmit="return confirm('Delete this room type?')"><?= csrf_field() ?>
+                    <input type="hidden" name="action"  value="delete_room">
+                    <input type="hidden" name="room_id" value="<?= $r['id'] ?>">
+                    <button class="btn btn-sm btn-outline-danger"
+                            style="border-radius:var(--radius-pill);font-size:.75rem;padding:.28rem .6rem">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
                 </div>
               </div>
-              <div class="fw-bold" style="color:#8e2434;font-size:1rem;white-space:nowrap">
-                ₱<?= number_format($r['price_per_night'],2) ?>/night
-              </div>
-              <div class="d-flex gap-2 flex-shrink-0">
-                <!-- Toggle availability -->
-                <form method="POST"><?= csrf_field() ?>
-                  <input type="hidden" name="action"   value="toggle_room">
-                  <input type="hidden" name="room_id"  value="<?= $r['id'] ?>">
-                  <button class="btn btn-sm <?= $r['is_available'] ? 'btn-outline-secondary' : 'btn-outline-success' ?>"
-                          style="border-radius:var(--radius-pill);font-size:.75rem;padding:.28rem .75rem"
-                          title="<?= $r['is_available'] ? 'Hide room type' : 'Show room type' ?>">
-                    <i class="bi <?= $r['is_available'] ? 'bi-eye-slash' : 'bi-eye' ?> me-1"></i><?= $r['is_available'] ? 'Hide' : 'Show' ?>
-                  </button>
-                </form>
-                <!-- Delete -->
-                <form method="POST" onsubmit="return confirm('Delete this room type?')"><?= csrf_field() ?>
-                  <input type="hidden" name="action"  value="delete_room">
+
+              <!-- Expandable photo gallery manager -->
+              <div id="room-gallery-<?= $r['id'] ?>" class="d-none gallery-panel" style="background:#fdf3f0;padding:1rem;border-top:1px solid var(--border)">
+                <?php if ($rPhotos): ?>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                  <?php foreach ($rPhotos as $ph): ?>
+                    <div style="position:relative;width:80px;height:80px;border-radius:8px;overflow:hidden;border:1.5px solid var(--border)">
+                      <img src="<?= e($ph['url']) ?>" style="width:100%;height:100%;object-fit:cover">
+                      <?php if ($ph['url'] === $r['image_url']): ?>
+                        <span class="badge" style="position:absolute;top:2px;left:2px;background:#8e2434;font-size:.55rem">Cover</span>
+                      <?php endif; ?>
+                      <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.55);padding:.15rem;display:flex;gap:.25rem;justify-content:center">
+                        <?php if ($ph['url'] !== $r['image_url']): ?>
+                          <form method="POST" class="m-0"><?= csrf_field() ?>
+                            <input type="hidden" name="action" value="set_main_room_photo">
+                            <input type="hidden" name="room_id" value="<?= $r['id'] ?>">
+                            <input type="hidden" name="photo_id" value="<?= $ph['id'] ?>">
+                            <button class="btn btn-sm btn-light" style="font-size:.6rem;padding:.05rem .35rem" title="Set as cover"><i class="bi bi-star"></i></button>
+                          </form>
+                        <?php endif; ?>
+                        <form method="POST" class="m-0" onsubmit="return confirm('Remove this photo?')"><?= csrf_field() ?>
+                          <input type="hidden" name="action" value="delete_room_photo">
+                          <input type="hidden" name="photo_id" value="<?= $ph['id'] ?>">
+                          <button class="btn btn-sm btn-outline-light" style="font-size:.6rem;padding:.05rem .35rem" title="Delete"><i class="bi bi-trash"></i></button>
+                        </form>
+                      </div>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+                <?php else: ?>
+                  <p class="small text-muted mb-3">No photos yet — rooms with photos get booked far more often.</p>
+                <?php endif; ?>
+                <form method="POST" enctype="multipart/form-data" class="d-flex gap-2 align-items-center"><?= csrf_field() ?>
+                  <input type="hidden" name="action" value="upload_room_photos">
                   <input type="hidden" name="room_id" value="<?= $r['id'] ?>">
-                  <button class="btn btn-sm btn-outline-danger"
-                          style="border-radius:var(--radius-pill);font-size:.75rem;padding:.28rem .6rem">
-                    <i class="bi bi-trash"></i>
-                  </button>
+                  <input type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple class="form-control form-control-sm" style="max-width:280px">
+                  <button type="submit" class="btn btn-sm" style="background:#8e2434;color:#fff">Upload</button>
                 </form>
               </div>
             </div>
             <?php endforeach; ?>
           </div>
+          <?php endif; ?>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    document.querySelectorAll('.gallery-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelector(btn.dataset.target).classList.toggle('d-none');
+      });
+    });
+    </script>
+
+    <!-- ── PHOTOS TAB ────────────────────────────────────────── -->
+    <div class="tab-pane fade" id="photos">
+      <div class="row justify-content-center">
+        <div class="col-lg-9">
+          <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-4">
+              <h5 class="fw-bold mb-3">Upload Photos</h5>
+              <p class="text-muted small mb-3">
+                These show up in your hotel's gallery on the public listing — the first
+                impression a tourist gets before booking. You can select multiple files at once.
+              </p>
+              <form method="POST" enctype="multipart/form-data">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="upload_hotel_photos">
+                <div class="mb-3">
+                  <input type="file" class="form-control" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple required>
+                  <div class="form-text">JPG, PNG, or WEBP. Max 3MB each.</div>
+                </div>
+                <button type="submit" class="btn" style="background:#8e2434;color:#fff">
+                  <i class="bi bi-upload me-1"></i>Upload
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <?php if (empty($hotel_photos)): ?>
+            <div class="text-center py-5 text-muted">
+              <i class="bi bi-images fs-1 d-block mb-2"></i>
+              <div class="fw-semibold">No photos yet</div>
+              <div class="small">Upload your first hotel photo above — listings with photos get booked far more often.</div>
+            </div>
+          <?php else: ?>
+            <div class="row g-3">
+              <?php foreach ($hotel_photos as $ph): ?>
+                <div class="col-6 col-md-4">
+                  <div style="position:relative;border-radius:var(--radius-sm);overflow:hidden;border:1.5px solid var(--border)">
+                    <img src="<?= e($ph['url']) ?>" alt="" style="width:100%;height:150px;object-fit:cover;display:block">
+                    <?php if ($ph['photo_type'] === 'main'): ?>
+                      <span class="badge" style="position:absolute;top:8px;left:8px;background:#8e2434;color:#fff">
+                        <i class="bi bi-star-fill me-1"></i>Main photo
+                      </span>
+                    <?php endif; ?>
+                    <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.55);padding:.4rem;display:flex;gap:.4rem;justify-content:center">
+                      <?php if ($ph['photo_type'] !== 'main'): ?>
+                        <form method="POST" class="m-0"><?= csrf_field() ?>
+                          <input type="hidden" name="action" value="set_main_hotel_photo">
+                          <input type="hidden" name="photo_id" value="<?= $ph['id'] ?>">
+                          <button class="btn btn-sm btn-light" style="font-size:.7rem;padding:.15rem .5rem" title="Set as main photo">
+                            <i class="bi bi-star"></i>
+                          </button>
+                        </form>
+                      <?php endif; ?>
+                      <form method="POST" class="m-0" onsubmit="return confirm('Remove this photo?')"><?= csrf_field() ?>
+                        <input type="hidden" name="action" value="delete_hotel_photo">
+                        <input type="hidden" name="photo_id" value="<?= $ph['id'] ?>">
+                        <button class="btn btn-sm btn-outline-light" style="font-size:.7rem;padding:.15rem .5rem" title="Delete">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              <?php endforeach; ?>
+            </div>
           <?php endif; ?>
         </div>
       </div>

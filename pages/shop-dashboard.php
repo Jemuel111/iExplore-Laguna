@@ -34,12 +34,99 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdesc  = trim(input('pdesc',  'post', ''));
         $stock  = (int) input('stock',  'post', 999);
         if ($pname && $price > 0) {
+            try {
+                $photoUrl = handle_image_upload('photo', 'products');
+            } catch (RuntimeException $e) {
+                $_SESSION['flash']['error'] = $e->getMessage();
+                header('Location: ' . APP_URL . '/pages/shop-dashboard.php#products'); exit;
+            }
             db_execute(
-                "INSERT INTO shop_products (shop_id, name, description, price, category, stock)
-                 VALUES (?, ?, ?, ?, ?, ?)",
-                [$sid, $pname, $pdesc, $price, $cat, $stock]
+                "INSERT INTO shop_products (shop_id, name, description, image_url, price, category, stock)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [$sid, $pname, $pdesc, $photoUrl, $price, $cat, $stock]
             );
+            $newId = db_last_id();
+            if ($photoUrl && $newId) {
+                db_execute("INSERT INTO product_photos (product_id, url, sort_order) VALUES (?,?,0)", [$newId, $photoUrl]);
+            }
             $_SESSION['flash']['success'] = "Product \"{$pname}\" added!";
+        }
+        header('Location: ' . APP_URL . '/pages/shop-dashboard.php#products'); exit;
+    }
+
+    // ── Update just a product's photo (existing product) ──────
+    // ── Product gallery: upload one or more photos ──────────────
+    // Scoped to $sid (this owner's own shop) — the product itself is
+    // also re-checked against shop_id to prevent an owner from adding
+    // photos to another shop's product by tampering with the form.
+    if ($action === 'upload_product_photos') {
+        $pid = (int) input('product_id', 'post', 0);
+        $owns = db_fetch_one("SELECT id FROM shop_products WHERE id=? AND shop_id=?", [$pid, $sid]);
+        if (!$owns) { header('Location: ' . APP_URL . '/pages/shop-dashboard.php#products'); exit; }
+
+        $uploaded = 0;
+        $failed   = [];
+        if (!empty($_FILES['photos']) && is_array($_FILES['photos']['name'])) {
+            $fileCount = count($_FILES['photos']['name']);
+            for ($i = 0; $i < $fileCount; $i++) {
+                if ($_FILES['photos']['error'][$i] === UPLOAD_ERR_NO_FILE) continue;
+                $_FILES['__single_photo'] = [
+                    'name' => $_FILES['photos']['name'][$i], 'type' => $_FILES['photos']['type'][$i],
+                    'tmp_name' => $_FILES['photos']['tmp_name'][$i], 'error' => $_FILES['photos']['error'][$i],
+                    'size' => $_FILES['photos']['size'][$i],
+                ];
+                try {
+                    $url = handle_image_upload('__single_photo', 'products');
+                    if ($url) {
+                        $sortOrder = db_fetch_one("SELECT COALESCE(MAX(sort_order),0)+1 AS n FROM product_photos WHERE product_id=?", [$pid])['n'] ?? 0;
+                        db_execute("INSERT INTO product_photos (product_id, url, sort_order) VALUES (?,?,?)", [$pid, $url, $sortOrder]);
+                        // First photo ever uploaded for this product also becomes its list-view cover.
+                        $hasCover = db_fetch_one("SELECT image_url FROM shop_products WHERE id=?", [$pid]);
+                        if (empty($hasCover['image_url'])) {
+                            db_execute("UPDATE shop_products SET image_url=? WHERE id=?", [$url, $pid]);
+                        }
+                        $uploaded++;
+                    }
+                } catch (RuntimeException $e) {
+                    $failed[] = $_FILES['photos']['name'][$i] . ': ' . $e->getMessage();
+                }
+            }
+        }
+        if ($uploaded > 0) $_SESSION['flash']['success'] = "Uploaded {$uploaded} photo" . ($uploaded!=1?'s':'') . "!";
+        if (!empty($failed)) $_SESSION['flash']['error'] = 'Some files failed: ' . implode('; ', $failed);
+        header('Location: ' . APP_URL . '/pages/shop-dashboard.php#products'); exit;
+    }
+
+    // ── Product gallery: set a photo as the cover shown on cards ──
+    if ($action === 'set_main_product_photo') {
+        $photoId = (int) input('photo_id', 'post', 0);
+        $photo = db_fetch_one(
+            "SELECT pp.url FROM product_photos pp JOIN shop_products p ON pp.product_id=p.id
+             WHERE pp.id=? AND p.shop_id=?", [$photoId, $sid]
+        );
+        if ($photo) {
+            $pid = (int) input('product_id', 'post', 0);
+            db_execute("UPDATE shop_products SET image_url=? WHERE id=? AND shop_id=?", [$photo['url'], $pid, $sid]);
+        }
+        header('Location: ' . APP_URL . '/pages/shop-dashboard.php#products'); exit;
+    }
+
+    // ── Product gallery: delete a photo ──────────────────────────
+    if ($action === 'delete_product_photo') {
+        $photoId = (int) input('photo_id', 'post', 0);
+        $photo = db_fetch_one(
+            "SELECT pp.url, pp.product_id FROM product_photos pp JOIN shop_products p ON pp.product_id=p.id
+             WHERE pp.id=? AND p.shop_id=?", [$photoId, $sid]
+        );
+        if ($photo) {
+            db_execute("DELETE FROM product_photos WHERE id=?", [$photoId]);
+            // If the deleted photo was the cover, promote another remaining
+            // gallery photo (if any) so the card never points at a dead URL.
+            $product = db_fetch_one("SELECT image_url FROM shop_products WHERE id=?", [$photo['product_id']]);
+            if ($product && $product['image_url'] === $photo['url']) {
+                $next = db_fetch_one("SELECT url FROM product_photos WHERE product_id=? ORDER BY sort_order LIMIT 1", [$photo['product_id']]);
+                db_execute("UPDATE shop_products SET image_url=? WHERE id=?", [$next['url'] ?? null, $photo['product_id']]);
+            }
         }
         header('Location: ' . APP_URL . '/pages/shop-dashboard.php#products'); exit;
     }
@@ -147,6 +234,14 @@ $products = db_fetch_all(
     "SELECT * FROM shop_products WHERE shop_id = ? ORDER BY sort_order, name",
     [$sid]
 );
+
+// Per-product photo galleries, grouped by product_id for easy lookup in the cards below.
+$product_photos_raw = db_fetch_all(
+    "SELECT pp.* FROM product_photos pp JOIN shop_products p ON pp.product_id=p.id
+     WHERE p.shop_id = ? ORDER BY pp.sort_order", [$sid]
+);
+$product_photos = [];
+foreach ($product_photos_raw as $pp) { $product_photos[$pp['product_id']][] = $pp; }
 
 $orders = db_fetch_all(
     "SELECT o.*, u.name AS tourist_name, u.phone AS tourist_phone
@@ -404,11 +499,16 @@ require_once __DIR__ . '/../includes/header.php';
             <h6 class="fw-bold mb-3" style="color:var(--maroon-dark);font-family:'Playfair Display',serif">
               <i class="bi bi-plus-circle me-2" style="color:var(--terracotta)"></i>Add New Product
             </h6>
-            <form method="POST"><?= csrf_field() ?>
+            <form method="POST" enctype="multipart/form-data"><?= csrf_field() ?>
               <input type="hidden" name="action" value="add_product">
               <div class="mb-3">
                 <label class="form-label">Product Name <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" name="pname" placeholder="e.g. Brown Sugar Milk Tea" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Photo</label>
+                <input type="file" class="form-control" name="photo" accept="image/jpeg,image/png,image/webp">
+                <div class="form-text">JPG, PNG, or WEBP. Max 3MB. Optional, but products with photos get picked more often.</div>
               </div>
               <div class="mb-3">
                 <label class="form-label">Price (₱) <span class="text-danger">*</span></label>
@@ -445,42 +545,93 @@ require_once __DIR__ . '/../includes/header.php';
           </div>
           <?php else: ?>
           <div class="d-flex flex-column gap-2">
-            <?php foreach ($products as $p): ?>
-            <div class="d-flex align-items-center gap-3 p-3"
-                 style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);
+            <?php foreach ($products as $p): $pPhotos = $product_photos[$p['id']] ?? []; ?>
+            <div style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;
                         opacity:<?= $p['is_available'] ? '1' : '.55' ?>">
-              <div style="width:44px;height:44px;background:var(--maroon-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:var(--maroon-mid);flex-shrink:0">
-                <i class="bi bi-bag"></i>
-              </div>
-              <div class="flex-grow-1 min-w-0">
-                <div class="fw-bold" style="font-size:.93rem"><?= e($p['name']) ?></div>
-                <div class="text-muted small">
-                  <?= $p['category'] ? e($p['category']).' · ' : '' ?>
-                  Stock: <?= $p['stock'] >= 999 ? '∞' : $p['stock'] ?>
+              <div class="d-flex align-items-center gap-3 p-3">
+                <?php if (!empty($p['image_url'])): ?>
+                  <img src="<?= e($p['image_url']) ?>" alt="<?= e($p['name']) ?>"
+                       style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex-shrink:0">
+                <?php else: ?>
+                  <div style="width:44px;height:44px;background:var(--maroon-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:var(--maroon-mid);flex-shrink:0">
+                    <i class="bi bi-bag"></i>
+                  </div>
+                <?php endif; ?>
+                <div class="flex-grow-1 min-w-0">
+                  <div class="fw-bold" style="font-size:.93rem"><?= e($p['name']) ?></div>
+                  <div class="text-muted small">
+                    <?= $p['category'] ? e($p['category']).' · ' : '' ?>
+                    Stock: <?= $p['stock'] >= 999 ? '∞' : $p['stock'] ?>
+                  </div>
+                </div>
+                <div class="fw-bold" style="color:var(--terracotta);font-size:1rem;white-space:nowrap">
+                  ₱<?= number_format($p['price'],2) ?>
+                </div>
+                <div class="d-flex gap-2 flex-shrink-0">
+                  <!-- Manage photos toggle -->
+                  <button type="button" class="btn btn-sm btn-outline-secondary gallery-toggle-btn"
+                          style="border-radius:var(--radius-pill);font-size:.75rem;padding:.28rem .7rem"
+                          data-target="#product-gallery-<?= $p['id'] ?>">
+                    <i class="bi bi-images me-1"></i>Photos<?= count($pPhotos) ? ' ('.count($pPhotos).')' : '' ?>
+                  </button>
+                  <!-- Toggle availability -->
+                  <form method="POST"><?= csrf_field() ?>
+                    <input type="hidden" name="action"     value="toggle_product">
+                    <input type="hidden" name="product_id" value="<?= $p['id'] ?>">
+                    <button class="btn btn-sm <?= $p['is_available'] ? 'btn-outline-secondary' : 'btn-outline-success' ?>"
+                            style="border-radius:var(--radius-pill);font-size:.75rem;padding:.28rem .75rem"
+                            title="<?= $p['is_available'] ? 'Hide product' : 'Show product' ?>">
+                      <i class="bi <?= $p['is_available'] ? 'bi-eye-slash' : 'bi-eye' ?> me-1"></i><?= $p['is_available'] ? 'Hide' : 'Show' ?>
+                    </button>
+                  </form>
+                  <!-- Delete -->
+                  <form method="POST" onsubmit="return confirm('Delete this product?')"><?= csrf_field() ?>
+                    <input type="hidden" name="action"     value="delete_product">
+                    <input type="hidden" name="product_id" value="<?= $p['id'] ?>">
+                    <button class="btn btn-sm btn-outline-danger"
+                            style="border-radius:var(--radius-pill);font-size:.75rem;padding:.28rem .6rem">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
                 </div>
               </div>
-              <div class="fw-bold" style="color:var(--terracotta);font-size:1rem;white-space:nowrap">
-                ₱<?= number_format($p['price'],2) ?>
-              </div>
-              <div class="d-flex gap-2 flex-shrink-0">
-                <!-- Toggle availability -->
-                <form method="POST"><?= csrf_field() ?>
-                  <input type="hidden" name="action"     value="toggle_product">
+
+              <!-- Expandable photo gallery manager -->
+              <div id="product-gallery-<?= $p['id'] ?>" class="d-none gallery-panel" style="background:var(--sand);padding:1rem;border-top:1px solid var(--border)">
+                <?php if ($pPhotos): ?>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                  <?php foreach ($pPhotos as $ph): ?>
+                    <div style="position:relative;width:80px;height:80px;border-radius:8px;overflow:hidden;border:1.5px solid var(--border)">
+                      <img src="<?= e($ph['url']) ?>" style="width:100%;height:100%;object-fit:cover">
+                      <?php if ($ph['url'] === $p['image_url']): ?>
+                        <span class="badge" style="position:absolute;top:2px;left:2px;background:var(--maroon-mid);font-size:.55rem">Cover</span>
+                      <?php endif; ?>
+                      <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.55);padding:.15rem;display:flex;gap:.25rem;justify-content:center">
+                        <?php if ($ph['url'] !== $p['image_url']): ?>
+                          <form method="POST" class="m-0"><?= csrf_field() ?>
+                            <input type="hidden" name="action" value="set_main_product_photo">
+                            <input type="hidden" name="product_id" value="<?= $p['id'] ?>">
+                            <input type="hidden" name="photo_id" value="<?= $ph['id'] ?>">
+                            <button class="btn btn-sm btn-light" style="font-size:.6rem;padding:.05rem .35rem" title="Set as cover"><i class="bi bi-star"></i></button>
+                          </form>
+                        <?php endif; ?>
+                        <form method="POST" class="m-0" onsubmit="return confirm('Remove this photo?')"><?= csrf_field() ?>
+                          <input type="hidden" name="action" value="delete_product_photo">
+                          <input type="hidden" name="photo_id" value="<?= $ph['id'] ?>">
+                          <button class="btn btn-sm btn-outline-light" style="font-size:.6rem;padding:.05rem .35rem" title="Delete"><i class="bi bi-trash"></i></button>
+                        </form>
+                      </div>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+                <?php else: ?>
+                  <p class="small text-muted mb-3">No photos yet — add some so tourists can see what this product actually looks like.</p>
+                <?php endif; ?>
+                <form method="POST" enctype="multipart/form-data" class="d-flex gap-2 align-items-center"><?= csrf_field() ?>
+                  <input type="hidden" name="action" value="upload_product_photos">
                   <input type="hidden" name="product_id" value="<?= $p['id'] ?>">
-                  <button class="btn btn-sm <?= $p['is_available'] ? 'btn-outline-secondary' : 'btn-outline-success' ?>"
-                          style="border-radius:var(--radius-pill);font-size:.75rem;padding:.28rem .75rem"
-                          title="<?= $p['is_available'] ? 'Hide product' : 'Show product' ?>">
-                    <i class="bi <?= $p['is_available'] ? 'bi-eye-slash' : 'bi-eye' ?> me-1"></i><?= $p['is_available'] ? 'Hide' : 'Show' ?>
-                  </button>
-                </form>
-                <!-- Delete -->
-                <form method="POST" onsubmit="return confirm('Delete this product?')"><?= csrf_field() ?>
-                  <input type="hidden" name="action"     value="delete_product">
-                  <input type="hidden" name="product_id" value="<?= $p['id'] ?>">
-                  <button class="btn btn-sm btn-outline-danger"
-                          style="border-radius:var(--radius-pill);font-size:.75rem;padding:.28rem .6rem">
-                    <i class="bi bi-trash"></i>
-                  </button>
+                  <input type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple class="form-control form-control-sm" style="max-width:280px">
+                  <button type="submit" class="btn btn-sm" style="background:var(--maroon-mid);color:#fff">Upload</button>
                 </form>
               </div>
             </div>
@@ -490,6 +641,14 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
       </div>
     </div>
+
+    <script>
+    document.querySelectorAll('.gallery-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelector(btn.dataset.target).classList.toggle('d-none');
+      });
+    });
+    </script>
 
     <!-- ── SETTINGS TAB ──────────────────────────────────────── -->
     <div class="tab-pane fade" id="settings">
