@@ -713,32 +713,29 @@ let rpCityOrder = []; // city IDs in actual travel order, for grouping the spot 
 const ALL_CITIES_RP = <?= json_encode(array_map(function($c){
   return ['id'=>(int)$c['id'],'name'=>$c['name'],'latitude'=>(float)$c['latitude'],'longitude'=>(float)$c['longitude']];
 }, $cities)) ?>;
-const CITY_CORRIDOR_KM_RP = 10;
+// Max extra distance (km) a town is allowed to add to the trip — measured as
+// (origin→town + town→destination) minus the direct origin→destination
+// distance — before it stops counting as "along the way". This replaces an
+// older nearest-point-on-line approach, which clamped to the line's
+// endpoints and could falsely flag towns that just happened to sit within
+// the radius of the origin or destination, even if they were off to the
+// side in a completely different direction from the actual route.
+const DETOUR_THRESHOLD_KM_RP = 5;
 
 function haversineKmRP(lat1, lon1, lat2, lon2) {
   const R = 6371, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
   const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
-function pointToSegmentKmRP(lat, lng, aLat, aLng, bLat, bLng) {
-  const latRef = (aLat + bLat) / 2;
-  const kmPerDegLat = 110.574, kmPerDegLng = 111.320 * Math.cos(latRef * Math.PI / 180);
-  const toXY = (la, lo) => [(lo - aLng) * kmPerDegLng, (la - aLat) * kmPerDegLat];
-  const [px, py] = toXY(lat, lng), [bx, by] = toXY(bLat, bLng);
-  const segLenSq = bx*bx + by*by;
-  let t = segLenSq > 0 ? (px*bx + py*by) / segLenSq : 0;
-  t = Math.max(0, Math.min(1, t));
-  const dx = px - bx*t, dy = py - by*t;
-  return Math.sqrt(dx*dx + dy*dy);
-}
-function distanceToRouteKmRP(lat, lng, routeLine) {
-  if (!routeLine || routeLine.length < 2) return Infinity;
-  let min = Infinity;
-  for (let i = 0; i < routeLine.length - 1; i++) {
-    const d = pointToSegmentKmRP(lat, lng, routeLine[i][0], routeLine[i][1], routeLine[i+1][0], routeLine[i+1][1]);
-    if (d < min) min = d;
-  }
-  return min;
+// How much farther the trip becomes if it detours through this city on the
+// way from origin to dest. ~0 for a city that's genuinely on the road;
+// large for a city that's only near one endpoint but off in another
+// direction (which is what let towns like Calauan/Rizal slip in before).
+function detourKmRP(city, origin, dest) {
+  const viaCity = haversineKmRP(origin.latitude, origin.longitude, city.latitude, city.longitude)
+                + haversineKmRP(city.latitude, city.longitude, dest.latitude, dest.longitude);
+  const direct  = haversineKmRP(origin.latitude, origin.longitude, dest.latitude, dest.longitude);
+  return viaCity - direct;
 }
 
 document.getElementById('rp-swap-btn').addEventListener('click', () => {
@@ -790,7 +787,7 @@ document.getElementById('rp-find-btn').addEventListener('click', async () => {
 
   const alongRouteUnsorted = ALL_CITIES_RP.filter(c => {
     if (c.id === rpOrigin.id || c.id === rpDest.id) return true;
-    return distanceToRouteKmRP(c.latitude, c.longitude, rpRouteLine) <= CITY_CORRIDOR_KM_RP;
+    return detourKmRP(c, rpOrigin, rpDest) <= DETOUR_THRESHOLD_KM_RP;
   });
 
   // Order cities the way a traveler actually encounters them — projected
