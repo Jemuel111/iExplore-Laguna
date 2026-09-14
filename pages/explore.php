@@ -713,30 +713,57 @@ let rpCityOrder = []; // city IDs in actual travel order, for grouping the spot 
 const ALL_CITIES_RP = <?= json_encode(array_map(function($c){
   return ['id'=>(int)$c['id'],'name'=>$c['name'],'latitude'=>(float)$c['latitude'],'longitude'=>(float)$c['longitude']];
 }, $cities)) ?>;
-// Max extra distance (km) a town is allowed to add to the trip — measured as
-// (origin→town + town→destination) minus the direct origin→destination
-// distance — before it stops counting as "along the way". This replaces an
-// older nearest-point-on-line approach, which clamped to the line's
-// endpoints and could falsely flag towns that just happened to sit within
-// the radius of the origin or destination, even if they were off to the
-// side in a completely different direction from the actual route.
-const DETOUR_THRESHOLD_KM_RP = 5;
+// Corridor width (km) for a town whose closest point on the route is
+// somewhere in the *interior* of the road — i.e. the road genuinely bends
+// near it. Generous, because real roads legitimately curve around terrain
+// (e.g. Mt. Makiling), and a town near one of those curves really is "on
+// the way" even if it looks far off a straight line between the endpoints.
+const CORRIDOR_KM_RP = 5;
+// Tighter radius used ONLY when a town's closest point on the route is the
+// very first or very last point of the route (i.e. right at the origin or
+// destination itself). Being "close" to an endpoint isn't the same as being
+// on the road — a town can sit just a few km from the destination but in a
+// totally different direction from the way the road actually approaches it
+// (this was the original bug: Calauan/Rizal were ~9km from San Pablo as the
+// crow flies, but north of it, not on the Alaminos→San Pablo road at all).
+const ENDPOINT_RADIUS_KM_RP = 2;
 
 function haversineKmRP(lat1, lon1, lat2, lon2) {
   const R = 6371, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
   const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
-// How much farther the trip becomes if it detours through this city on the
-// way from origin to dest. ~0 for a city that's genuinely on the road;
-// large for a city that's only near one endpoint but off in another
-// direction (which is what let towns like Calauan/Rizal slip in before).
-function detourKmRP(city, origin, dest) {
-  const viaCity = haversineKmRP(origin.latitude, origin.longitude, city.latitude, city.longitude)
-                + haversineKmRP(city.latitude, city.longitude, dest.latitude, dest.longitude);
-  const direct  = haversineKmRP(origin.latitude, origin.longitude, dest.latitude, dest.longitude);
-  return viaCity - direct;
+// Distance from a point to one segment of the route, plus the segment-local
+// parameter t (0 = at segment's start, 1 = at segment's end, clamped).
+function pointToSegmentInfoRP(lat, lng, aLat, aLng, bLat, bLng) {
+  const latRef = (aLat + bLat) / 2;
+  const kmPerDegLat = 110.574, kmPerDegLng = 111.320 * Math.cos(latRef * Math.PI / 180);
+  const toXY = (la, lo) => [(lo - aLng) * kmPerDegLng, (la - aLat) * kmPerDegLat];
+  const [px, py] = toXY(lat, lng), [bx, by] = toXY(bLat, bLng);
+  const segLenSq = bx*bx + by*by;
+  let t = segLenSq > 0 ? (px*bx + py*by) / segLenSq : 0;
+  const tClamped = Math.max(0, Math.min(1, t));
+  const dx = px - bx*tClamped, dy = py - by*tClamped;
+  return { distanceKm: Math.sqrt(dx*dx + dy*dy), t: tClamped };
 }
+// Finds the closest point on the WHOLE route (all segments) to a city, and
+// flags whether that closest point landed exactly on the route's absolute
+// start or absolute end — the only case where "close" can still mean "off
+// to the side, wrong direction" rather than "genuinely along this road".
+function routeProximityInfoRP(lat, lng, routeLine) {
+  if (!routeLine || routeLine.length < 2) return { distanceKm: Infinity, isEndpointOnly: true };
+  const lastSeg = routeLine.length - 2;
+  let best = null;
+  for (let i = 0; i <= lastSeg; i++) {
+    const info = pointToSegmentInfoRP(lat, lng, routeLine[i][0], routeLine[i][1], routeLine[i+1][0], routeLine[i+1][1]);
+    const isEndpointOnly = (i === 0 && info.t === 0) || (i === lastSeg && info.t === 1);
+    if (!best || info.distanceKm < best.distanceKm) {
+      best = { distanceKm: info.distanceKm, isEndpointOnly };
+    }
+  }
+  return best;
+}
+
 
 document.getElementById('rp-swap-btn').addEventListener('click', () => {
   const o = document.getElementById('rp-origin-select');
@@ -787,7 +814,8 @@ document.getElementById('rp-find-btn').addEventListener('click', async () => {
 
   const alongRouteUnsorted = ALL_CITIES_RP.filter(c => {
     if (c.id === rpOrigin.id || c.id === rpDest.id) return true;
-    return detourKmRP(c, rpOrigin, rpDest) <= DETOUR_THRESHOLD_KM_RP;
+    const { distanceKm, isEndpointOnly } = routeProximityInfoRP(c.latitude, c.longitude, rpRouteLine);
+    return distanceKm <= (isEndpointOnly ? ENDPOINT_RADIUS_KM_RP : CORRIDOR_KM_RP);
   });
 
   // Order cities the way a traveler actually encounters them — projected
