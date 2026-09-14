@@ -404,6 +404,15 @@ function setTrafficEnabled(enabled) {
     }
     if (legend) legend.hidden = true;
   }
+
+  // Live traffic changes the itinerary's estimated arrival times (see
+  // getTrafficAdjustment), not just the map overlay — so if a schedule is
+  // already on screen, recompute it right away rather than leaving stale
+  // times up until the visitor happens to replan.
+  if (lastItineraryRender) {
+    const { routeData, spots, days, forceIncludeAll } = lastItineraryRender;
+    renderItinerary(routeData, spots, days, forceIncludeAll);
+  }
 }
 
 document.getElementById('traffic-toggle-btn')?.addEventListener('click', () => {
@@ -471,6 +480,51 @@ function estimateTravelMinutes(km) {
 function distanceTimeLabel(km) {
   const mins = estimateTravelMinutes(km);
   return `${km < 10 ? km.toFixed(1) : Math.round(km)} km · ~${formatDuration(mins)}`;
+}
+
+// ── Live traffic-adjusted travel time ───────────────────────
+// Reuses the same TomTom Flow Segment data that powers the map overlay
+// (see setTrafficEnabled below) to nudge the itinerary's estimated leg
+// times when the current is slower than usual — e.g. a "1:00 PM" arrival
+// becomes "1:20 PM" when the road it's traveling on is showing heavy
+// traffic right now, instead of always assuming the same average speed.
+
+// Cached per lookup so re-rendering the itinerary, or two legs that pass
+// near the same spot, don't each cost a separate API call. Keyed to ~1km
+// precision — plenty coarse for "is this stretch of road congested".
+const trafficCache = new Map();
+
+// Turns a single point's live conditions into a multiplier applied to the
+// leg's normally-estimated travel time (1 = no change, >1 = slower than
+// usual right now). Falls back to "no adjustment" whenever live traffic
+// isn't turned on, isn't configured, or the lookup fails for any reason —
+// the itinerary must still work even if TomTom is unreachable.
+async function getTrafficAdjustment(lat, lng) {
+  if (!trafficEnabled || !TOMTOM_API_KEY) return { multiplier: 1, condition: null };
+
+  const key = `${lat.toFixed(2)},${lng.toFixed(2)}`;
+  if (trafficCache.has(key)) return trafficCache.get(key);
+
+  let result = { multiplier: 1, condition: null };
+  try {
+    const res = await fetch(
+      `<?= APP_URL ?>/api/routes.php?action=traffic&points=${encodeURIComponent(JSON.stringify([{ lat, lng }]))}`
+    ).then(r => r.json());
+    const point = res.success && Array.isArray(res.data) ? res.data[0] : null;
+    if (point && point.relativeSpeed > 0) {
+      // relativeSpeed is currentSpeed/freeFlowSpeed — under 1 means slower
+      // than the road's normal free-flow speed right now. Floor it at 0.35
+      // so one severely-congested (or misreported near-zero) data point
+      // can't blow a leg's estimate up to several hours.
+      const clampedRatio = Math.max(0.35, Math.min(1, point.relativeSpeed));
+      result = { multiplier: 1 / clampedRatio, condition: point.condition };
+    }
+  } catch (err) {
+    // Network hiccup or TomTom outage — quietly keep the static estimate.
+  }
+
+  trafficCache.set(key, result);
+  return result;
 }
 
 // ── "Is this spot actually along the way?" corridor filter ──
@@ -1210,7 +1264,13 @@ async function findNearestHotel(anchorSpot) {
   }
 }
 
+// Remembers the args of the last itinerary render so toggling live traffic
+// on/off can recompute the schedule immediately, instead of only affecting
+// the map overlay until the visitor happens to replan the trip.
+let lastItineraryRender = null;
+
 async function renderItinerary(routeData, spots, days, forceIncludeAll = false) {
+  lastItineraryRender = { routeData, spots, days, forceIncludeAll };
   const container = document.getElementById('itinerary-days');
 
   // Closed spots (that won't reopen before travel) are never scheduled.
@@ -1317,12 +1377,25 @@ async function renderItinerary(routeData, spots, days, forceIncludeAll = false) 
         const interCityKm = fare && fare.distance_km
           ? parseFloat(fare.distance_km)
           : haversineKm(lastPoint.latitude, lastPoint.longitude, cityLat, cityLng);
-        const travelMins = fare && fare.duration_min ? fare.duration_min : estimateTravelMinutes(interCityKm);
+        const baseTravelMins = fare && fare.duration_min ? fare.duration_min : estimateTravelMinutes(interCityKm);
+
+        // Sample live traffic near the midpoint of this leg — a single
+        // point can't capture an entire 15-20km ride, but it's a reasonable
+        // proxy for "is this general corridor congested right now", and
+        // matches what the traffic overlay itself is already showing.
+        const midLat = (lastPoint.latitude + cityLat) / 2;
+        const midLng = (lastPoint.longitude + cityLng) / 2;
+        const traffic = await getTrafficAdjustment(midLat, midLng);
+        const travelMins = Math.round(baseTravelMins * traffic.multiplier);
+        const extraMins = travelMins - baseTravelMins;
 
         const heading = fare ? `Board a ${transportLabel(fare.transport_type)} to ${spot.city_name}` : `Travel to ${spot.city_name}`;
-        const desc = fare
-          ? `${fare.fare_php > 0 ? '₱'+parseFloat(fare.fare_php).toFixed(2) : 'Own vehicle'} · ${fare.distance_km} km · ${formatDuration(fare.duration_min)} from ${lastPoint.cityName}`
-          : `${distanceTimeLabel(interCityKm)} from ${lastPoint.cityName} · no fixed fare on file — try tricycle/habal-habal and negotiate`;
+        const trafficNote = (traffic.condition && traffic.condition !== 'free' && extraMins > 0)
+          ? ` · 🚦 ${traffic.condition} traffic right now (+${extraMins} min)`
+          : '';
+        const desc = (fare
+          ? `${fare.fare_php > 0 ? '₱'+parseFloat(fare.fare_php).toFixed(2) : 'Own vehicle'} · ${fare.distance_km} km · ${formatDuration(travelMins)} from ${lastPoint.cityName}`
+          : `${distanceTimeLabel(interCityKm)} from ${lastPoint.cityName} · no fixed fare on file — try tricycle/habal-habal and negotiate`) + trafficNote;
 
         events.push({
           t: time,
