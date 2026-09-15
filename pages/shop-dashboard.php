@@ -277,7 +277,7 @@ require_once __DIR__ . '/../includes/header.php';
 <?php endif; ?>
 
 <!-- Page header -->
-<section class="py-3" style="background:linear-gradient(135deg,var(--terracotta),var(--sand-dark));color:#fff">
+<section class="py-3" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
       <div class="d-flex align-items-center gap-3">
@@ -296,7 +296,7 @@ require_once __DIR__ . '/../includes/header.php';
       </div>
       <?php if ($pending_count > 0): ?>
         <a href="#orders" class="btn btn-sm"
-           style="background:#fff;color:var(--terracotta);font-weight:700;border-radius:var(--radius-pill)">
+           style="background:#fff;color:var(--maroon-mid);font-weight:700;border-radius:var(--radius-pill)">
           <i class="bi bi-bell-fill me-1"></i><?= $pending_count ?> New Order<?= $pending_count > 1 ? 's' : '' ?>
         </a>
       <?php endif; ?>
@@ -335,7 +335,7 @@ require_once __DIR__ . '/../includes/header.php';
       <a class="nav-link active" data-bs-toggle="tab" href="#orders" style="font-weight:600">
         <i class="bi bi-receipt me-1"></i>Orders
         <?php if ($pending_count): ?>
-          <span class="badge rounded-pill ms-1" style="background:var(--terracotta);font-size:.7rem"><?= $pending_count ?></span>
+          <span class="badge rounded-pill ms-1" style="background:var(--maroon-mid);font-size:.7rem"><?= $pending_count ?></span>
         <?php endif; ?>
       </a>
     </li>
@@ -362,7 +362,17 @@ require_once __DIR__ . '/../includes/header.php';
           <p class="text-muted">Orders will appear here once tourists place them.</p>
         </div>
       <?php else: ?>
-        <div class="d-flex flex-column gap-3">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+          <div class="input-group" style="max-width:340px">
+            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+            <input type="text" id="orders-search" class="form-control"
+                   placeholder="Search by order #, customer, item, or status…">
+          </div>
+          <span class="badge border text-body" style="background:#fff;border-color:var(--border)!important">
+            <span id="orders-visible-count"><?= count($orders) ?></span> / <?= count($orders) ?> shown
+          </span>
+        </div>
+        <div class="d-flex flex-column gap-3" id="orders-list-body">
           <?php foreach ($orders as $ord):
             $st = order_status_meta($ord['status']);
             $bg = $st['bg']; $fg = $st['fg'];
@@ -371,8 +381,11 @@ require_once __DIR__ . '/../includes/header.php';
                 "SELECT * FROM order_items WHERE order_id = ?",
                 [$ord['id']]
             );
+            $itemNames = implode(' ', array_column($items, 'product_name'));
+            $orderSearchBlob = strtolower($ord['order_number'].' '.$ord['tourist_name'].' '.$ord['status'].' '.$itemNames);
           ?>
-          <div class="p-0 rounded overflow-hidden" style="border:1.5px solid var(--border);background:#fff">
+          <div class="p-0 rounded overflow-hidden order-row" data-search="<?= e($orderSearchBlob) ?>"
+               style="border:1.5px solid var(--border);background:#fff">
             <!-- Order header -->
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 p-3"
                  style="background:var(--cream);border-bottom:1px solid var(--border)">
@@ -475,7 +488,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <input type="hidden" name="action"   value="update_order">
                     <input type="hidden" name="order_id" value="<?= $ord['id'] ?>">
                     <input type="hidden" name="status"   value="picked_up">
-                    <button class="btn btn-sm" style="background:var(--terracotta);color:#fff;border-radius:var(--radius-pill)">
+                    <button class="btn btn-sm" style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-pill)">
                       <i class="bi bi-check2-circle me-1"></i>Mark Picked Up
                     </button>
                   </form>
@@ -486,6 +499,54 @@ require_once __DIR__ . '/../includes/header.php';
           </div>
           <?php endforeach; ?>
         </div>
+        <div class="text-center mt-3">
+          <button type="button" id="orders-show-more" class="btn btn-outline-secondary btn-sm">
+            Show more <i class="bi bi-chevron-down ms-1"></i>
+          </button>
+          <div id="orders-no-results" class="text-muted small py-3 d-none">
+            <i class="bi bi-search me-1"></i>No orders match "<span id="orders-no-results-query"></span>".
+          </div>
+        </div>
+        <script>
+        (function () {
+          const PAGE_SIZE = 10;
+          const rows = Array.from(document.querySelectorAll('#orders-list-body .order-row'));
+          const searchInput = document.getElementById('orders-search');
+          const showMoreBtn = document.getElementById('orders-show-more');
+          const visibleCountEl = document.getElementById('orders-visible-count');
+          const noResultsEl = document.getElementById('orders-no-results');
+          const noResultsQueryEl = document.getElementById('orders-no-results-query');
+          let shownCount = PAGE_SIZE;
+
+          function renderPaged() {
+            rows.forEach((row, i) => { row.style.display = i < shownCount ? '' : 'none'; });
+            visibleCountEl.textContent = Math.min(shownCount, rows.length);
+            showMoreBtn.classList.toggle('d-none', shownCount >= rows.length);
+            noResultsEl.classList.add('d-none');
+          }
+          function renderSearch(query) {
+            let matches = 0;
+            rows.forEach(row => {
+              const isMatch = row.dataset.search.includes(query);
+              row.style.display = isMatch ? '' : 'none';
+              if (isMatch) matches++;
+            });
+            visibleCountEl.textContent = matches;
+            showMoreBtn.classList.add('d-none');
+            noResultsEl.classList.toggle('d-none', matches > 0);
+            noResultsQueryEl.textContent = query;
+          }
+          showMoreBtn.addEventListener('click', () => {
+            shownCount = Math.min(shownCount + PAGE_SIZE, rows.length);
+            renderPaged();
+          });
+          searchInput.addEventListener('input', () => {
+            const query = searchInput.value.trim().toLowerCase();
+            if (query) renderSearch(query); else { shownCount = PAGE_SIZE; renderPaged(); }
+          });
+          renderPaged();
+        })();
+        </script>
       <?php endif; ?>
     </div>
 
@@ -497,7 +558,7 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="col-lg-4">
           <div class="form-panel">
             <h6 class="fw-bold mb-3" style="color:var(--maroon-dark);font-family:'Playfair Display',serif">
-              <i class="bi bi-plus-circle me-2" style="color:var(--terracotta)"></i>Add New Product
+              <i class="bi bi-plus-circle me-2" style="color:var(--maroon-mid)"></i>Add New Product
             </h6>
             <form method="POST" enctype="multipart/form-data"><?= csrf_field() ?>
               <input type="hidden" name="action" value="add_product">
@@ -564,7 +625,7 @@ require_once __DIR__ . '/../includes/header.php';
                     Stock: <?= $p['stock'] >= 999 ? '∞' : $p['stock'] ?>
                   </div>
                 </div>
-                <div class="fw-bold" style="color:var(--terracotta);font-size:1rem;white-space:nowrap">
+                <div class="fw-bold" style="color:var(--maroon-mid);font-size:1rem;white-space:nowrap">
                   ₱<?= number_format($p['price'],2) ?>
                 </div>
                 <div class="d-flex gap-2 flex-shrink-0">

@@ -332,7 +332,7 @@ require_once __DIR__ . '/../includes/header.php';
 <?php endif; ?>
 
 <!-- Page header -->
-<section class="py-3" style="background:linear-gradient(135deg,#8e2434,#c65a68);color:#fff">
+<section class="py-3" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
       <div class="d-flex align-items-center gap-3">
@@ -351,7 +351,7 @@ require_once __DIR__ . '/../includes/header.php';
       </div>
       <?php if ($pending_count > 0): ?>
         <a href="#bookings" class="btn btn-sm"
-           style="background:#fff;color:#8e2434;font-weight:700;border-radius:var(--radius-pill)">
+           style="background:#fff;color:var(--maroon-dark);font-weight:700;border-radius:var(--radius-pill)">
           <i class="bi bi-bell-fill me-1"></i><?= $pending_count ?> New Booking<?= $pending_count > 1 ? 's' : '' ?>
         </a>
       <?php endif; ?>
@@ -390,7 +390,7 @@ require_once __DIR__ . '/../includes/header.php';
       <a class="nav-link active" data-bs-toggle="tab" href="#bookings" style="font-weight:600">
         <i class="bi bi-calendar-check me-1"></i>Bookings
         <?php if ($pending_count): ?>
-          <span class="badge rounded-pill ms-1" style="background:#8e2434;font-size:.7rem"><?= $pending_count ?></span>
+          <span class="badge rounded-pill ms-1" style="background:var(--maroon-dark);font-size:.7rem"><?= $pending_count ?></span>
         <?php endif; ?>
       </a>
     </li>
@@ -422,12 +422,24 @@ require_once __DIR__ . '/../includes/header.php';
           <p class="text-muted">Bookings will appear here once tourists reserve a room.</p>
         </div>
       <?php else: ?>
-        <div class="d-flex flex-column gap-3">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+          <div class="input-group" style="max-width:340px">
+            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+            <input type="text" id="bookings-search" class="form-control"
+                   placeholder="Search by booking #, customer, room type, or status…">
+          </div>
+          <span class="badge border text-body" style="background:#fff;border-color:var(--border)!important">
+            <span id="bookings-visible-count"><?= count($bookings) ?></span> / <?= count($bookings) ?> shown
+          </span>
+        </div>
+        <div class="d-flex flex-column gap-3" id="bookings-list-body">
           <?php foreach ($bookings as $bk):
             $st = booking_status_meta($bk['status']);
             $bg = $st['bg']; $fg = $st['fg'];
+            $bookingSearchBlob = strtolower($bk['booking_number'].' '.$bk['tourist_name'].' '.$bk['room_type'].' '.$bk['status']);
           ?>
-          <div class="p-0 rounded overflow-hidden" style="border:1.5px solid var(--border);background:#fff">
+          <div class="p-0 rounded overflow-hidden booking-row" data-search="<?= e($bookingSearchBlob) ?>"
+               style="border:1.5px solid var(--border);background:#fff">
             <!-- Booking header -->
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 p-3"
                  style="background:var(--cream);border-bottom:1px solid var(--border)">
@@ -523,6 +535,54 @@ require_once __DIR__ . '/../includes/header.php';
           </div>
           <?php endforeach; ?>
         </div>
+        <div class="text-center mt-3">
+          <button type="button" id="bookings-show-more" class="btn btn-outline-secondary btn-sm">
+            Show more <i class="bi bi-chevron-down ms-1"></i>
+          </button>
+          <div id="bookings-no-results" class="text-muted small py-3 d-none">
+            <i class="bi bi-search me-1"></i>No bookings match "<span id="bookings-no-results-query"></span>".
+          </div>
+        </div>
+        <script>
+        (function () {
+          const PAGE_SIZE = 10;
+          const rows = Array.from(document.querySelectorAll('#bookings-list-body .booking-row'));
+          const searchInput = document.getElementById('bookings-search');
+          const showMoreBtn = document.getElementById('bookings-show-more');
+          const visibleCountEl = document.getElementById('bookings-visible-count');
+          const noResultsEl = document.getElementById('bookings-no-results');
+          const noResultsQueryEl = document.getElementById('bookings-no-results-query');
+          let shownCount = PAGE_SIZE;
+
+          function renderPaged() {
+            rows.forEach((row, i) => { row.style.display = i < shownCount ? '' : 'none'; });
+            visibleCountEl.textContent = Math.min(shownCount, rows.length);
+            showMoreBtn.classList.toggle('d-none', shownCount >= rows.length);
+            noResultsEl.classList.add('d-none');
+          }
+          function renderSearch(query) {
+            let matches = 0;
+            rows.forEach(row => {
+              const isMatch = row.dataset.search.includes(query);
+              row.style.display = isMatch ? '' : 'none';
+              if (isMatch) matches++;
+            });
+            visibleCountEl.textContent = matches;
+            showMoreBtn.classList.add('d-none');
+            noResultsEl.classList.toggle('d-none', matches > 0);
+            noResultsQueryEl.textContent = query;
+          }
+          showMoreBtn.addEventListener('click', () => {
+            shownCount = Math.min(shownCount + PAGE_SIZE, rows.length);
+            renderPaged();
+          });
+          searchInput.addEventListener('input', () => {
+            const query = searchInput.value.trim().toLowerCase();
+            if (query) renderSearch(query); else { shownCount = PAGE_SIZE; renderPaged(); }
+          });
+          renderPaged();
+        })();
+        </script>
       <?php endif; ?>
     </div>
 
@@ -534,7 +594,7 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="col-lg-4">
           <div class="form-panel">
             <h6 class="fw-bold mb-3" style="color:var(--maroon-dark);font-family:'Playfair Display',serif">
-              <i class="bi bi-plus-circle me-2" style="color:#8e2434"></i>Add Room Type
+              <i class="bi bi-plus-circle me-2" style="color:var(--maroon-dark)"></i>Add Room Type
             </h6>
             <form method="POST" enctype="multipart/form-data"><?= csrf_field() ?>
               <input type="hidden" name="action" value="add_room">
@@ -595,7 +655,7 @@ require_once __DIR__ . '/../includes/header.php';
                   <img src="<?= e($r['image_url']) ?>" alt="<?= e($r['room_type']) ?>"
                        style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex-shrink:0">
                 <?php else: ?>
-                  <div style="width:44px;height:44px;background:#f7dde1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:#8e2434;flex-shrink:0">
+                  <div style="width:44px;height:44px;background:var(--maroon-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:var(--maroon-dark);flex-shrink:0">
                     <i class="bi bi-door-closed"></i>
                   </div>
                 <?php endif; ?>
@@ -606,7 +666,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <?= $r['room_count'] ?> room<?= $r['room_count']!=1?'s':'' ?>
                   </div>
                 </div>
-                <div class="fw-bold" style="color:#8e2434;font-size:1rem;white-space:nowrap">
+                <div class="fw-bold" style="color:var(--maroon-dark);font-size:1rem;white-space:nowrap">
                   ₱<?= number_format($r['price_per_night'],2) ?>/night
                 </div>
                 <div class="d-flex gap-2 flex-shrink-0">
@@ -646,7 +706,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <div style="position:relative;width:80px;height:80px;border-radius:8px;overflow:hidden;border:1.5px solid var(--border)">
                       <img src="<?= e($ph['url']) ?>" style="width:100%;height:100%;object-fit:cover">
                       <?php if ($ph['url'] === $r['image_url']): ?>
-                        <span class="badge" style="position:absolute;top:2px;left:2px;background:#8e2434;font-size:.55rem">Cover</span>
+                        <span class="badge" style="position:absolute;top:2px;left:2px;background:var(--maroon-dark);font-size:.55rem">Cover</span>
                       <?php endif; ?>
                       <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.55);padding:.15rem;display:flex;gap:.25rem;justify-content:center">
                         <?php if ($ph['url'] !== $r['image_url']): ?>
@@ -673,7 +733,7 @@ require_once __DIR__ . '/../includes/header.php';
                   <input type="hidden" name="action" value="upload_room_photos">
                   <input type="hidden" name="room_id" value="<?= $r['id'] ?>">
                   <input type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple class="form-control form-control-sm" style="max-width:280px">
-                  <button type="submit" class="btn btn-sm" style="background:#8e2434;color:#fff">Upload</button>
+                  <button type="submit" class="btn btn-sm" style="background:var(--maroon-dark);color:#fff">Upload</button>
                 </form>
               </div>
             </div>
@@ -710,7 +770,7 @@ require_once __DIR__ . '/../includes/header.php';
                   <input type="file" class="form-control" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple required>
                   <div class="form-text">JPG, PNG, or WEBP. Max 3MB each.</div>
                 </div>
-                <button type="submit" class="btn" style="background:#8e2434;color:#fff">
+                <button type="submit" class="btn" style="background:var(--maroon-dark);color:#fff">
                   <i class="bi bi-upload me-1"></i>Upload
                 </button>
               </form>
@@ -730,7 +790,7 @@ require_once __DIR__ . '/../includes/header.php';
                   <div style="position:relative;border-radius:var(--radius-sm);overflow:hidden;border:1.5px solid var(--border)">
                     <img src="<?= e($ph['url']) ?>" alt="" style="width:100%;height:150px;object-fit:cover;display:block">
                     <?php if ($ph['photo_type'] === 'main'): ?>
-                      <span class="badge" style="position:absolute;top:8px;left:8px;background:#8e2434;color:#fff">
+                      <span class="badge" style="position:absolute;top:8px;left:8px;background:var(--maroon-dark);color:#fff">
                         <i class="bi bi-star-fill me-1"></i>Main photo
                       </span>
                     <?php endif; ?>
