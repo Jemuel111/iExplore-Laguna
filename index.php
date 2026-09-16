@@ -60,7 +60,7 @@ function spot_badge(string $category): string {
           <span class="hero-eyebrow">Smart Travel Planner · Laguna, Philippines</span>
         </div>
         <h1 class="hero-title fade-up fade-up-1">
-          Discover the <em>Heart</em> of Laguna Province
+          Discover  <em>More</em> To Love
         </h1>
         <p class="hero-subtitle fade-up fade-up-2">
           <strong style="color:var(--sand-dark);font-style:italic">i</strong>Explore Laguna
