@@ -1326,7 +1326,7 @@ async function generateItinerary(btn) {
       const heading = fare ? `Board a ${transportLabelGI(fare.transport_type)} to ${d.city}` : `Travel to ${d.city}`;
       const desc = fare
         ? `${fare.fare_php > 0 ? '₱'+parseFloat(fare.fare_php).toFixed(2) : 'Own vehicle'} · ${fare.distance_km} km · ${formatDurationGI(fare.duration_min)}`
-        : `${hopKm.toFixed(1)} km · no fixed fare on file — try tricycle/habal-habal and negotiate`;
+        : `${hopKm.toFixed(1)} km · no fixed fare on file — try tricycle and negotiate`;
       html += `
         <div class="itinerary-row">
           <div class="itinerary-time">${minutesToLabelGI(time)}</div>
