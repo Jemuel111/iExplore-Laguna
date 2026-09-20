@@ -24,10 +24,10 @@ function ensure_site_settings_table(): void {
 
     $defaults = [
         'logo_path'     => '',
-        'theme_dark'    => '#6b0f14',
-        'theme_primary' => '#a61c1c',
-        'theme_light'   => '#e2574c',
-        'theme_pale'    => '#fbdede',
+        'theme_dark'    => '#B0281C',
+        'theme_primary' => '#D9481F',
+        'theme_light'   => '#FF7A45',
+        'theme_pale'    => '#FFE3D2',
         'theme_accent'  => '#e9c46a',
     ];
 
@@ -53,10 +53,10 @@ function site_settings(): array {
 
     $settings += [
         'logo_path'     => '',
-        'theme_dark'    => '#6b0f14',
-        'theme_primary' => '#a61c1c',
-        'theme_light'   => '#e2574c',
-        'theme_pale'    => '#fbdede',
+        'theme_dark'    => '#B0281C',
+        'theme_primary' => '#D9481F',
+        'theme_light'   => '#FF7A45',
+        'theme_pale'    => '#FFE3D2',
         'theme_accent'  => '#e9c46a',
     ];
     return $settings;

@@ -697,6 +697,17 @@ $shops = db_fetch_all(
 
 <!-- ── JavaScript ─────────────────────────────────────────── -->
 <script>
+// Map colors can't use CSS var() directly — Leaflet needs literal color
+// strings. Reading the computed value at runtime (same approach as
+// planner.php) keeps this map's route/markers following whatever color
+// the admin sets in Site Settings, instead of a frozen hardcoded hex.
+function themeColor(varName, fallback) {
+  const v = getComputedStyle(document.body).getPropertyValue(varName).trim();
+  return v || fallback;
+}
+const THEME_DARK  = themeColor('--maroon-dark',  '#B0281C');
+const THEME_LIGHT = themeColor('--maroon-light', '#FF7A45');
+
 // ── Cart State ────────────────────────────────────────────────
 let cart = JSON.parse(localStorage.getItem('iexplore_cart') || '[]');
 let lastGeneratedItinerary = null;
@@ -889,7 +900,7 @@ function renderRpMap(alongRoute) {
   if (rpMap) { rpMap.remove(); rpMap = null; }
   rpMap = L.map('rp-map', { zoomControl: true }).setView([rpOrigin.latitude, rpOrigin.longitude], 10);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 18 }).addTo(rpMap);
-  L.polyline(rpRouteLine, { color: '#6b0f14', weight: 4, opacity: 0.8 }).addTo(rpMap);
+  L.polyline(rpRouteLine, { color: THEME_DARK, weight: 4, opacity: 0.8 }).addTo(rpMap);
 
   rpMapMarkers = [];
   const bounds = [];
@@ -897,7 +908,7 @@ function renderRpMap(alongRoute) {
     const isEndpoint = c.id === rpOrigin.id || c.id === rpDest.id;
     const marker = L.circleMarker([c.latitude, c.longitude], {
       radius: isEndpoint ? 10 : 8,
-      fillColor: isEndpoint ? '#6b0f14' : (includedCityIds.has(c.id) ? '#e2574c' : '#c9c2b4'),
+      fillColor: isEndpoint ? THEME_DARK : (includedCityIds.has(c.id) ? THEME_LIGHT : '#c9c2b4'),
       color: '#fff', weight: 2, fillOpacity: 1,
     }).addTo(rpMap).bindPopup(`<strong>${c.name}</strong>`);
     marker._cityId = c.id;
@@ -912,7 +923,7 @@ function renderRpMap(alongRoute) {
 
 function updateRpMarkerStyle(cityId, included) {
   const marker = rpMapMarkers.find(m => m._cityId === cityId);
-  if (marker) marker.setStyle({ fillColor: included ? '#e2574c' : '#c9c2b4' });
+  if (marker) marker.setStyle({ fillColor: included ? THEME_LIGHT : '#c9c2b4' });
 }
 
 document.getElementById('rp-continue-btn').addEventListener('click', () => {
@@ -1326,7 +1337,7 @@ async function generateItinerary(btn) {
       const heading = fare ? `Board a ${transportLabelGI(fare.transport_type)} to ${d.city}` : `Travel to ${d.city}`;
       const desc = fare
         ? `${fare.fare_php > 0 ? '₱'+parseFloat(fare.fare_php).toFixed(2) : 'Own vehicle'} · ${fare.distance_km} km · ${formatDurationGI(fare.duration_min)}`
-        : `${hopKm.toFixed(1)} km · no fixed fare on file — try tricycle and negotiate`;
+        : `${hopKm.toFixed(1)} km · no fixed fare on file — try tricycle/habal-habal and negotiate`;
       html += `
         <div class="itinerary-row">
           <div class="itinerary-time">${minutesToLabelGI(time)}</div>

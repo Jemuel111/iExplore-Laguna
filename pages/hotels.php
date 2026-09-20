@@ -375,7 +375,7 @@ $base_qs = http_build_query(array_filter([
                 <span class="text-muted" style="font-size:.78rem"> – ₱<?= number_format($hotel['price_max'], 0) ?></span>
                 <div style="font-size:.68rem;color:var(--text-muted)">per night</div>
               </div>
-              <a href="hotel.php?id=<?= $hotel['id'] ?>" class="btn btn-sm" style="padding:.3rem .9rem;background:#8e2434;color:#fff;border-radius:var(--radius-pill)">
+              <a href="hotel.php?id=<?= $hotel['id'] ?>" class="btn btn-sm" style="padding:.3rem .9rem;background:var(--maroon-mid);color:#fff;border-radius:var(--radius-pill)">
                 <i class="bi bi-calendar-check me-1"></i>Book
               </a>
             </div>
@@ -424,7 +424,7 @@ $base_qs = http_build_query(array_filter([
                 </div>
                 <div style="font-size:.7rem;color:var(--text-muted)">per night</div>
               </div>
-              <a href="hotel.php?id=<?= $hotel['id'] ?>" class="btn btn-sm" style="padding:.3rem .8rem;font-size:.78rem;background:#8e2434;color:#fff;border-radius:var(--radius-pill)">
+              <a href="hotel.php?id=<?= $hotel['id'] ?>" class="btn btn-sm" style="padding:.3rem .8rem;font-size:.78rem;background:var(--maroon-mid);color:#fff;border-radius:var(--radius-pill)">
                 <i class="bi bi-calendar-check me-1"></i>Book
               </a>
             </div>
@@ -505,7 +505,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const hotelPinIcon = L.divIcon({
     className: '',
     html: `<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;
-             background:#8e2434;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
+             background:var(--maroon-mid);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
              transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
              <i class="bi bi-building" style="transform:rotate(45deg);font-size:14px;color:#fff"></i></div>`,
     iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30],
@@ -524,7 +524,7 @@ document.addEventListener('DOMContentLoaded', function() {
           <span style="color:#e9c46a">${stars}</span><br>
           <span style="font-size:.85rem;color:#666">${h.city_name} · ${price}</span><br>
           <a href="<?= APP_URL ?>/pages/hotel.php?id=${h.id}"
-             style="display:inline-block;margin-top:.4rem;padding:.25rem .7rem;background:#8e2434;color:#fff;
+             style="display:inline-block;margin-top:.4rem;padding:.25rem .7rem;background:var(--maroon-mid);color:#fff;
                     border-radius:6px;font-size:.78rem;text-decoration:none">View & Book</a>
         </div>
       `);

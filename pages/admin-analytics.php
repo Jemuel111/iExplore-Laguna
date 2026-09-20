@@ -240,7 +240,7 @@ require_once __DIR__ . '/../includes/header.php';
 
 </style>
 
-<section class="py-3" style="background:linear-gradient(135deg,var(--theme-dark,#5c1620),var(--theme-primary,#a61c1c));color:#fff">
+<section class="py-3" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
       <div class="d-flex align-items-center gap-3">
@@ -381,7 +381,7 @@ require_once __DIR__ . '/../includes/header.php';
   const green = css.getPropertyValue('--maroon-mid').trim() || '#5c8d6a';
   const dark = css.getPropertyValue('--maroon-dark').trim() || '#285943';
   const accent = css.getPropertyValue('--sand-dark').trim() || '#d9a441';
-  const primary = css.getPropertyValue('--theme-primary').trim() || '#a61c1c';
+  const primary = css.getPropertyValue('--maroon-dark').trim() || '#B0281C';
   const muted = '#9aa3ad';
   const ctx = document.getElementById('activityChart');
   if (ctx && window.Chart) new Chart(ctx, {type:'line',data:{labels,datasets:[

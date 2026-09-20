@@ -254,7 +254,7 @@ $transport_labels = [
     <div class="d-flex align-items-center justify-content-center flex-wrap gap-3 mb-3"
          style="font-size:.75rem;color:var(--text-muted);padding:.4rem 0">
       <div class="d-flex align-items-center gap-2">
-        <span style="width:12px;height:12px;background:#a61c1c;border-radius:50%;display:inline-block;flex-shrink:0"></span>
+        <span style="width:12px;height:12px;background:var(--maroon-mid);border-radius:50%;display:inline-block;flex-shrink:0"></span>
         <span>Start / End</span>
       </div>
       <div class="d-flex align-items-center gap-2">
@@ -262,7 +262,7 @@ $transport_labels = [
         <span>Tourist Spot</span>
       </div>
       <div class="d-flex align-items-center gap-2">
-        <span style="width:16px;height:3px;background:#a61c1c;display:inline-block;border-radius:2px;flex-shrink:0"></span>
+        <span style="width:16px;height:3px;background:var(--maroon-mid);display:inline-block;border-radius:2px;flex-shrink:0"></span>
         <span>Road Route (ORS)</span>
       </div>
     </div>
@@ -345,6 +345,20 @@ document.addEventListener('DOMContentLoaded', function() {
    ============================================================ */
 
 const API_BASE = '<?= APP_URL ?>/api/';
+
+// Map colors (route lines, pins) can't use CSS var() directly — Leaflet
+// takes literal color strings, not CSS custom properties. Reading the
+// *computed* value at runtime instead of hardcoding a hex means these
+// actually follow whatever color the admin sets in Site Settings,
+// instead of being frozen at whatever the brand color happened to be
+// when this file was last edited.
+function themeColor(varName, fallback) {
+  const v = getComputedStyle(document.body).getPropertyValue(varName).trim();
+  return v || fallback;
+}
+const THEME_DARK  = themeColor('--maroon-dark',  '#B0281C');
+const THEME_MID   = themeColor('--maroon-mid',   '#D9481F');
+const THEME_LIGHT = themeColor('--maroon-light', '#FF7A45');
 
 // ── Map init ────────────────────────────────────────────────
 const map = L.map('trip-map', { zoomControl: true }).setView([14.17, 121.24], 10);
@@ -449,8 +463,8 @@ function makeIcon(color, icon = '●', size = 32) {
   });
 }
 
-const iconStart = makeIcon('#a61c1c', '▶', 34);
-const iconEnd   = makeIcon('#6b0f14', '■', 34);
+const iconStart = makeIcon(THEME_MID, '▶', 34);
+const iconEnd   = makeIcon(THEME_DARK, '■', 34);
 const iconSpot  = makeIcon('#c77c48', '★', 28);
 
 // ── Distance / travel-time estimation ───────────────────────
@@ -860,7 +874,7 @@ async function drawRoute(data) {
   function drawFallback(reason) {
     routeLayerGroup = L.layerGroup().addTo(map);
     L.polyline([startLatLng, endLatLng], {
-      color: '#a61c1c', weight: 4, opacity: 0.6, dashArray: '10 6',
+      color: THEME_MID, weight: 4, opacity: 0.6, dashArray: '10 6',
     }).addTo(routeLayerGroup);
     addEndpointMarkers(routeLayerGroup);
     map.fitBounds([startLatLng, endLatLng], { padding: [40, 40] });
@@ -885,7 +899,7 @@ async function drawRoute(data) {
     routeLayerGroup = L.layerGroup().addTo(map);
     const latlngs = res.data.coordinates; // already [lat, lng] pairs
     L.polyline(latlngs, {
-      color: '#a61c1c', weight: 5, opacity: 0.85,
+      color: THEME_MID, weight: 5, opacity: 0.85,
     }).addTo(routeLayerGroup);
     addEndpointMarkers(routeLayerGroup);
     map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40] });

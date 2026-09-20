@@ -78,8 +78,8 @@ ksort($byDay);
     <?php endif; ?>
 
     <!-- Hotel -->
-    <div class="p-3 mb-3 d-flex align-items-center gap-3" style="background:#f7dde1;border-radius:var(--radius-sm)">
-      <div style="width:48px;height:48px;background:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:#8e2434;flex-shrink:0"><i class="bi bi-building"></i></div>
+    <div class="p-3 mb-3 d-flex align-items-center gap-3" style="background:var(--maroon-pale);border-radius:var(--radius-sm)">
+      <div style="width:48px;height:48px;background:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:var(--maroon-dark);flex-shrink:0"><i class="bi bi-building"></i></div>
       <div class="flex-grow-1">
         <div class="fw-bold" style="font-size:.92rem"><?= e($pkg['hotel_name'] ?? 'Hotel') ?>
           <span style="color:var(--sand-dark);font-size:.75rem"><?= str_repeat('★',(int)$pkg['star_rating']) ?></span>
@@ -272,7 +272,7 @@ document.addEventListener('DOMContentLoaded', function() {
   pkgPoints.forEach((pt, i) => {
     pkgLatLngs.push([pt.lat, pt.lng]);
     const isHotel = pt.type === 'hotel';
-    const bg = isHotel ? '#8e2434' : 'var(--maroon-mid)';
+    const bg = isHotel ? 'var(--maroon-dark)' : 'var(--maroon-mid)';
     const label = isHotel ? '<i class="bi bi-building"></i>' : String(pt.day);
     const icon = L.divIcon({
       className: '',

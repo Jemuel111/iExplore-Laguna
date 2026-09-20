@@ -92,7 +92,7 @@ $reviews = attach_review_photos($reviews, 'hotel');
 ?>
 
 <!-- Hotel hero -->
-<section class="py-4" style="background:linear-gradient(135deg,#5c1620,#8e2434);color:#fff">
+<section class="py-4" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container">
     <div class="d-flex align-items-start gap-4 flex-wrap">
       <div style="width:72px;height:72px;background:rgba(255,255,255,.15);border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:2.5rem;flex-shrink:0">
@@ -269,7 +269,7 @@ $reviews = attach_review_photos($reviews, 'hotel');
                    style="width:52px;height:52px;object-fit:cover;border-radius:10px;flex-shrink:0<?= count($rPhotos) > 1 ? ';cursor:pointer' : '' ?>"
                    <?= count($rPhotos) > 1 ? 'onclick="event.stopPropagation(); openPhotoGallery('.htmlspecialchars(json_encode($rPhotos)).', '.htmlspecialchars(json_encode($r['room_type'])).')"' : '' ?>>
             <?php else: ?>
-              <div style="width:52px;height:52px;background:#f7dde1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:#8e2434;flex-shrink:0">
+              <div style="width:52px;height:52px;background:var(--maroon-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:var(--maroon-dark);flex-shrink:0">
                 <i class="bi bi-door-closed"></i>
               </div>
             <?php endif; ?>
@@ -283,7 +283,7 @@ $reviews = attach_review_photos($reviews, 'hotel');
               <?php endif; ?>
             </div>
             <div class="text-end flex-shrink-0">
-              <div class="fw-bold" style="color:#8e2434;font-size:1.05rem">
+              <div class="fw-bold" style="color:var(--maroon-dark);font-size:1.05rem">
                 ₱<?= number_format($r['price_per_night'],2) ?>
               </div>
               <div class="small text-muted">per night</div>
@@ -302,7 +302,7 @@ $reviews = attach_review_photos($reviews, 'hotel');
     <?php if ($hotel['latitude'] && $hotel['longitude']): ?>
     <div class="hotel-detail-section">
       <h6 class="fw-bold mb-2 pb-2" style="color:var(--maroon-dark);border-bottom:2px solid var(--maroon-pale);font-family:'Playfair Display',serif">
-        <i class="bi bi-pin-map-fill me-2" style="color:#8e2434"></i>Location
+        <i class="bi bi-pin-map-fill me-2" style="color:var(--maroon-dark)"></i>Location
       </h6>
       <div id="mini-map" style="height:220px;border-radius:10px;overflow:hidden"></div>
       <div class="mt-2 small text-muted">
@@ -314,8 +314,8 @@ $reviews = attach_review_photos($reviews, 'hotel');
     <!-- ── Reviews ─────────────────────────────────────────── -->
     <div class="hotel-detail-section" id="reviews-section">
       <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2 pb-2"
-           style="border-bottom:2px solid #f7dde1">
-        <h6 class="fw-bold mb-0" style="color:#8e2434;font-family:'Playfair Display',serif;font-size:1rem">
+           style="border-bottom:2px solid var(--maroon-pale)">
+        <h6 class="fw-bold mb-0" style="color:var(--maroon-dark);font-family:'Playfair Display',serif;font-size:1rem">
           <i class="bi bi-chat-quote-fill me-2"></i>Guest Reviews
           <?php if ($review_stats['total'] > 0): ?>
             <span style="font-size:.85rem;font-weight:400;color:var(--text-muted)">
@@ -324,7 +324,7 @@ $reviews = attach_review_photos($reviews, 'hotel');
           <?php endif; ?>
         </h6>
         <?php if (is_logged_in() && !$my_existing_hotel_review): ?>
-        <button class="btn btn-sm" id="write-hotel-review-btn" style="background:#8e2434;color:#fff;border-radius:var(--radius-pill)">
+        <button class="btn btn-sm" id="write-hotel-review-btn" style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-pill)">
           <i class="bi bi-pencil me-1"></i>Write a Review
         </button>
         <?php elseif (is_logged_in()): ?>
@@ -340,7 +340,7 @@ $reviews = attach_review_photos($reviews, 'hotel');
       <!-- Rating summary -->
       <?php if ($review_stats['total'] > 0): ?>
       <div class="d-flex align-items-center gap-3 mb-4">
-        <span style="font-size:2rem;font-weight:700;color:#8e2434;font-family:'Playfair Display',serif">
+        <span style="font-size:2rem;font-weight:700;color:var(--maroon-dark);font-family:'Playfair Display',serif">
           <?= number_format((float)$review_stats['avg_rating'], 1) ?>
         </span>
         <div class="d-flex flex-column">
@@ -362,7 +362,7 @@ $reviews = attach_review_photos($reviews, 'hotel');
       <!-- Write review form (hidden by default) -->
       <?php if (is_logged_in()): ?>
       <div id="hotel-review-form-wrap" class="hotel-review-form-wrap d-none mb-4">
-        <h6 class="fw-bold mb-3" style="color:#8e2434">Share Your Stay</h6>
+        <h6 class="fw-bold mb-3" style="color:var(--maroon-dark)">Share Your Stay</h6>
 
         <div class="mb-3">
           <label class="form-label">Your Rating</label>
@@ -400,7 +400,7 @@ $reviews = attach_review_photos($reviews, 'hotel');
         </div>
 
         <div class="d-flex gap-2">
-          <button class="btn" id="submit-hotel-review-btn" style="background:#8e2434;color:#fff;border-radius:var(--radius-sm)">
+          <button class="btn" id="submit-hotel-review-btn" style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-sm)">
             <i class="bi bi-send me-1"></i>Submit Review
           </button>
           <button class="btn btn-outline-secondary" id="cancel-hotel-review-btn">Cancel</button>
@@ -457,7 +457,7 @@ $reviews = attach_review_photos($reviews, 'hotel');
             <?php endif; ?>
             <?php if ((int)$rv['user_id'] === $my_user_id && $my_user_id): ?>
             <div class="d-flex gap-3 mt-2">
-              <button class="btn btn-link btn-sm p-0 hotel-review-edit-btn" style="color:#8e2434;text-decoration:none;font-size:.8rem"
+              <button class="btn btn-link btn-sm p-0 hotel-review-edit-btn" style="color:var(--maroon-dark);text-decoration:none;font-size:.8rem"
                       data-review-id="<?= $rv['id'] ?>" data-rating="<?= $rv['rating'] ?>"
                       data-title="<?= e($rv['title'] ?? '') ?>" data-body="<?= e($rv['body'] ?? '') ?>"
                       data-stayed="<?= e($rv['stayed_on'] ?? '') ?>">
@@ -487,7 +487,7 @@ $reviews = attach_review_photos($reviews, 'hotel');
   <div class="col-lg-4">
     <div style="position:sticky;top:80px">
       <div style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden">
-        <div class="p-3" style="background:linear-gradient(135deg,#5c1620,#8e2434);color:#fff">
+        <div class="p-3" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
           <h6 class="mb-0" style="font-family:'Playfair Display',serif">
             <i class="bi bi-calendar-check me-2" style="color:var(--sand-dark)"></i>Reserve a Room
           </h6>
@@ -528,9 +528,9 @@ $reviews = attach_review_photos($reviews, 'hotel');
           </div>
 
           <?php if ($nearby_spot): ?>
-          <div class="mb-3 p-2 d-flex align-items-center gap-2" style="background:#f7dde1;border-radius:var(--radius-sm);font-size:.78rem">
-            <i class="bi bi-signpost-split-fill" style="color:#8e2434"></i>
-            <span style="color:#8e2434">
+          <div class="mb-3 p-2 d-flex align-items-center gap-2" style="background:var(--maroon-pale);border-radius:var(--radius-sm);font-size:.78rem">
+            <i class="bi bi-signpost-split-fill" style="color:var(--maroon-dark)"></i>
+            <span style="color:var(--maroon-dark)">
               <strong><?= e($hotel['name']) ?></strong> is near <strong><?= e($nearby_spot['name']) ?></strong> —
               we'll add it to your itinerary when you reserve!
             </span>
@@ -555,7 +555,7 @@ $reviews = attach_review_photos($reviews, 'hotel');
             <span style="color:var(--maroon-dark)" id="booking-total">₱0.00</span>
           </div>
 
-          <button class="btn w-100" id="book-btn" style="background:#8e2434;color:#fff;border-radius:var(--radius-sm)"
+          <button class="btn w-100" id="book-btn" style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-sm)"
                   onclick="submitBooking(<?= $hotel_id ?>)" disabled>
             <i class="bi bi-calendar-check me-2"></i>Reserve Now
           </button>
@@ -575,13 +575,13 @@ $reviews = attach_review_photos($reviews, 'hotel');
 </div>
 
 <style>
-.room-option.selected { border-color:#8e2434 !important; background:#f7dde1 !important; }
+.room-option.selected { border-color:var(--maroon-dark) !important; background:var(--maroon-pale) !important; }
 
 /* ── About / detail sections ─────────────────────────────── */
 .hotel-detail-section { border-top:1px solid var(--border);padding-top:1.75rem;margin-top:1.75rem; }
 .hotel-detail-section-title {
   font-family:'Playfair Display',serif;font-size:1.15rem;
-  color:#8e2434;margin-bottom:1rem;
+  color:var(--maroon-dark);margin-bottom:1rem;
 }
 .hotel-chip {
   display:inline-flex;align-items:center;gap:.4rem;
@@ -595,10 +595,10 @@ $reviews = attach_review_photos($reviews, 'hotel');
 }
 .hotel-amenity-item {
   display:flex;align-items:center;gap:.6rem;
-  background:#f7dde1;border-radius:10px;padding:.6rem .85rem;
-  font-size:.84rem;font-weight:500;color:#8e2434;
+  background:var(--maroon-pale);border-radius:10px;padding:.6rem .85rem;
+  font-size:.84rem;font-weight:500;color:var(--maroon-dark);
 }
-.hotel-amenity-item i { font-size:1rem;color:#8e2434;flex-shrink:0; }
+.hotel-amenity-item i { font-size:1rem;color:var(--maroon-dark);flex-shrink:0; }
 
 /* ── Hotel reviews ────────────────────────────────────────── */
 .hotel-review-card {
@@ -608,7 +608,7 @@ $reviews = attach_review_photos($reviews, 'hotel');
 }
 .hotel-review-card:hover { box-shadow:0 2px 12px rgba(0,0,0,.08); }
 .hotel-review-avatar {
-  width:38px;height:38px;border-radius:50%;background:#8e2434;
+  width:38px;height:38px;border-radius:50%;background:var(--maroon-mid);
   color:#fff;display:flex;align-items:center;justify-content:center;
   font-weight:700;font-size:.95rem;flex-shrink:0;
 }
@@ -764,7 +764,7 @@ if (hotelReviewPhotosInput) {
     const files = Array.from(hotelReviewPhotosInput.files).slice(0, 3);
     files.forEach(file => {
       const chip = document.createElement('span');
-      chip.style.cssText = 'font-size:.75rem;background:#f7dde1;color:#8e2434;padding:.25rem .6rem;border-radius:20px';
+      chip.style.cssText = 'font-size:.75rem;background:var(--maroon-pale);color:var(--maroon-dark);padding:.25rem .6rem;border-radius:20px';
       chip.innerHTML = '<i class="bi bi-image me-1"></i>' + escapeHotelHtml(file.name);
       preview.appendChild(chip);
     });
@@ -942,7 +942,7 @@ if (loadMoreHotelBtn) {
           </div>` : ''}
           ${isMine ? `
           <div class="d-flex gap-3 mt-2">
-            <button class="btn btn-link btn-sm p-0 hotel-review-edit-btn" style="color:#8e2434;text-decoration:none;font-size:.8rem"
+            <button class="btn btn-link btn-sm p-0 hotel-review-edit-btn" style="color:var(--maroon-dark);text-decoration:none;font-size:.8rem"
                     data-review-id="${rv.id}" data-rating="${rv.rating}"
                     data-title="${escapeHotelHtml(rv.title || '')}" data-body="${escapeHotelHtml(rv.body || '')}"
                     data-stayed="${rv.stayed_on || ''}">
@@ -1106,7 +1106,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const hotelIcon = L.divIcon({
     className: '',
     html: `<div style="width:32px;height:32px;border-radius:50% 50% 50% 0;
-             background:#8e2434;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
+             background:var(--maroon-mid);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
              transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
              <i class="bi bi-building" style="transform:rotate(45deg);font-size:14px;color:#fff"></i></div>`,
     iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32],

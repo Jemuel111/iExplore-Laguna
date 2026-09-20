@@ -194,7 +194,7 @@ require_once __DIR__ . '/../includes/header.php';
   <?php endforeach; unset($_SESSION['flash']); ?>
 <?php endif; ?>
 
-<section class="py-3" style="background:linear-gradient(135deg,#5c1620,#8e2434);color:#fff">
+<section class="py-3" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container">
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-images fs-2" style="color:var(--sand-dark)"></i>
@@ -212,7 +212,7 @@ require_once __DIR__ . '/../includes/header.php';
   <!-- ── Hotel picker ────────────────────────────────────────── -->
   <div class="col-lg-4">
     <div class="form-panel">
-      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:#8e2434">
+      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
         <i class="bi bi-building me-2"></i>Select a Hotel
       </h6>
       <form method="GET">
@@ -229,7 +229,7 @@ require_once __DIR__ . '/../includes/header.php';
 
     <?php if ($selected_hotel): ?>
     <div class="form-panel mt-3">
-      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:#8e2434">
+      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
         <i class="bi bi-cloud-upload me-2"></i>Upload Photos
       </h6>
       <form method="POST" enctype="multipart/form-data"><?= csrf_field() ?>
@@ -253,7 +253,7 @@ require_once __DIR__ . '/../includes/header.php';
           <label class="form-label">Caption (applies to all in this batch)</label>
           <input type="text" class="form-control" name="caption" placeholder="Optional">
         </div>
-        <button type="submit" class="btn w-100" style="background:#8e2434;color:#fff;border-radius:var(--radius-sm)">
+        <button type="submit" class="btn w-100" style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-sm)">
           <i class="bi bi-upload me-2"></i>Upload Photos
         </button>
       </form>
@@ -262,7 +262,7 @@ require_once __DIR__ . '/../includes/header.php';
 
     <?php if ($selected_hotel): ?>
     <div class="form-panel mt-3">
-      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:#8e2434">
+      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
         <i class="bi bi-grid-3x3-gap-fill me-2"></i>Add Amenity
       </h6>
       <form method="POST" id="amenity-form"><?= csrf_field() ?>
@@ -288,7 +288,7 @@ require_once __DIR__ . '/../includes/header.php';
             <div class="form-text">Uses <a href="https://icons.getbootstrap.com/" target="_blank">Bootstrap Icons</a> class names. Leave blank for a default checkmark.</div>
           </div>
         </div>
-        <button type="submit" class="btn w-100" style="background:#8e2434;color:#fff;border-radius:var(--radius-sm)">
+        <button type="submit" class="btn w-100" style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-sm)">
           <i class="bi bi-plus-circle me-2"></i>Add Amenity
         </button>
       </form>
@@ -304,7 +304,7 @@ require_once __DIR__ . '/../includes/header.php';
         <h5>Pick a hotel to manage its photos</h5>
       </div>
     <?php else: ?>
-      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:#8e2434">
+      <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
         <?= e($selected_hotel['name']) ?> — <?= count($hotel_photos) ?> photo<?= count($hotel_photos)!=1?'s':'' ?>
       </h6>
       <?php if (empty($hotel_photos)): ?>
@@ -317,7 +317,7 @@ require_once __DIR__ . '/../includes/header.php';
             <div style="position:relative;height:140px">
               <img src="<?= e($ph['url']) ?>" alt="" style="width:100%;height:100%;object-fit:cover">
               <?php if ($ph['photo_type'] === 'main'): ?>
-              <span class="badge" style="position:absolute;top:6px;left:6px;background:var(--sand-dark);color:#8e2434;font-size:.68rem">
+              <span class="badge" style="position:absolute;top:6px;left:6px;background:var(--sand-dark);color:var(--maroon-dark);font-size:.68rem">
                 <i class="bi bi-star-fill me-1"></i>Main Photo
               </span>
               <?php endif; ?>
@@ -347,7 +347,7 @@ require_once __DIR__ . '/../includes/header.php';
       </div>
       <?php endif; ?>
 
-      <h6 class="fw-bold mb-3 mt-4 pt-3" style="font-family:'Playfair Display',serif;color:#8e2434;border-top:1px solid var(--border)">
+      <h6 class="fw-bold mb-3 mt-4 pt-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark);border-top:1px solid var(--border)">
         <i class="bi bi-grid-3x3-gap-fill me-2"></i>Amenities — <?= count($hotel_amenities) ?>
       </h6>
       <?php if (empty($hotel_amenities)): ?>
@@ -356,13 +356,13 @@ require_once __DIR__ . '/../includes/header.php';
       <div class="d-flex flex-wrap gap-2 mb-2">
         <?php foreach ($hotel_amenities as $am): ?>
         <form method="POST" onsubmit="return confirm('Remove this amenity?')"
-              style="display:flex;align-items:center;gap:.5rem;background:#f7dde1;border-radius:20px;padding:.35rem .5rem .35rem .9rem"><?= csrf_field() ?>
+              style="display:flex;align-items:center;gap:.5rem;background:var(--maroon-pale);border-radius:20px;padding:.35rem .5rem .35rem .9rem"><?= csrf_field() ?>
           <input type="hidden" name="action" value="delete_amenity">
           <input type="hidden" name="amenity_id" value="<?= $am['id'] ?>">
           <input type="hidden" name="hotel_id" value="<?= $selected_hotel['id'] ?>">
-          <i class="bi <?= e($am['icon']) ?>" style="color:#8e2434"></i>
-          <span style="font-size:.85rem;color:#8e2434"><?= e($am['label']) ?></span>
-          <button type="submit" class="btn btn-sm p-0" style="line-height:1;color:#a61c1c" title="Remove">
+          <i class="bi <?= e($am['icon']) ?>" style="color:var(--maroon-dark)"></i>
+          <span style="font-size:.85rem;color:var(--maroon-dark)"><?= e($am['label']) ?></span>
+          <button type="submit" class="btn btn-sm p-0" style="line-height:1;color:var(--maroon-mid)" title="Remove">
             <i class="bi bi-x-circle-fill"></i>
           </button>
         </form>

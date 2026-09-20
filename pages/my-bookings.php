@@ -34,7 +34,7 @@ $bookings = db_fetch_all(
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
-<section class="py-3" style="background:linear-gradient(135deg,#5c1620,#8e2434);color:#fff">
+<section class="py-3" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
   <div class="container">
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-calendar-check-fill fs-2" style="color:var(--sand-dark)"></i>
@@ -63,12 +63,12 @@ require_once __DIR__ . '/../includes/header.php';
   </div>
   <?php if ($new_spot): ?>
   <div class="alert d-flex align-items-start gap-3 mb-4"
-       style="border-radius:var(--radius);background:#f7dde1;border:1px solid #c65a68;color:#8e2434">
+       style="border-radius:var(--radius);background:var(--maroon-pale);border:1px solid var(--maroon-light);color:var(--maroon-dark)">
     <i class="bi bi-signpost-split-fill fs-4 flex-shrink-0"></i>
     <div>
       <div class="fw-bold mb-1">Added to your itinerary!</div>
       <div>This hotel is near <strong><?= e($new_spot) ?></strong> — we added it to your trip list.</div>
-      <a href="explore.php" class="fw-bold" style="color:#8e2434">Open My Itinerary →</a>
+      <a href="explore.php" class="fw-bold" style="color:var(--maroon-dark)">Open My Itinerary →</a>
     </div>
   </div>
   <?php endif; ?>

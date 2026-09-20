@@ -244,7 +244,7 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
               <?php if ($__role === 'shop_owner'): ?>
                 <span class="badge ms-1" style="background:var(--terracotta);font-size:.65rem">Shop</span>
               <?php elseif ($__role === 'hotel_owner'): ?>
-                <span class="badge ms-1" style="background:#8e2434;font-size:.65rem">Hotel</span>
+                <span class="badge ms-1" style="background:var(--maroon-dark);font-size:.65rem">Hotel</span>
               <?php elseif ($__role === 'admin'): ?>
                 <span class="badge ms-1" style="background:var(--maroon-dark);font-size:.65rem">Admin</span>
               <?php endif; ?>
@@ -264,7 +264,7 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
 
               <?php elseif ($__role === 'hotel_owner'): ?>
                 <li><a class="dropdown-item fw-bold" href="<?= APP_URL ?>/pages/hotel-dashboard.php">
-                  <i class="bi bi-building me-2" style="color:#8e2434"></i>My Hotel Dashboard</a></li>
+                  <i class="bi bi-building me-2" style="color:var(--maroon-dark)"></i>My Hotel Dashboard</a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/hotel-dashboard.php#bookings">
                   <i class="bi bi-calendar-check me-2"></i>Manage Bookings</a></li>

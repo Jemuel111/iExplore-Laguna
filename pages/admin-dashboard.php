@@ -103,10 +103,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'reset_site_theme') {
         // Restore the original iExplore Laguna color theme without changing the logo.
         $default_theme = [
-            'theme_dark'    => '#6b0f14',
-            'theme_primary' => '#a61c1c',
-            'theme_light'   => '#e2574c',
-            'theme_pale'    => '#fbdede',
+            'theme_dark'    => '#B0281C',
+            'theme_primary' => '#D9481F',
+            'theme_light'   => '#FF7A45',
+            'theme_pale'    => '#FFE3D2',
             'theme_accent'  => '#e9c46a',
         ];
         foreach ($default_theme as $key => $value) {
@@ -452,7 +452,7 @@ require_once __DIR__ . '/../includes/header.php';
 
             <div class="d-flex flex-wrap gap-2 mb-4">
               <button type="button" class="btn btn-sm btn-outline-secondary theme-preset" data-theme='{"dark":"#1a3a2a","primary":"#2d6a4f","light":"#52b788","pale":"#d8f3dc","accent":"#e9c46a"}'>Laguna Green</button>
-              <button type="button" class="btn btn-sm btn-outline-secondary theme-preset" data-theme='{"dark":"#6b0f14","primary":"#a61c1c","light":"#e2574c","pale":"#fbdede","accent":"#e9c46a"}'>Sunset Red</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary theme-preset" data-theme='{"dark":"#B0281C","primary":"#D9481F","light":"#FF7A45","pale":"#FFE3D2","accent":"#e9c46a"}'>Sunset Red</button>
               <button type="button" class="btn btn-sm btn-outline-secondary theme-preset" data-theme='{"dark":"#073b4c","primary":"#118ab2","light":"#06d6a0","pale":"#d8f3dc","accent":"#ffd166"}'>Laguna Blue</button>
               <button type="button" class="btn btn-sm btn-outline-secondary theme-preset" data-theme='{"dark":"#3b1f5f","primary":"#6c3aa3","light":"#9b72cf","pale":"#eee3ff","accent":"#f2c94c"}'>Royal Purple</button>
             </div>

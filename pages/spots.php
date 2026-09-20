@@ -490,7 +490,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const icon = L.divIcon({
       className: '',
       html: `<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;
-               background:var(--maroon-mid,#a61c1c);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
+               background:var(--maroon-mid);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);
                transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
                <i class="bi ${iconClass}" style="transform:rotate(45deg);font-size:14px;color:#fff"></i></div>`,
       iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30],
@@ -504,7 +504,7 @@ document.addEventListener('DOMContentLoaded', function() {
           <span style="color:#e9c46a">★ ${parseFloat(s.rating).toFixed(1)}</span><br>
           <span style="font-size:.85rem;color:#666">${s.city_name} · ${fee}</span><br>
           <a href="<?= APP_URL ?>/pages/spot-detail.php?id=${s.id}"
-             style="display:inline-block;margin-top:.4rem;padding:.25rem .7rem;background:var(--maroon-mid,#a61c1c);color:#fff;
+             style="display:inline-block;margin-top:.4rem;padding:.25rem .7rem;background:var(--maroon-mid);color:#fff;
                     border-radius:6px;font-size:.78rem;text-decoration:none">View Details</a>
         </div>
       `);
