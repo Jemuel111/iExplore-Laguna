@@ -335,6 +335,74 @@ $transport_labels = [
 
 <!-- ── Hide LRM default turn-by-turn panel ─────────────────── -->
 <style>
+/* Slide-in spot detail panel over the map.
+   This block was empty, so .map-spot-panel had no positioning or
+   hide/show rule at all — it rendered as a plain static block on every
+   page load (visible even before any spot was clicked), and its
+   "Center on Map" / "Full Details" buttons only get their onclick
+   handlers wired up inside openSpotPanel(), which runs when a spot
+   marker or card is actually clicked. So without this CSS, the panel
+   you see on load has buttons with no handler attached yet — they
+   look real but do nothing until a spot has actually been opened. */
+.map-spot-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(320px, 100%);
+  background: #fff;
+  box-shadow: -4px 0 16px rgba(0,0,0,.12);
+  border-left: 1px solid var(--border);
+  transform: translateX(100%);
+  transition: transform .25s ease;
+  z-index: 1001;
+  overflow-y: auto;
+  pointer-events: none;
+}
+
+.map-spot-panel.open {
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.map-spot-panel-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.92);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.msp-emoji-header {
+  height: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: #fff;
+}
+
+.msp-name { font-weight: 700; color: var(--charcoal); }
+.msp-meta { font-size: .85rem; color: var(--text-muted); }
+.msp-desc { font-size: .85rem; color: var(--text-muted); line-height: 1.5; }
+
+.msp-chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+.msp-chip {
+  font-size: .75rem;
+  padding: .25rem .55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--charcoal);
+  background: var(--sand, #f7f2ea);
+}
 </style>
 
 <!-- ── JS ──────────────────────────────────────────────────── -->
