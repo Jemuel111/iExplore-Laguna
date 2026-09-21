@@ -25,27 +25,29 @@ switch ($action) {
             json_error('Origin and destination required.', 400);
         }
 
-        // Get transport fare (cheapest for level)
+        // Get transport fare.
+        // If the planner passed an explicit transport mode (the option the
+        // traveler actually clicked in Transport Options), price THAT mode.
+        // Otherwise fall back to the modes implied by the budget level.
         $transport_map = [
             'budget'   => ['jeepney','bus','tricycle'],
             'midrange' => ['bus','fx_uv','jeepney'],
             'upscale'  => ['private_car','fx_uv','bus'],
         ];
-        $preferred = $transport_map[$level];
-        $placeholders = implode(',', array_fill(0, count($preferred), '?'));
+        $valid_types = ['jeepney','bus','tricycle','private_car','fx_uv'];
+        $chosen_type = input('transport', 'get', '');
 
-        $route = db_fetch_one(
-            "SELECT fare_php, distance_km, duration_min, transport_type
-             FROM routes
-             WHERE origin_city_id = ? AND dest_city_id = ?
-               AND transport_type IN ($placeholders)
-             ORDER BY fare_php ASC
-             LIMIT 1",
-            array_merge([$origin_id, $dest_id], $preferred)
-        );
+        // Try the explicitly chosen mode first, then the level's modes.
+        $attempts = [];
+        if ($chosen_type && in_array($chosen_type, $valid_types, true)) {
+            $attempts[] = [$chosen_type];
+        }
+        $attempts[] = $transport_map[$level];
 
-        // Try reverse if not found
-        if (!$route) {
+        $route = null;
+        foreach ($attempts as $preferred) {
+            $placeholders = implode(',', array_fill(0, count($preferred), '?'));
+
             $route = db_fetch_one(
                 "SELECT fare_php, distance_km, duration_min, transport_type
                  FROM routes
@@ -53,8 +55,23 @@ switch ($action) {
                    AND transport_type IN ($placeholders)
                  ORDER BY fare_php ASC
                  LIMIT 1",
-                array_merge([$dest_id, $origin_id], $preferred)
+                array_merge([$origin_id, $dest_id], $preferred)
             );
+
+            // Try reverse if not found
+            if (!$route) {
+                $route = db_fetch_one(
+                    "SELECT fare_php, distance_km, duration_min, transport_type
+                     FROM routes
+                     WHERE origin_city_id = ? AND dest_city_id = ?
+                       AND transport_type IN ($placeholders)
+                     ORDER BY fare_php ASC
+                     LIMIT 1",
+                    array_merge([$dest_id, $origin_id], $preferred)
+                );
+            }
+
+            if ($route) break;
         }
 
         $transport_fare = $route ? (float)$route['fare_php'] : 80.00;

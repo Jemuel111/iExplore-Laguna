@@ -992,11 +992,20 @@ function renderTransportOptions(options) {
     return;
   }
 
+  // Options arrive sorted by fare ASC, which puts private_car (₱0.00,
+  // "Own vehicle") first on almost every route. Defaulting to that made
+  // the whole planner look like it ignored fares: Route Info showed
+  // "Own vehicle", the itinerary's per-leg lines showed "Own vehicle",
+  // and Budget priced transport at ₱0. Default to the cheapest option
+  // that has an actual fare instead, and only fall back to index 0 when
+  // own-vehicle is genuinely the only choice on file.
+  const defaultIndex = Math.max(0, options.findIndex(t => parseFloat(t.fare_php) > 0));
+
   container.innerHTML = options.map((t, i) => `
-    <div class="transport-option p-2 mb-2 rounded-2 ${i===0?'selected':''}"
+    <div class="transport-option p-2 mb-2 rounded-2 ${i===defaultIndex?'selected':''}"
          data-index="${i}"
-         style="border:1.5px solid ${i===0?'var(--maroon-light)':'var(--border)'};
-                background:${i===0?'var(--maroon-pale)':'#fff'};
+         style="border:1.5px solid ${i===defaultIndex?'var(--maroon-light)':'var(--border)'};
+                background:${i===defaultIndex?'var(--maroon-pale)':'#fff'};
                 cursor:pointer;transition:all .2s">
       <div class="d-flex align-items-center justify-content-between">
         <div class="d-flex align-items-center gap-2">
@@ -1018,7 +1027,7 @@ function renderTransportOptions(options) {
     </div>
   `).join('');
 
-  selectedTransport = options[0];
+  selectedTransport = options[defaultIndex];
 
   container.querySelectorAll('.transport-option').forEach(el => {
     el.addEventListener('click', () => {
@@ -1493,7 +1502,16 @@ async function renderItinerary(routeData, spots, days, forceIncludeAll = false) 
           });
           // Sleep at the hotel, not at the last spot visited — tomorrow's
           // first "distance from previous stop" should measure from here.
-          lastPoint = { latitude: parseFloat(hotel.latitude), longitude: parseFloat(hotel.longitude), cityName: nextSpot.city_name };
+          // Keep cityId — without it, tomorrow's first leg compares
+          // spot.city_id against undefined, so every Day 2+ hop looked
+          // like a city crossing but then failed its fare lookup and fell
+          // back to the generic "no fixed fare on file" line.
+          lastPoint = {
+            latitude:  parseFloat(hotel.latitude),
+            longitude: parseFloat(hotel.longitude),
+            cityName:  nextSpot.city_name,
+            cityId:    nextSpot.city_id,
+          };
         } else {
           events.push({
             t: TOUR_END_MIN,
