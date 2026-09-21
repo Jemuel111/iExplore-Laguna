@@ -178,7 +178,7 @@ $transport_labels = [
   <div class="col-lg-4 col-xl-4">
 
     <!-- Map -->
-    <div class="position-relative mb-2" id="map-wrapper">
+    <div class="position-relative mb-2" id="map-wrapper" style="overflow:hidden">
             <div id="trip-map"></div>
 
       <div class="traffic-map-legend" id="traffic-map-legend" hidden>
