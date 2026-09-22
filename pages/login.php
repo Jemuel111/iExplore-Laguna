@@ -121,6 +121,9 @@ require_once __DIR__ . '/../includes/header.php';
               <i class="bi bi-eye" id="pw-icon"></i>
             </button>
           </div>
+          <div class="text-end mt-1">
+            <a href="forgot-password.php" class="small text-maroon">Forgot password?</a>
+          </div>
         </div>
         <button type="submit" class="btn btn-primary-app w-100 py-2">
           <i class="bi bi-box-arrow-in-right me-2"></i>Log In

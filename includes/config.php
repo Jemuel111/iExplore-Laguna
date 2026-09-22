@@ -36,6 +36,21 @@ define('BCRYPT_COST', 12);
 // TOMTOM_API_KEY empty in .env to keep the Traffic button disabled.
 define('ORS_API_KEY',    env('ORS_API_KEY', ''));
 define('TOMTOM_API_KEY', env('TOMTOM_API_KEY', ''));
+
+// SMTP — used by includes/mailer.php to send "reset your password"
+// emails. For Gmail: enable 2-Step Verification on the sending
+// account, then create an App Password at
+// https://myaccount.google.com/apppasswords and use that (not the
+// normal account password) as SMTP_PASS. Any other SMTP provider
+// (Mailtrap, SendGrid SMTP, your host's mail server, etc.) works too —
+// just fill in its host/port/user/pass here instead.
+define('SMTP_HOST',       env('SMTP_HOST', ''));
+define('SMTP_PORT',       (int) env('SMTP_PORT', 587));
+define('SMTP_USER',       env('SMTP_USER', ''));
+define('SMTP_PASS',       env('SMTP_PASS', ''));
+define('SMTP_FROM_EMAIL', env('SMTP_FROM_EMAIL', SMTP_USER));
+define('SMTP_FROM_NAME',  env('SMTP_FROM_NAME', APP_NAME));
+
 date_default_timezone_set('Asia/Manila');
 
 // ── Error display (set false in production) ───────────────────

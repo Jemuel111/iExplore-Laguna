@@ -522,6 +522,86 @@ function logout_user(): void {
     session_destroy();
 }
 
+// ── Password Reset ──────────────────────────────────────────────
+
+const PASSWORD_RESET_TTL_MINUTES = 30;
+
+/**
+ * Per-email rate limit for *requesting* a reset link — separate from
+ * the login-attempt limiter above, since this guards against someone
+ * spamming a stranger's inbox rather than guessing a password.
+ * Mirrors login_attempt_blocked()'s session-based approach.
+ */
+function password_reset_request_blocked(string $email): ?int {
+    session_start_safe();
+    $key = 'pwreset_req_' . md5(strtolower(trim($email)));
+    $last = $_SESSION[$key] ?? null;
+    if ($last === null) return null;
+
+    $elapsed = time() - $last;
+    $cooldown = 60; // one request per minute per email
+    return $elapsed < $cooldown ? $cooldown - $elapsed : null;
+}
+
+function password_reset_request_touch(string $email): void {
+    session_start_safe();
+    $key = 'pwreset_req_' . md5(strtolower(trim($email)));
+    $_SESSION[$key] = time();
+}
+
+/**
+ * Create a reset token for the given user, store only its hash, and
+ * return the raw token (this is the only time the raw value exists —
+ * put it straight into the emailed link).
+ */
+function create_password_reset_token(int $user_id): string {
+    // Invalidate any reset links already sent to this user so only the
+    // most recent one is usable.
+    db_execute(
+        "UPDATE password_resets SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL",
+        [$user_id]
+    );
+
+    $token = bin2hex(random_bytes(32));
+    $hash  = hash('sha256', $token);
+    $expires = date('Y-m-d H:i:s', time() + PASSWORD_RESET_TTL_MINUTES * 60);
+
+    db_execute(
+        "INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
+        [$user_id, $hash, $expires]
+    );
+
+    return $token;
+}
+
+/**
+ * Look up the user a (still valid, unused) raw token belongs to.
+ * Returns null for an unknown, expired, or already-used token.
+ */
+function find_user_by_reset_token(string $token): ?array {
+    $hash = hash('sha256', $token);
+
+    $row = db_fetch_one(
+        "SELECT pr.id AS reset_id, u.*
+         FROM password_resets pr
+         JOIN users u ON u.id = pr.user_id
+         WHERE pr.token_hash = ?
+           AND pr.used_at IS NULL
+           AND pr.expires_at > NOW()
+         LIMIT 1",
+        [$hash]
+    );
+
+    return $row ?: null;
+}
+
+/**
+ * Mark a reset token as used so the same link can't be replayed.
+ */
+function consume_password_reset_token(int $reset_id): void {
+    db_execute("UPDATE password_resets SET used_at = NOW() WHERE id = ?", [$reset_id]);
+}
+
 // ── Database Helpers ──────────────────────────────────────────
 
 /**
