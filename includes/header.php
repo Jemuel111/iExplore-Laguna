@@ -72,6 +72,14 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
   </script>
   <title><?= e($page_title) ?> | <?= APP_NAME ?></title>
 
+  <!-- Favicon — a simple maroon/gold compass matching the site's own
+       branding, used since there was no logo file to draw from yet.
+       Swap these for a real logo-based icon whenever one exists. -->
+  <link rel="icon" href="<?= APP_URL ?>/assets/img/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="<?= APP_URL ?>/assets/img/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="<?= APP_URL ?>/assets/img/favicon-16.png">
+  <link rel="apple-touch-icon" href="<?= APP_URL ?>/assets/img/apple-touch-icon.png">
+
   <!-- Bootstrap 5 -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <!-- Bootstrap Icons -->
