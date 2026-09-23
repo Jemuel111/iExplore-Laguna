@@ -398,40 +398,39 @@ function csrf_verify_header(): void {
 }
 
 /**
- * Simple login rate-limiter, tracked per email+IP in the session (no
- * extra table needed). After MAX_ATTEMPTS failed logins, blocks further
- * tries for LOCKOUT_SECONDS. Call login_attempt_blocked() before
+ * Login rate-limiter, tracked in the login_attempts table (one row per
+ * email) rather than the session. A session-based counter resets the
+ * moment someone opens a new browser/incognito window or clears
+ * cookies — trivial to route around. A DB-backed counter follows the
+ * *account*, not the browser, so it actually holds up as a brute-force
+ * defense. After LOGIN_MAX_ATTEMPTS failed logins, blocks further
+ * tries for LOGIN_LOCKOUT_SECONDS. Call login_attempt_blocked() before
  * checking the password, and record_failed_login() / reset_login_attempts()
  * after checking it.
  */
-function login_rate_limit_key(string $email): string {
-    // Keyed by email only (not email+IP). On XAMPP, "localhost" can
-    // inconsistently resolve to 127.0.0.1 or ::1 between requests,
-    // which silently reset the counter every attempt. Locking by
-    // account rather than account+IP is also the more standard
-    // behavior anyway — it stops distributed attempts too, not just
-    // ones from a single address.
-    return 'login_attempts_' . md5(strtolower(trim($email)));
-}
-
 const LOGIN_MAX_ATTEMPTS    = 5;
 const LOGIN_LOCKOUT_SECONDS = 300; // 5 minutes
 
 function login_attempt_blocked(string $email): ?int {
-    session_start_safe();
-    $key = login_rate_limit_key($email);
-    $data = $_SESSION[$key] ?? null;
-    if (!$data) return null;
+    $email = strtolower(trim($email));
+    if ($email === '') return null;
 
-    if ($data['count'] >= LOGIN_MAX_ATTEMPTS) {
-        $elapsed = time() - $data['last'];
-        if ($elapsed < LOGIN_LOCKOUT_SECONDS) {
-            return LOGIN_LOCKOUT_SECONDS - $elapsed; // seconds remaining
-        }
-        // Lockout expired — clear it so they can try again
-        unset($_SESSION[$key]);
+    $row = db_fetch_one(
+        "SELECT locked_until FROM login_attempts WHERE email = ?",
+        [$email]
+    );
+    if (!$row || !$row['locked_until']) return null;
+
+    $remaining = strtotime($row['locked_until']) - time();
+    if ($remaining <= 0) {
+        // Lockout has expired — clear it so a fresh attempt window starts.
+        db_execute(
+            "UPDATE login_attempts SET attempt_count = 0, locked_until = NULL WHERE email = ?",
+            [$email]
+        );
+        return null;
     }
-    return null;
+    return $remaining;
 }
 
 /**
@@ -440,18 +439,34 @@ function login_attempt_blocked(string $email): ?int {
  * lockout). Used to show "N attempts remaining" on the login form.
  */
 function record_failed_login(string $email): int {
-    session_start_safe();
-    $key = login_rate_limit_key($email);
-    $data = $_SESSION[$key] ?? ['count' => 0, 'last' => time()];
-    $data['count']++;
-    $data['last'] = time();
-    $_SESSION[$key] = $data;
-    return max(0, LOGIN_MAX_ATTEMPTS - $data['count']);
+    $email = strtolower(trim($email));
+    if ($email === '') return LOGIN_MAX_ATTEMPTS;
+
+    $now = date('Y-m-d H:i:s');
+    db_execute(
+        "INSERT INTO login_attempts (email, attempt_count, first_attempt_at, last_attempt_at)
+         VALUES (?, 1, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           attempt_count    = attempt_count + 1,
+           last_attempt_at  = VALUES(last_attempt_at)",
+        [$email, $now, $now]
+    );
+
+    $row   = db_fetch_one("SELECT attempt_count FROM login_attempts WHERE email = ?", [$email]);
+    $count = (int) ($row['attempt_count'] ?? 1);
+
+    if ($count >= LOGIN_MAX_ATTEMPTS) {
+        $locked_until = date('Y-m-d H:i:s', time() + LOGIN_LOCKOUT_SECONDS);
+        db_execute("UPDATE login_attempts SET locked_until = ? WHERE email = ?", [$locked_until, $email]);
+        return 0;
+    }
+    return LOGIN_MAX_ATTEMPTS - $count;
 }
 
 function reset_login_attempts(string $email): void {
-    session_start_safe();
-    unset($_SESSION[login_rate_limit_key($email)]);
+    $email = strtolower(trim($email));
+    if ($email === '') return;
+    db_execute("DELETE FROM login_attempts WHERE email = ?", [$email]);
 }
 
 /**
