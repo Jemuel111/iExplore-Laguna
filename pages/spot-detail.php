@@ -100,6 +100,9 @@ $cat_bg   = $cat_meta['bg'];
 $cat_name = $cat_meta['label'];
 
 $page_title  = e($spot['name']);
+$page_description = seo_excerpt($spot['description'] ?: (
+    $spot['name'] . ' in ' . $spot['city_name'] . ', Laguna — hours, entrance fee, and tips for visiting, plus how to add it to your trip itinerary.'
+));
 $active_page = 'spots';
 require_once __DIR__ . '/../includes/header.php';
 ?>

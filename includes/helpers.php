@@ -314,6 +314,23 @@ function e(string $str): string {
 }
 
 /**
+ * Turn a raw DB text field (description, tips, etc.) into a clean,
+ * length-capped string safe for a <meta name="description"> tag —
+ * search engines truncate around 155-160 chars anyway, and a raw
+ * field can contain newlines/HTML that don't belong in an attribute.
+ */
+function seo_excerpt(?string $text, int $max_len = 155): string {
+    $text = trim(preg_replace('/\s+/', ' ', strip_tags((string) $text)));
+    if ($text === '') return '';
+    if (mb_strlen($text) <= $max_len) return $text;
+
+    $cut = mb_substr($text, 0, $max_len);
+    $lastSpace = mb_strrpos($cut, ' ');
+    if ($lastSpace !== false) $cut = mb_substr($cut, 0, $lastSpace);
+    return rtrim($cut, " .,;:") . '…';
+}
+
+/**
  * Return the current CSRF token, generating one for this session if it
  * doesn't have one yet. One token per session, reused across the whole
  * session lifetime (regenerated on login — see login_user()).

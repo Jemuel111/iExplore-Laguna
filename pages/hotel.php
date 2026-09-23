@@ -5,9 +5,8 @@ ob_start();
 // pages/hotel.php?id=HOTEL_ID
 // Tourists browse room types and make a reservation
 // ============================================================
-$page_title  = 'Hotel';
+require_once __DIR__ . '/../includes/helpers.php';
 $active_page = 'hotels';
-require_once __DIR__ . '/../includes/header.php';
 
 $hotel_id = (int) input('id', 'get', 0);
 if (!$hotel_id) { header('Location: ' . APP_URL . '/pages/hotels.php'); exit; }
@@ -19,6 +18,14 @@ $hotel = db_fetch_one(
     [$hotel_id]
 );
 if (!$hotel) { header('Location: ' . APP_URL . '/pages/hotels.php'); exit; }
+
+// SEO — real per-hotel title/description now that we have the record,
+// instead of the generic "Hotel" every hotel page used to show.
+$page_title = e($hotel['name']);
+$page_description = seo_excerpt($hotel['description'] ?: (
+    $hotel['name'] . ' in ' . $hotel['city_name'] . ', Laguna — room rates, availability, and booking on IExplore Laguna.'
+));
+require_once __DIR__ . '/../includes/header.php';
 
 $rooms = db_fetch_all(
     "SELECT * FROM hotel_rooms

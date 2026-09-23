@@ -60,7 +60,22 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="IExplore Laguna — Smart Travel Planner for Laguna Province">
+  <?php
+  // Pages that know their own subject (a specific spot, hotel, shop,
+  // package) set $page_description before including this file, via
+  // seo_excerpt() on that record's real description. Everything else
+  // falls back to this one generic line — better than nothing, but
+  // not something we want repeated on hundreds of detail pages.
+  $__page_description = trim((string) ($page_description ?? '')) ?: 'IExplore Laguna — Smart Travel Planner for Laguna Province';
+
+  // Canonical URL — defaults to the current path+query so a page that
+  // doesn't set $page_canonical still gets a self-referencing tag
+  // (recommended even then; it tells crawlers this IS the authoritative
+  // copy, not a dupe of something else).
+  $__page_canonical = $page_canonical ?? (APP_URL . strtok($_SERVER['REQUEST_URI'] ?? '', '#'));
+  ?>
+  <meta name="description" content="<?= e($__page_description) ?>">
+  <link rel="canonical" href="<?= e($__page_canonical) ?>">
   <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
   <script>
     // The meta tag above holds the real CSRF token, but nothing was ever

@@ -1,0 +1,25 @@
+User-agent: *
+Allow: /
+
+# Auth, dashboards, and admin — nothing here is useful to a search
+# engine, and some of it shouldn't be indexed at all (account pages,
+# booking history, admin tooling).
+Disallow: /pages/login.php
+Disallow: /pages/register.php
+Disallow: /pages/register-hotel.php
+Disallow: /pages/register-shop.php
+Disallow: /pages/forgot-password.php
+Disallow: /pages/reset-password.php
+Disallow: /pages/logout.php
+Disallow: /pages/my-bookings.php
+Disallow: /pages/my-orders.php
+Disallow: /pages/budget.php
+Disallow: /pages/itineraries.php
+Disallow: /pages/admin-*.php
+Disallow: /pages/hotel-dashboard.php
+Disallow: /pages/shop-dashboard.php
+Disallow: /api/
+Disallow: /includes/
+Disallow: /vendor/
+
+Sitemap: https://iexplorelaguna.online/sitemap.php

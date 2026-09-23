@@ -23,6 +23,13 @@ $shop = db_fetch_one(
 );
 if (!$shop) { header('Location: ' . APP_URL . '/pages/explore.php'); exit; }
 
+// SEO — real per-shop title/description instead of the generic "Shop"
+// every shop page used to show.
+$page_title = e($shop['name']);
+$page_description = seo_excerpt($shop['description'] ?: (
+    $shop['name'] . ' in ' . $shop['city_name'] . ', Laguna — browse products and order on IExplore Laguna.'
+));
+
 $products = db_fetch_all(
     "SELECT * FROM shop_products
      WHERE shop_id = ? AND is_available = 1

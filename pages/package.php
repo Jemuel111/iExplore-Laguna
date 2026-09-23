@@ -4,9 +4,8 @@ ob_start();
 // iEXPLORE LAGUNA — Package Detail & Booking
 // pages/package.php?id=PACKAGE_ID
 // ============================================================
-$page_title  = 'Package';
+require_once __DIR__ . '/../includes/helpers.php';
 $active_page = 'packages';
-require_once __DIR__ . '/../includes/header.php';
 
 $package_id = (int) input('id', 'get', 0);
 if (!$package_id) { header('Location: ' . APP_URL . '/pages/packages.php'); exit; }
@@ -24,6 +23,14 @@ $pkg = db_fetch_one(
     [$package_id]
 );
 if (!$pkg) { header('Location: ' . APP_URL . '/pages/packages.php'); exit; }
+
+// SEO — real per-package title/description instead of the generic
+// "Package" every package page used to show.
+$page_title = e($pkg['title']);
+$page_description = seo_excerpt($pkg['description'] ?: (
+    $pkg['title'] . ' — a ' . (int) $pkg['days'] . '-day trip package in ' . ($pkg['city_name'] ?? 'Laguna') . ' on IExplore Laguna.'
+));
+require_once __DIR__ . '/../includes/header.php';
 
 $spot_rows = db_fetch_all(
     "SELECT ps.day_number, s.id, s.name, s.category, s.entrance_fee, s.description,
