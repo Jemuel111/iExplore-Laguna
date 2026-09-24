@@ -622,6 +622,27 @@ const ROUTE_CORRIDOR_KM = 6;
 // nothing at all — see the fallback comment where this is used.
 const ROUTE_CORRIDOR_KM_FALLBACK = 10;
 
+// How much EXTRA distance visiting a spot adds versus going straight
+// from origin to destination — i.e. is it actually worth the detour.
+// distanceToRouteKm alone isn't enough to catch a bad inclusion: a real
+// road route can wind close to a spot at some bend without that spot
+// being anywhere near worth the round trip to actually reach and return
+// from (this is what let a 20km-detour resort into an 8.6km Alaminos→
+// San Pablo trip — it sat near some point on the drawn route without
+// being remotely on the way).
+function detourKm(oLat, oLng, spotLat, spotLng, dLat, dLng) {
+  const direct = haversineKm(oLat, oLng, dLat, dLng);
+  const via    = haversineKm(oLat, oLng, spotLat, spotLng) + haversineKm(spotLat, spotLng, dLat, dLng);
+  return via - direct;
+}
+
+// A detour is "reasonable" up to roughly the trip's own direct length —
+// a floor keeps this sane for very short trips (a couple km apart)
+// rather than excluding almost every side stop.
+function maxReasonableDetourKm(directKm) {
+  return Math.max(10, directKm);
+}
+
 // Perpendicular distance (km) from point P to the segment A→B, using a
 // local flat-earth approximation. Laguna's whole span is under ~50km, so
 // the curvature error this introduces is negligible for filtering purposes.
@@ -860,27 +881,33 @@ async function planRoute() {
 
     // Keep only spots genuinely along the way. The backend's bounding-box
     // query is deliberately loose (fast, simple SQL) and can include spots
-    // that sit off to the side and are never actually passed — filter those
-    // out here against the real drawn route line.
-    //
+    // that sit off to the side and are never actually passed — filter
+    // those out here against the real drawn route line AND against how
+    // much actual detour reaching them would add (see detourKm() above —
+    // distance-to-route-line alone isn't enough, since a real winding
+    // road can pass near a spot at some bend without it being remotely
+    // on the way).
+    const oLat = parseFloat(routeData.origin.latitude), oLng = parseFloat(routeData.origin.longitude);
+    const dLat = parseFloat(routeData.destination.latitude), dLng = parseFloat(routeData.destination.longitude);
+    const directTripKm = haversineKm(oLat, oLng, dLat, dLng);
+    const detourCapKm  = maxReasonableDetourKm(directTripKm);
+
+    const isReasonableStop = (s, corridorKm) => {
+      const lat = parseFloat(s.latitude), lng = parseFloat(s.longitude);
+      return distanceToRouteKm(lat, lng, routeLine) <= corridorKm
+          && detourKm(oLat, oLng, lat, lng, dLat, dLng) <= detourCapKm;
+    };
+
     // If the strict corridor comes back empty, widen it ONE step
     // (ROUTE_CORRIDOR_KM_FALLBACK) rather than abandoning the distance
-    // check entirely. Falling back to the full unfiltered pool used to
-    // mean a spot dozens of km off the direct path — a whole detour to a
-    // different town — could get scheduled with zero distance vetting
-    // whenever the tight corridor happened to match nothing for a
-    // particular origin/destination pair (most likely for short trips
-    // between two nearby towns, exactly where a big unplanned detour is
-    // least appropriate). If even the widened corridor comes back empty,
-    // show nothing rather than something arbitrarily far away — the
+    // check entirely — the detour cap above still applies either way, so
+    // widening this can never let in something that isn't genuinely on
+    // the way. If even the widened corridor comes back empty, show
+    // nothing rather than something arbitrarily far away — the
     // empty-state messaging elsewhere already handles a spot-free plan.
-    let onRouteSpots = allSpots.filter(
-      s => distanceToRouteKm(parseFloat(s.latitude), parseFloat(s.longitude), routeLine) <= ROUTE_CORRIDOR_KM
-    );
+    let onRouteSpots = allSpots.filter(s => isReasonableStop(s, ROUTE_CORRIDOR_KM));
     if (onRouteSpots.length === 0) {
-      onRouteSpots = allSpots.filter(
-        s => distanceToRouteKm(parseFloat(s.latitude), parseFloat(s.longitude), routeLine) <= ROUTE_CORRIDOR_KM_FALLBACK
-      );
+      onRouteSpots = allSpots.filter(s => isReasonableStop(s, ROUTE_CORRIDOR_KM_FALLBACK));
       if (onRouteSpots.length > 0) {
         console.warn(`No spots within ${ROUTE_CORRIDOR_KM}km of the route — widened to ${ROUTE_CORRIDOR_KM_FALLBACK}km.`);
       } else {
