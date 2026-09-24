@@ -688,6 +688,17 @@ function lastMileSuggestion(km) {
   return `<i class="bi bi-bicycle me-1"></i>Tricycle or multicab (~₱20–30, ~${formatDuration(mins)}, fare varies — confirm with the driver)`;
 }
 
+// Numeric twin of lastMileSuggestion() above — same distance bands, but
+// returns a peso estimate (the midpoint of whichever range it shows)
+// instead of a label. Used to total up a real "Local Transport" figure
+// from the itinerary's actual hops, instead of the flat per-day estimate
+// budget.php falls back to when no itinerary has been built yet.
+function lastMileFareEstimate(km) {
+  if (km <= 0.8) return 0;         // walking distance, no fare
+  if (km <= 3)   return 17.5;      // midpoint of the ~₱15–20 tricycle range
+  return 25;                        // midpoint of the ~₱20–30 tricycle/multicab range
+}
+
 // Cache of city-pair → cheapest transport option, so repeated hops between
 // the same two cities within one itinerary don't refetch. Cleared each
 // time a fresh itinerary is built.
@@ -1266,13 +1277,27 @@ async function renderBudget(routeData, spots, days, persons, budgetLevel) {
 
   const totalFees = spots.reduce((sum, s) => sum + parseFloat(s.entrance_fee), 0);
 
-  document.getElementById('total-budget').textContent = formatPeso(b.grand_total + totalFees * persons);
+  // budget.php's "local" figure is a flat per-day estimate (a rough
+  // ₱/day rate looked up by city), not an actual count of this specific
+  // itinerary's hops. When renderItinerary() has already run for this
+  // trip, use its real total instead — the sum of every actual hop's
+  // lastMileFareEstimate() — so this row matches what the itinerary
+  // text is telling the traveler each hop will cost. Falls back to the
+  // flat estimate if no itinerary has been built yet (e.g. this budget
+  // call somehow ran first) so the row is never left blank.
+  const flatLocalPerPerson = b.local * days;
+  const realLocalPerPerson = lastLocalHopsEstimate !== null ? lastLocalHopsEstimate : flatLocalPerPerson;
+  // Carry the same swap into the header total, so the rows shown still
+  // add up to the number displayed above them instead of quietly diverging.
+  const localDelta = (realLocalPerPerson - flatLocalPerPerson) * persons;
+
+  document.getElementById('total-budget').textContent = formatPeso(b.grand_total + totalFees * persons + localDelta);
 
   document.getElementById('budget-breakdown').innerHTML = `
     ${budgetRow('bi-bus-front',   'Transport',       b.transport * persons)}
     ${budgetRow('bi-house-door',  'Accommodation',   b.accommodation * persons * Math.max(0, days - 1))}
     ${budgetRow('bi-cup-hot',     'Food',            b.food * persons * days)}
-    ${budgetRow('bi-signpost-2',  'Local Transport', b.local * persons * days)}
+    ${budgetRow('bi-signpost-2',  'Local Transport', realLocalPerPerson * persons)}
     ${budgetRow('bi-ticket',      'Entrance Fees',   totalFees * persons)}
     ${budgetRow('bi-three-dots',  'Miscellaneous',   b.misc * persons)}
   `;
@@ -1306,9 +1331,18 @@ function dayCapacity(day) {
 
 // Groups spots by city, then orders those city clusters by how far along
 // the straight line from origin to destination they sit (vector
-// projection). Within a cluster, spots are still ranked by rating. This
-// keeps a day's stops in one "base" city before moving on, instead of the
-// old rating-only order which could bounce origin → dest → origin → dest.
+// projection). This keeps a day's stops in one "base" city before moving
+// on, instead of an order that could bounce origin → dest → origin → dest.
+//
+// Within a cluster, spots are walked as a nearest-neighbor route rather
+// than sorted by rating alone. Rating-only ordering ignored geography
+// entirely — e.g. San Pablo's seven lakes could list a highly-rated but
+// farther lake (Bunot) before a lower-rated one sitting right at the
+// city center (Sampaloc), forcing real backtracking on the ground that a
+// human planner would never suggest. The entry point for each cluster is
+// the previous cluster's last stop, or the trip's origin for the very
+// first cluster — so the walk always continues from wherever the
+// traveler actually is, not from some fixed reference point.
 function orderSpotsAlongRoute(spots, routeData) {
   const oLat = parseFloat(routeData.origin.latitude);
   const oLng = parseFloat(routeData.origin.longitude);
@@ -1329,11 +1363,33 @@ function orderSpotsAlongRoute(spots, routeData) {
     // Projection of the cluster's centroid onto the origin→destination
     // vector: ~0 means "near origin", ~1 means "near destination".
     const t = ((avgLng - oLng) * dx + (avgLat - oLat) * dy) / lenSq;
-    return { t, list: list.slice().sort((a, b) => b.rating - a.rating) };
+    return { t, list };
   });
   clusters.sort((a, b) => a.t - b.t);
 
-  return clusters.flatMap(c => c.list);
+  let entryLat = oLat, entryLng = oLng;
+  const ordered = [];
+
+  clusters.forEach(cluster => {
+    const remaining = cluster.list.slice();
+    // Greedy nearest-neighbor walk. Ties within ~50m favor the
+    // higher-rated spot, so equally-close options still respect quality.
+    while (remaining.length) {
+      let bestIdx = 0, bestKm = Infinity;
+      remaining.forEach((s, i) => {
+        const km = haversineKm(entryLat, entryLng, parseFloat(s.latitude), parseFloat(s.longitude));
+        const better = km < bestKm - 0.05
+          || (Math.abs(km - bestKm) <= 0.05 && s.rating > remaining[bestIdx].rating);
+        if (better) { bestKm = km; bestIdx = i; }
+      });
+      const next = remaining.splice(bestIdx, 1)[0];
+      ordered.push(next);
+      entryLat = parseFloat(next.latitude);
+      entryLng = parseFloat(next.longitude);
+    }
+  });
+
+  return ordered;
 }
 
 // Fetch verified hotels in a spot's city (reuses the existing
@@ -1360,7 +1416,18 @@ async function findNearestHotel(anchorSpot) {
 // the map overlay until the visitor happens to replan the trip.
 let lastItineraryRender = null;
 
+// Total estimated local-transport cost (per person, across every day
+// shown) from the itinerary actually rendered — the sum of
+// lastMileFareEstimate() over every hop between stops. renderBudget()
+// uses this real figure instead of the flat per-day estimate whenever
+// it's available, so the "Local Transport" line matches what the
+// itinerary text is actually telling the traveler to expect. Reset to
+// null at the top of every render so a stale total from a previous
+// itinerary is never shown against a new one.
+let lastLocalHopsEstimate = null;
+
 async function renderItinerary(routeData, spots, days, forceIncludeAll = false) {
+  lastLocalHopsEstimate = null;
   lastItineraryRender = { routeData, spots, days, forceIncludeAll };
   const container = document.getElementById('itinerary-days');
 
@@ -1410,6 +1477,7 @@ async function renderItinerary(routeData, spots, days, forceIncludeAll = false) 
   includedSpotIds = scheduledSpots.map(s => s.id);
 
   let html = '';
+  let localHopsCost = 0; // summed across every hop, every day — see lastLocalHopsEstimate above
 
   // Running "current location" (and the city name that goes with it),
   // used to estimate distance/time to the next stop and to detect when a
@@ -1509,6 +1577,7 @@ async function renderItinerary(routeData, spots, days, forceIncludeAll = false) 
       const timeStr = minutesToLabel(time);
       const legKm = haversineKm(lastMileLat, lastMileLng, spot.latitude, spot.longitude);
       const legLabel = `${lastMileSuggestion(legKm)} from ${lastMileFrom} (${legKm < 10 ? legKm.toFixed(1) : Math.round(legKm)} km)`;
+      localHopsCost += lastMileFareEstimate(legKm);
       lastPoint = { latitude: spot.latitude, longitude: spot.longitude, cityName: spot.city_name, cityId: spot.city_id };
 
       events.push({
@@ -1633,6 +1702,7 @@ async function renderItinerary(routeData, spots, days, forceIncludeAll = false) 
   }
 
   container.innerHTML = noticeHtml + html;
+  lastLocalHopsEstimate = localHopsCost;
 }
 
 function itineraryItem(time, icon, name, desc, isSpot = false) {
