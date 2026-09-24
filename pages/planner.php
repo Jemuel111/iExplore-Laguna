@@ -1367,6 +1367,9 @@ function budgetRow(icon, label, amount) {
 const TOUR_END_MIN   = 18 * 60; // stop scheduling new visits after 6 PM
 const HOURS_PER_STOP = 120;     // minutes budgeted per spot visit
 const LUNCH_MIN      = 60;
+// Below this straight-line distance, a hop between two spots is treated as
+// a local ride even if the spots are filed under different cities.
+const INTERCITY_MIN_KM = 8;
 
 function dayTouringStart(day) {
   return (day === 1 ? 10 : 8) * 60;
@@ -1438,6 +1441,42 @@ function orderSpotsAlongRoute(spots, routeData) {
   });
 
   return ordered;
+}
+
+// A spot counts as "at the destination" if it's filed under the destination
+// city OR physically sits within a few km of it. Checking both matters:
+// a resort can be administratively in a neighboring town but still be the
+// destination-side stop, and a mis-filed spot shouldn't hide the destination.
+const DEST_NEAR_KM = 5;
+function isNearDestination(spot, routeData) {
+  if (String(spot.city_id) === String(routeData.destination.id)) return true;
+  return haversineKm(
+    parseFloat(spot.latitude), parseFloat(spot.longitude),
+    parseFloat(routeData.destination.latitude), parseFloat(routeData.destination.longitude)
+  ) <= DEST_NEAR_KM;
+}
+
+// When there are more candidate spots than the trip has time for, don't
+// just take the first N in route order — that fills the whole trip with
+// stops near the origin and never reaches the place the person said they
+// were going (e.g. Alaminos → San Pablo showing only Alaminos stops).
+// Instead, reserve about half the slots (at least one) for the destination,
+// fill the rest from the origin/en-route side, pick the best-rated within
+// each group, and re-walk the result in route order.
+function pickSpotsForTrip(ordered, routeData, totalSlots) {
+  if (ordered.length <= totalSlots) return ordered;
+
+  const byRating = (a, b) => (b.rating || 0) - (a.rating || 0);
+  const destSpots = ordered.filter(s => isNearDestination(s, routeData)).sort(byRating);
+  const restSpots = ordered.filter(s => !isNearDestination(s, routeData)).sort(byRating);
+
+  let destQuota = Math.min(destSpots.length, Math.max(1, Math.ceil(totalSlots / 2)));
+  const restQuota = Math.min(restSpots.length, totalSlots - destQuota);
+  // If the origin side can't fill its share, hand the leftover slots to the destination.
+  destQuota = Math.min(destSpots.length, totalSlots - restQuota);
+
+  const chosen = [...destSpots.slice(0, destQuota), ...restSpots.slice(0, restQuota)];
+  return orderSpotsAlongRoute(chosen, routeData);
 }
 
 // Fetch verified hotels in a spot's city (reuses the existing
@@ -1513,15 +1552,20 @@ async function renderItinerary(routeData, spots, days, forceIncludeAll = false) 
       daySlices.push(daySpots);
     }
   } else {
+    // Choose which spots make the cut BEFORE slicing into days, so the
+    // destination is always represented when time is tight.
+    let totalSlots = 0;
+    for (let day = 1; day <= days; day++) totalSlots += dayCapacity(day);
+    const selected = pickSpotsForTrip(ordered, routeData, totalSlots);
     for (let day = 1; day <= days; day++) {
       const capacity = dayCapacity(day);
-      const daySpots = ordered.slice(cursor, cursor + capacity);
+      const daySpots = selected.slice(cursor, cursor + capacity);
       cursor += daySpots.length;
       daySlices.push(daySpots);
     }
   }
-  const scheduledSpots = ordered.slice(0, cursor);
-  const timeCutSpots = forceIncludeAll ? [] : ordered.slice(cursor);
+  const scheduledSpots = daySlices.flat();
+  const timeCutSpots = forceIncludeAll ? [] : ordered.filter(s => !scheduledSpots.includes(s));
   includedSpotIds = scheduledSpots.map(s => s.id);
 
   let html = '';
@@ -1567,7 +1611,15 @@ async function renderItinerary(routeData, spots, days, forceIncludeAll = false) 
     let lunchInserted = false;
     const LUNCH_START_MIN = 12 * 60; // don't schedule lunch before noon
     for (const spot of daySpots) {
-      const crossingCity = spot.city_id !== lastPoint.cityId;
+      // A different city_id only means a real inter-town ride if the spot is
+      // actually far from where we are. Spots can be filed under a
+      // neighboring municipality while sitting right beside the previous
+      // stop (e.g. Hidden Valley Springs is listed under Calauan but is
+      // entered via Alaminos) — routing those through the other town's
+      // center invents a long detour that isn't real. Close spots are just
+      // a local tricycle hop from the previous stop.
+      const crossingCity = spot.city_id !== lastPoint.cityId
+        && haversineKm(lastPoint.latitude, lastPoint.longitude, spot.latitude, spot.longitude) > INTERCITY_MIN_KM;
 
       // Where does the "last mile to the spot" measurement start from?
       // Normally the previous stop — but if we just crossed into a new
