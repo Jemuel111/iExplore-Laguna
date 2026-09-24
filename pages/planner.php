@@ -618,6 +618,9 @@ async function getTrafficAdjustment(lat, lng) {
 // origin→destination line) and only keeps spots within a walkable/short
 // detour distance of it.
 const ROUTE_CORRIDOR_KM = 6;
+// One-step widening used only when the strict corridor above matches
+// nothing at all — see the fallback comment where this is used.
+const ROUTE_CORRIDOR_KM_FALLBACK = 10;
 
 // Perpendicular distance (km) from point P to the segment A→B, using a
 // local flat-earth approximation. Laguna's whole span is under ~50km, so
@@ -859,14 +862,32 @@ async function planRoute() {
     // query is deliberately loose (fast, simple SQL) and can include spots
     // that sit off to the side and are never actually passed — filter those
     // out here against the real drawn route line.
-    const onRouteSpots = allSpots.filter(
+    //
+    // If the strict corridor comes back empty, widen it ONE step
+    // (ROUTE_CORRIDOR_KM_FALLBACK) rather than abandoning the distance
+    // check entirely. Falling back to the full unfiltered pool used to
+    // mean a spot dozens of km off the direct path — a whole detour to a
+    // different town — could get scheduled with zero distance vetting
+    // whenever the tight corridor happened to match nothing for a
+    // particular origin/destination pair (most likely for short trips
+    // between two nearby towns, exactly where a big unplanned detour is
+    // least appropriate). If even the widened corridor comes back empty,
+    // show nothing rather than something arbitrarily far away — the
+    // empty-state messaging elsewhere already handles a spot-free plan.
+    let onRouteSpots = allSpots.filter(
       s => distanceToRouteKm(parseFloat(s.latitude), parseFloat(s.longitude), routeLine) <= ROUTE_CORRIDOR_KM
     );
-    if (onRouteSpots.length > 0) {
-      allSpots = onRouteSpots;
-    } else {
-      console.warn(`No spots found within ${ROUTE_CORRIDOR_KM}km of the route — showing all fetched spots instead.`);
+    if (onRouteSpots.length === 0) {
+      onRouteSpots = allSpots.filter(
+        s => distanceToRouteKm(parseFloat(s.latitude), parseFloat(s.longitude), routeLine) <= ROUTE_CORRIDOR_KM_FALLBACK
+      );
+      if (onRouteSpots.length > 0) {
+        console.warn(`No spots within ${ROUTE_CORRIDOR_KM}km of the route — widened to ${ROUTE_CORRIDOR_KM_FALLBACK}km.`);
+      } else {
+        console.warn(`No spots found within ${ROUTE_CORRIDOR_KM_FALLBACK}km of the route.`);
+      }
     }
+    allSpots = onRouteSpots;
 
     fareCache = new Map(); // fresh fare lookups for this itinerary
     drawSpotMarkers(allSpots);
