@@ -617,18 +617,28 @@ async function getTrafficAdjustment(lat, lng) {
 // road-following polyline when available, otherwise the straight
 // origin→destination line) and only keeps spots within a walkable/short
 // detour distance of it.
-const ROUTE_CORRIDOR_KM = 2;
+const ROUTE_CORRIDOR_KM = 6;
 // Only widen the corridor when the strict corridor has no candidates.
 // The road-detour check below still applies, so this cannot by itself
-// make a far-away attraction qualify.
-const ROUTE_CORRIDOR_KM_FALLBACK = 3;
+// make a far-away attraction qualify. Kept looser than the detour cap
+// itself — this is just a cheap pre-filter to cut down on road-detour
+// API calls, not the real gatekeeper, so it shouldn't reject a
+// candidate the road check would otherwise have accepted.
+const ROUTE_CORRIDOR_KM_FALLBACK = 10;
 
-// Maximum extra ROAD distance we allow for an attraction. The previous
-// rule allowed a 10 km detour even when the whole trip was only 8–9 km.
-// That is too loose for an itinerary planner.
+// Maximum extra ROAD distance we allow for an attraction, scaled to the
+// trip's own length. The previous rule allowed a flat 10 km detour even
+// on a short 8-9 km trip (how a 20km-detour resort snuck into an
+// Alaminos→San Pablo itinerary). But capping it at a flat 3 km
+// regardless of trip length is just as wrong in the other direction —
+// it would reject nearly every real attraction on anything but a very
+// short trip, since Laguna's waterfalls and lakes typically sit several
+// km off the highway. Scale with the trip instead, with a floor for
+// short trips and a ceiling so a very long trip still can't justify an
+// absurd detour.
 function maxReasonableDetourKm(directKm) {
-  if (!Number.isFinite(directKm) || directKm <= 0) return 1.5;
-  return Math.min(3, Math.max(1.5, directKm * 0.20));
+  if (!Number.isFinite(directKm) || directKm <= 0) return 3;
+  return Math.min(15, Math.max(3, directKm * 0.35));
 }
 
 // Straight-line fallback used only when the server-side road-detour
