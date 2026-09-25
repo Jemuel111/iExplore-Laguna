@@ -115,7 +115,9 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
     <!-- Brand -->
     <a class="navbar-brand d-flex align-items-center gap-2" href="<?= APP_URL ?>">
       <?php if ($__logo_path): ?>
-        <img src="<?= APP_URL . '/' . ltrim(e($__logo_path), '/') ?>" alt="<?= e(APP_NAME) ?> logo" class="brand-logo site-navbar-logo">
+        <img src="<?= APP_URL . '/' . ltrim(e($__logo_path), '/') ?>" alt="<?= e(APP_NAME) ?> logo" class="brand-logo site-navbar-logo"
+             onerror="this.style.display='none';this.nextElementSibling.style.display=''">
+        <span class="brand-icon" style="display:none"><i class="bi bi-map-fill"></i></span>
       <?php else: ?>
         <span class="brand-icon"><i class="bi bi-map-fill"></i></span>
       <?php endif; ?>

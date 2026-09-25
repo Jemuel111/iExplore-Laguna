@@ -56,11 +56,20 @@ $period_bookings = analytics_count(
 $period_orders = analytics_count(
     "SELECT COUNT(*) c FROM orders WHERE created_at >= ? AND status NOT IN ('cancelled')", [$period_start]
 );
+// Joined to active spots and scoped to the selected period so this
+// matches exactly what the Spot Performance table below sums to — the
+// two used to disagree (444 vs 442) because this counted every view
+// ever logged regardless of period, while the table counted all-time
+// views but only for spots still active. Same rules now, both places.
 $period_views = analytics_count(
-    "SELECT COUNT(*) c FROM spot_views WHERE viewed_at >= ?", [$period_start]
+    "SELECT COUNT(*) c FROM spot_views v
+     JOIN tourist_spots s ON s.id = v.spot_id
+     WHERE v.viewed_at >= ? AND s.is_active = 1", [$period_start]
 );
 $period_checkins = analytics_count(
-    "SELECT COUNT(*) c FROM spot_checkins WHERE checked_in_at >= ?", [$period_start]
+    "SELECT COUNT(*) c FROM spot_checkins k
+     JOIN tourist_spots s ON s.id = k.spot_id
+     WHERE k.checked_in_at >= ? AND s.is_active = 1", [$period_start]
 );
 $period_booking_revenue = analytics_money(
     "SELECT COALESCE(SUM(total_amount),0) n FROM bookings WHERE created_at >= ? AND status NOT IN ('cancelled','no_show')", [$period_start]
@@ -143,11 +152,11 @@ $top_nationalities = analytics_rows("SELECT nationality, COUNT(*) c FROM users W
 
 // ── Spot analytics ────────────────────────────────────────────
 $spot_stats = analytics_rows("SELECT s.id,s.name,c.name city_name,
-    (SELECT COUNT(*) FROM spot_views v WHERE v.spot_id=s.id) total_views,
-    (SELECT COUNT(*) FROM spot_checkins k WHERE k.spot_id=s.id) total_checkins,
-    (SELECT MIN(k2.checked_in_at) FROM spot_checkins k2 WHERE k2.spot_id=s.id) first_checkin
+    (SELECT COUNT(*) FROM spot_views v WHERE v.spot_id=s.id AND v.viewed_at >= ?) total_views,
+    (SELECT COUNT(*) FROM spot_checkins k WHERE k.spot_id=s.id AND k.checked_in_at >= ?) total_checkins,
+    (SELECT MIN(k2.checked_in_at) FROM spot_checkins k2 WHERE k2.spot_id=s.id AND k2.checked_in_at >= ?) first_checkin
     FROM tourist_spots s JOIN cities c ON s.city_id=c.id WHERE s.is_active=1
-    ORDER BY total_checkins DESC,total_views DESC");
+    ORDER BY total_checkins DESC,total_views DESC", [$period_start, $period_start, $period_start]);
 foreach ($spot_stats as &$row) {
     $monthsActive = 1;
     if ($row['first_checkin']) $monthsActive = max(1,(int)((strtotime('now')-strtotime($row['first_checkin']))/(30*86400))+1);
@@ -272,12 +281,12 @@ require_once __DIR__ . '/../includes/header.php';
       ['bi-geo-alt-fill','Verified Check-ins',$period_checkins,null,'checkins'],
     ];
     foreach ($kpis as [$icon,$label,$value,$growth,$key]): ?>
-      <div class="col-6 col-lg-2"><div class="analytics-card analytics-kpi"><div class="card-body">
+      <div class="col-6 col-lg-2 d-flex"><div class="analytics-card analytics-kpi h-100 w-100"><div class="card-body d-flex flex-column">
         <div class="analytics-kpi-icon mb-3"><i class="bi <?= $icon ?>"></i></div>
         <div class="value"><?= is_string($value) ? $value : number_format($value) ?></div>
         <div class="label mt-1"><?= $label ?></div>
         <?php if ($growth !== null): $cls=$growth>0?'up':($growth<0?'down':'flat'); $arrow=$growth>0?'↑':($growth<0?'↓':'→'); ?>
-          <div class="analytics-growth <?= $cls ?> mt-2"><?= $arrow ?> <?= number_format(abs($growth),1) ?>% vs previous period</div>
+          <div class="analytics-growth <?= $cls ?> mt-auto pt-2"><?= $arrow ?> <?= number_format(abs($growth),1) ?>% vs previous period</div>
         <?php endif; ?>
       </div></div></div>
     <?php endforeach; ?>
@@ -357,10 +366,18 @@ require_once __DIR__ . '/../includes/header.php';
     </div></div></div>
   </div>
 
-  <div class="analytics-card analytics-spot-performance mb-4"><div class="card-body"><div class="d-flex justify-content-between align-items-center mb-3"><div><h6 class="fw-bold mb-1">Spot Performance</h6><div class="text-muted small">Interest views, verified visits and visit conversion</div></div><span class="badge rounded-pill" style="background:var(--maroon-pale);color:var(--maroon-dark)"><?= number_format($site_total_views) ?> total views</span></div>
-    <div class="table-responsive"><table class="table analytics-table align-middle mb-0 analytics-compact-table"><thead><tr><th>Spot</th><th>City</th><th class="text-end">Views</th><th class="text-end">Visits</th><th class="text-end">Conversion</th><th class="text-end">Avg / Month</th></tr></thead><tbody>
-      <?php foreach($spot_stats as $s): ?><tr><td class="fw-bold"><?= e($s['name']) ?></td><td class="text-muted"><?= e($s['city_name']) ?></td><td class="text-end"><?= number_format($s['total_views']) ?></td><td class="text-end fw-bold" style="color:var(--maroon-dark)"><?= number_format($s['total_checkins']) ?></td><td class="text-end"><?= number_format($s['conversion'],1) ?>%</td><td class="text-end"><?= number_format($s['avg_per_month'],1) ?></td></tr><?php endforeach; ?>
+  <div class="analytics-card analytics-spot-performance mb-4"><div class="card-body"><div class="d-flex justify-content-between align-items-center mb-3"><div><h6 class="fw-bold mb-1">Spot Performance</h6><div class="text-muted small">Interest views, verified visits and visit conversion &middot; last <?= $period ?> days</div></div><span class="badge rounded-pill" style="background:var(--maroon-pale);color:var(--maroon-dark)"><?= number_format($site_total_views) ?> total views</span></div>
+    <div class="table-responsive"><table class="table analytics-table align-middle mb-0 analytics-compact-table"><thead><tr><th>Spot</th><th>City</th><th class="text-end">Views</th><th class="text-end">Visits</th><th class="text-end">Conversion</th><th class="text-end">Avg / Month</th></tr></thead><tbody id="spot-perf-body">
+      <?php foreach($spot_stats as $s): ?><tr class="spot-perf-row"><td class="fw-bold"><?= e($s['name']) ?></td><td class="text-muted"><?= e($s['city_name']) ?></td><td class="text-end"><?= number_format($s['total_views']) ?></td><td class="text-end fw-bold" style="color:var(--maroon-dark)"><?= number_format($s['total_checkins']) ?></td><td class="text-end"><?= number_format($s['conversion'],1) ?>%</td><td class="text-end"><?= number_format($s['avg_per_month'],1) ?></td></tr><?php endforeach; ?>
     </tbody></table></div>
+    <div class="d-flex justify-content-between align-items-center mt-2" id="spot-perf-pagination" style="display:none">
+      <span class="small text-muted">Showing <span id="spot-perf-range"></span> of <?= count($spot_stats) ?> spots</span>
+      <div class="d-flex align-items-center gap-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="spot-perf-prev"><i class="bi bi-chevron-left"></i></button>
+        <span class="small text-muted" id="spot-perf-page-label"></span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="spot-perf-next"><i class="bi bi-chevron-right"></i></button>
+      </div>
+    </div>
   </div></div>
 
   <div class="analytics-card analytics-top-shops"><div class="card-body"><h6 class="fw-bold mb-1">Top Shops</h6><div class="text-muted small mb-3">Most orders in the selected period</div>
@@ -391,6 +408,36 @@ require_once __DIR__ . '/../includes/header.php';
   ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8}}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:10}},y:{beginAtZero:true,ticks:{precision:0}}}}});
   const vc = document.getElementById('visitChart');
   if (vc && window.Chart) new Chart(vc,{type:'doughnut',data:{labels:['Interest views','Verified check-ins'],datasets:[{data:[<?= (int)$site_total_views ?>,<?= (int)$site_total_checkins ?>],backgroundColor:[muted,green],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8}}}}});
+
+  // ── Spot Performance table: client-side pagination ──────────────
+  // The full list is already rendered server-side; this just shows one
+  // page of it at a time instead of one long scroll of every spot.
+  const spotRows = Array.from(document.querySelectorAll('.spot-perf-row'));
+  const PAGE_SIZE = 10;
+  if (spotRows.length > PAGE_SIZE) {
+    const totalPages = Math.ceil(spotRows.length / PAGE_SIZE);
+    let page = 1;
+    const pagWrap  = document.getElementById('spot-perf-pagination');
+    const rangeEl  = document.getElementById('spot-perf-range');
+    const labelEl  = document.getElementById('spot-perf-page-label');
+    const prevBtn  = document.getElementById('spot-perf-prev');
+    const nextBtn  = document.getElementById('spot-perf-next');
+
+    function renderSpotPage() {
+      const start = (page - 1) * PAGE_SIZE;
+      const end   = Math.min(start + PAGE_SIZE, spotRows.length);
+      spotRows.forEach((row, i) => { row.style.display = (i >= start && i < end) ? '' : 'none'; });
+      rangeEl.textContent = `${start + 1}\u2013${end}`;
+      labelEl.textContent = `Page ${page} of ${totalPages}`;
+      prevBtn.disabled = page <= 1;
+      nextBtn.disabled = page >= totalPages;
+    }
+
+    pagWrap.style.display = '';
+    prevBtn.addEventListener('click', () => { if (page > 1) { page--; renderSpotPage(); } });
+    nextBtn.addEventListener('click', () => { if (page < totalPages) { page++; renderSpotPage(); } });
+    renderSpotPage();
+  }
 })();
 </script>
 

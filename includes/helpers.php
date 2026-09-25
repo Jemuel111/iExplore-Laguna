@@ -1027,7 +1027,16 @@ function handle_image_upload(string $fieldName, string $subfolder): ?string {
         throw new RuntimeException('Could not save the uploaded file. Please try again.');
     }
 
-    return APP_URL . '/uploads/' . $subfolder . '/' . $filename;
+    // Root-relative, NOT a full URL with the domain baked in. A path like
+    // "/uploads/spots/xyz.jpg" resolves correctly against whatever host is
+    // currently serving the page — production domain, a staging URL,
+    // localhost during development, http or https, doesn't matter.
+    // Storing the full APP_URL here instead would freeze that domain into
+    // the database forever: any photo uploaded while the app was reached
+    // through a different host (local dev, staging, a future domain
+    // change) would 404 from then on even though the file itself is fine
+    // — which looks exactly like "some pictures just don't load."
+    return '/uploads/' . $subfolder . '/' . $filename;
 }
 
 // ── Content moderation ──────────────────────────────────────────
