@@ -61,6 +61,49 @@ function fetch_tomtom_route(float $oLat, float $oLng, float $dLat, float $dLng, 
     ];
 }
 
+function fetch_tomtom_route_via(float $oLat, float $oLng, float $sLat, float $sLng, float $dLat, float $dLng, ?string &$error = null): ?array {
+    $url = 'https://api.tomtom.com/routing/1/calculateRoute/'
+         . $oLat . ',' . $oLng . ':'
+         . $sLat . ',' . $sLng . ':'
+         . $dLat . ',' . $dLng . '/json'
+         . '?key=' . urlencode(TOMTOM_API_KEY)
+         . '&routeType=fastest&travelMode=car';
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 8,
+    ]);
+    $raw      = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr  = curl_error($ch);
+    curl_close($ch);
+
+    if ($raw === false || $httpCode !== 200) {
+        $body = $raw !== false ? json_decode($raw, true) : null;
+        $msg  = $body['error']['description'] ?? null;
+        error_log(sprintf(
+            '[TomTom via route] curl_error=%s http_code=%s body=%s',
+            $curlErr ?: '(none)', $httpCode, $raw === false ? '(no response)' : substr($raw, 0, 500)
+        ));
+        $error = $curlErr ?: ($msg ?: "HTTP {$httpCode}");
+        return null;
+    }
+
+    $data = json_decode($raw, true);
+    $summary = $data['routes'][0]['summary'] ?? null;
+    if (!$summary) {
+        $error = 'No route found through the selected attraction.';
+        return null;
+    }
+
+    return [
+        'distance_km'  => isset($summary['lengthInMeters']) ? round($summary['lengthInMeters'] / 1000, 2) : null,
+        'duration_min' => isset($summary['travelTimeInSeconds']) ? round($summary['travelTimeInSeconds'] / 60) : null,
+        'provider'     => 'tomtom',
+    ];
+}
+
 function fetch_ors_route(float $oLat, float $oLng, float $dLat, float $dLng, ?string &$error = null): ?array {
     $url = 'https://api.openrouteservice.org/v2/directions/driving-car'
          . '?api_key=' . urlencode(ORS_API_KEY)
@@ -205,6 +248,97 @@ switch ($action) {
             'transport_options' => $transport_options,
             'waypoints'         => $waypoints,
             'has_route'         => !empty($transport_options),
+        ]);
+        break;
+
+    // ── Actual road distance through a candidate attraction ──
+    // Used by the planner to decide whether a tourist spot is genuinely
+    // along the way. TomTom receives three points:
+    // origin → attraction → destination.
+    case 'detour':
+        $oLat = (float) input('origin_lat', 'get');
+        $oLng = (float) input('origin_lng', 'get');
+        $sLat = (float) input('spot_lat',   'get');
+        $sLng = (float) input('spot_lng',   'get');
+        $dLat = (float) input('dest_lat',   'get');
+        $dLng = (float) input('dest_lng',   'get');
+        $directKm = (float) input('direct_km', 'get', 0);
+
+        if (!$oLat || !$oLng || !$sLat || !$sLng || !$dLat || !$dLng) {
+            json_error('All route coordinates are required.', 400);
+        }
+
+        $error = null;
+        $result = null;
+
+        if (defined('TOMTOM_API_KEY') && TOMTOM_API_KEY) {
+            $result = fetch_tomtom_route_via($oLat, $oLng, $sLat, $sLng, $dLat, $dLng, $error);
+        }
+
+        if ($result && isset($result['distance_km'])) {
+            $viaKm = (float) $result['distance_km'];
+            $baseKm = $directKm > 0 ? $directKm : null;
+
+            // If the browser did not supply the direct road distance,
+            // obtain it from the same TomTom provider for consistency.
+            if ($baseKm === null) {
+                $directError = null;
+                $direct = fetch_tomtom_route($oLat, $oLng, $dLat, $dLng, $directError);
+                $baseKm = $direct['distance_km'] ?? null;
+            }
+
+            if ($baseKm !== null) {
+                json_ok([
+                    'via_distance_km' => $viaKm,
+                    'direct_distance_km' => (float) $baseKm,
+                    'detour_km' => round(max(0, $viaKm - (float) $baseKm), 2),
+                    'road_based' => true,
+                    'provider' => $result['provider'],
+                ]);
+            }
+        }
+
+        // No TomTom route available. Return a failure instead of inventing
+        // a road distance; planner.php has a conservative Haversine fallback.
+        json_error($error ?: 'Road detour service is unavailable.', 502);
+        break;
+
+    // ── Direct road distance ────────────────────────────────
+    // Used once per itinerary so the detour threshold is based on the
+    // actual driving distance, not the straight-line distance.
+    case 'road_distance':
+        $oLat = (float) input('origin_lat', 'get');
+        $oLng = (float) input('origin_lng', 'get');
+        $dLat = (float) input('dest_lat',   'get');
+        $dLng = (float) input('dest_lng',   'get');
+
+        if (!$oLat || !$oLng || !$dLat || !$dLng) {
+            json_error('Origin and destination coordinates are required.', 400);
+        }
+
+        $error = null;
+        $result = null;
+
+        if (defined('TOMTOM_API_KEY') && TOMTOM_API_KEY) {
+            $result = fetch_tomtom_route($oLat, $oLng, $dLat, $dLng, $error);
+        }
+
+        if (!$result) {
+            $orsError = null;
+            if (defined('ORS_API_KEY') && ORS_API_KEY) {
+                $result = fetch_ors_route($oLat, $oLng, $dLat, $dLng, $orsError);
+            }
+            $error = $orsError ?: $error;
+        }
+
+        if (!$result || !isset($result['distance_km'])) {
+            json_error($error ?: 'Road distance service is unavailable.', 502);
+        }
+
+        json_ok([
+            'distance_km' => (float) $result['distance_km'],
+            'duration_min' => $result['duration_min'] ?? null,
+            'provider' => $result['provider'] ?? null,
         ]);
         break;
 

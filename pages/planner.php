@@ -617,30 +617,89 @@ async function getTrafficAdjustment(lat, lng) {
 // road-following polyline when available, otherwise the straight
 // origin→destination line) and only keeps spots within a walkable/short
 // detour distance of it.
-const ROUTE_CORRIDOR_KM = 6;
-// One-step widening used only when the strict corridor above matches
-// nothing at all — see the fallback comment where this is used.
-const ROUTE_CORRIDOR_KM_FALLBACK = 10;
+const ROUTE_CORRIDOR_KM = 2;
+// Only widen the corridor when the strict corridor has no candidates.
+// The road-detour check below still applies, so this cannot by itself
+// make a far-away attraction qualify.
+const ROUTE_CORRIDOR_KM_FALLBACK = 3;
 
-// How much EXTRA distance visiting a spot adds versus going straight
-// from origin to destination — i.e. is it actually worth the detour.
-// distanceToRouteKm alone isn't enough to catch a bad inclusion: a real
-// road route can wind close to a spot at some bend without that spot
-// being anywhere near worth the round trip to actually reach and return
-// from (this is what let a 20km-detour resort into an 8.6km Alaminos→
-// San Pablo trip — it sat near some point on the drawn route without
-// being remotely on the way).
-function detourKm(oLat, oLng, spotLat, spotLng, dLat, dLng) {
-  const direct = haversineKm(oLat, oLng, dLat, dLng);
-  const via    = haversineKm(oLat, oLng, spotLat, spotLng) + haversineKm(spotLat, spotLng, dLat, dLng);
-  return via - direct;
+// Maximum extra ROAD distance we allow for an attraction. The previous
+// rule allowed a 10 km detour even when the whole trip was only 8–9 km.
+// That is too loose for an itinerary planner.
+function maxReasonableDetourKm(directKm) {
+  if (!Number.isFinite(directKm) || directKm <= 0) return 1.5;
+  return Math.min(3, Math.max(1.5, directKm * 0.20));
 }
 
-// A detour is "reasonable" up to roughly the trip's own direct length —
-// a floor keeps this sane for very short trips (a couple km apart)
-// rather than excluding almost every side stop.
-function maxReasonableDetourKm(directKm) {
-  return Math.max(10, directKm);
+// Straight-line fallback used only when the server-side road-detour
+// lookup is unavailable. The normal path uses actual TomTom road distance.
+function detourKm(oLat, oLng, spotLat, spotLng, dLat, dLng) {
+  const direct = haversineKm(oLat, oLng, dLat, dLng);
+  const via = haversineKm(oLat, oLng, spotLat, spotLng)
+           + haversineKm(spotLat, spotLng, dLat, dLng);
+  return Math.max(0, via - direct);
+}
+
+// Ask our server for the actual driving distance:
+// origin → attraction → destination. The TomTom API key stays server-side.
+// Results are cached so the same attraction is never routed twice during
+// one planning operation.
+const roadDetourCache = new Map();
+
+async function getRoadDetour(origin, spot, destination, directRoadKm = null) {
+  const oLat = parseFloat(origin.latitude);
+  const oLng = parseFloat(origin.longitude);
+  const sLat = parseFloat(spot.latitude);
+  const sLng = parseFloat(spot.longitude);
+  const dLat = parseFloat(destination.latitude);
+  const dLng = parseFloat(destination.longitude);
+
+  if (![oLat, oLng, sLat, sLng, dLat, dLng].every(Number.isFinite)) {
+    return { detourKm: Infinity, viaRoadKm: Infinity, roadBased: false };
+  }
+
+  const key = [oLat, oLng, sLat, sLng, dLat, dLng].map(v => v.toFixed(5)).join(',');
+  if (roadDetourCache.has(key)) return roadDetourCache.get(key);
+
+  try {
+    const params = new URLSearchParams({
+      action: 'detour',
+      origin_lat: oLat,
+      origin_lng: oLng,
+      spot_lat: sLat,
+      spot_lng: sLng,
+      dest_lat: dLat,
+      dest_lng: dLng,
+    });
+
+    if (Number.isFinite(directRoadKm)) {
+      params.set('direct_km', directRoadKm);
+    }
+
+    const res = await fetch(API_BASE + 'routes.php?' + params.toString()).then(r => r.json());
+
+    if (res.success && res.data) {
+      const result = {
+        detourKm: Number(res.data.detour_km),
+        viaRoadKm: Number(res.data.via_distance_km),
+        roadBased: !!res.data.road_based,
+      };
+      roadDetourCache.set(key, result);
+      return result;
+    }
+  } catch (err) {
+    console.warn('Road detour lookup failed:', err);
+  }
+
+  // Safe fallback: do not silently treat a failed road lookup as a perfect
+  // route. Use the stricter straight-line estimate and mark it as fallback.
+  const fallback = {
+    detourKm: detourKm(oLat, oLng, sLat, sLng, dLat, dLng),
+    viaRoadKm: null,
+    roadBased: false,
+  };
+  roadDetourCache.set(key, fallback);
+  return fallback;
 }
 
 // Perpendicular distance (km) from point P to the segment A→B, using a
@@ -889,32 +948,80 @@ async function planRoute() {
     // on the way).
     const oLat = parseFloat(routeData.origin.latitude), oLng = parseFloat(routeData.origin.longitude);
     const dLat = parseFloat(routeData.destination.latitude), dLng = parseFloat(routeData.destination.longitude);
-    const directTripKm = haversineKm(oLat, oLng, dLat, dLng);
+
+    // drawRoute() already asked the server for the actual road route.
+    // Ask once more for the direct road distance so the detour comparison
+    // uses the same routing provider as the map whenever possible.
+    let directRoadKm = null;
+    try {
+      const directParams = new URLSearchParams({
+        action: 'road_distance',
+        origin_lat: oLat,
+        origin_lng: oLng,
+        dest_lat: dLat,
+        dest_lng: dLng,
+      });
+      const directRes = await fetch(API_BASE + 'routes.php?' + directParams.toString()).then(r => r.json());
+      if (directRes.success && directRes.data && Number.isFinite(Number(directRes.data.distance_km))) {
+        directRoadKm = Number(directRes.data.distance_km);
+      }
+    } catch (err) {
+      console.warn('Direct road-distance lookup failed; using straight-line fallback.', err);
+    }
+
+    const directTripKm = directRoadKm ?? haversineKm(oLat, oLng, dLat, dLng);
     const detourCapKm  = maxReasonableDetourKm(directTripKm);
 
-    const isReasonableStop = (s, corridorKm) => {
+    // First remove attractions that are obviously far from the actual
+    // road. This keeps the number of expensive road-detour API calls low.
+    // The final decision is made using actual driving distance below.
+    const corridorCandidates = (corridorKm) => allSpots.filter(s => {
       const lat = parseFloat(s.latitude), lng = parseFloat(s.longitude);
-      return distanceToRouteKm(lat, lng, routeLine) <= corridorKm
-          && detourKm(oLat, oLng, lat, lng, dLat, dLng) <= detourCapKm;
-    };
+      return Number.isFinite(lat) && Number.isFinite(lng)
+          && distanceToRouteKm(lat, lng, routeLine) <= corridorKm;
+    });
 
-    // If the strict corridor comes back empty, widen it ONE step
-    // (ROUTE_CORRIDOR_KM_FALLBACK) rather than abandoning the distance
-    // check entirely — the detour cap above still applies either way, so
-    // widening this can never let in something that isn't genuinely on
-    // the way. If even the widened corridor comes back empty, show
-    // nothing rather than something arbitrarily far away — the
-    // empty-state messaging elsewhere already handles a spot-free plan.
-    let onRouteSpots = allSpots.filter(s => isReasonableStop(s, ROUTE_CORRIDOR_KM));
-    if (onRouteSpots.length === 0) {
-      onRouteSpots = allSpots.filter(s => isReasonableStop(s, ROUTE_CORRIDOR_KM_FALLBACK));
-      if (onRouteSpots.length > 0) {
+    let candidates = corridorCandidates(ROUTE_CORRIDOR_KM);
+    if (candidates.length === 0) {
+      candidates = corridorCandidates(ROUTE_CORRIDOR_KM_FALLBACK);
+      if (candidates.length > 0) {
         console.warn(`No spots within ${ROUTE_CORRIDOR_KM}km of the route — widened to ${ROUTE_CORRIDOR_KM_FALLBACK}km.`);
-      } else {
-        console.warn(`No spots found within ${ROUTE_CORRIDOR_KM_FALLBACK}km of the route.`);
       }
     }
-    allSpots = onRouteSpots;
+
+    // Now use REAL ROAD distance for each candidate:
+    // origin → attraction → destination. This is the important fix.
+    // A place is included only if the extra driving distance is within
+    // the allowed detour.
+    const checked = await Promise.all(candidates.map(async s => {
+      const result = await getRoadDetour(
+        routeData.origin,
+        s,
+        routeData.destination,
+        directRoadKm
+      );
+
+      return {
+        spot: s,
+        detourKm: result.detourKm,
+        viaRoadKm: result.viaRoadKm,
+        roadBased: result.roadBased,
+      };
+    }));
+
+    const accepted = checked
+      .filter(x => Number.isFinite(x.detourKm) && x.detourKm <= detourCapKm)
+      .sort((a, b) => a.detourKm - b.detourKm);
+
+    allSpots = accepted.map(x => x.spot);
+
+    if (accepted.length === 0) {
+      console.warn(
+        `No attractions passed the road-detour check. ` +
+        `Direct trip: ${directTripKm.toFixed(1)}km; ` +
+        `maximum detour: ${detourCapKm.toFixed(1)}km.`
+      );
+    }
 
     fareCache = new Map(); // fresh fare lookups for this itinerary
     drawSpotMarkers(allSpots);
