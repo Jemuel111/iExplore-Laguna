@@ -8,7 +8,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') { csrf_verify(); }
 // Step 1: package info + hotel/room   Step 2: assign spots per day
 // ============================================================
 $page_title  = 'Manage Packages';
-$active_page = '';
+$active_page = 'admin-packages';
 
 
 if (!is_logged_in()) { header('Location: ' . APP_URL . '/pages/login.php'); exit; }
@@ -170,10 +170,34 @@ require_once __DIR__ . '/../includes/header.php';
         <form method="POST"><?= csrf_field() ?>
           <input type="hidden" name="action" value="save_spots">
           <input type="hidden" name="package_id" value="<?= $edit_id ?>">
-          <div style="max-height:520px;overflow-y:auto" class="mb-3">
-            <?php foreach ($spot_pool as $sp): $checked = isset($editing_spots[$sp['id']]); ?>
-            <div class="d-flex align-items-center gap-2 p-2 mb-1" style="border:1px solid var(--border);border-radius:var(--radius-sm)">
-              <input type="checkbox" class="form-check-input" name="spot_id[]" value="<?= $sp['id'] ?>"
+
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <div class="position-relative flex-grow-1">
+              <i class="bi bi-search position-absolute top-50 translate-middle-y text-muted" style="left:.6rem;font-size:.8rem"></i>
+              <input type="text" id="spot-search" class="form-control form-control-sm" style="padding-left:1.8rem"
+                     placeholder="Search spots or city…">
+            </div>
+            <span class="small text-muted flex-shrink-0" style="white-space:nowrap">
+              <span id="spot-selected-count">0</span> of <?= count($spot_pool) ?> selected
+            </span>
+          </div>
+
+          <div style="max-height:520px;overflow-y:auto" class="mb-3" id="spot-list">
+            <?php $lastCity = null; foreach ($spot_pool as $sp):
+              $checked = isset($editing_spots[$sp['id']]);
+              $showCityHeader = $editing_package['scope'] === 'multi_city' && $sp['city_name'] !== $lastCity;
+              $lastCity = $sp['city_name'];
+            ?>
+            <?php if ($showCityHeader): ?>
+            <div class="small fw-bold text-uppercase mt-2 mb-1" data-city-header
+                 style="color:var(--maroon-dark);letter-spacing:.04em;font-size:.7rem">
+              <?= e($sp['city_name']) ?>
+            </div>
+            <?php endif; ?>
+            <div class="d-flex align-items-center gap-2 p-2 mb-1 spot-row"
+                 data-name="<?= e(mb_strtolower($sp['name'])) ?>" data-city="<?= e(mb_strtolower($sp['city_name'])) ?>"
+                 style="border:1px solid var(--border);border-radius:var(--radius-sm)">
+              <input type="checkbox" class="form-check-input spot-checkbox" name="spot_id[]" value="<?= $sp['id'] ?>"
                      id="sp<?= $sp['id'] ?>" <?= $checked?'checked':'' ?>>
               <label for="sp<?= $sp['id'] ?>" class="flex-grow-1 mb-0" style="font-size:.86rem;cursor:pointer">
                 <strong><?= e($sp['name']) ?></strong>
@@ -186,7 +210,11 @@ require_once __DIR__ . '/../includes/header.php';
               </select>
             </div>
             <?php endforeach; ?>
+            <div id="spot-no-results" class="text-muted small text-center py-3 d-none">
+              No spots match your search.
+            </div>
           </div>
+
           <button type="submit" class="btn btn-primary-app w-100">
             <i class="bi bi-check-lg me-2"></i>Save Package Itinerary
           </button>
@@ -323,6 +351,51 @@ function filterRooms() {
     ? rooms.map(r => `<option value="${r.id}">${r.room_type} — ₱${Number(r.price_per_night).toLocaleString()}/night</option>`).join('')
     : '<option value="">No rooms for this hotel</option>';
 }
+
+// ── Step 2 spot checklist: live selected count + search/filter ─────
+// Only present on the "Assign Spots" step, so every lookup here can
+// come back empty on step 1 without erroring.
+(function () {
+  const checkboxes = document.querySelectorAll('.spot-checkbox');
+  const countEl = document.getElementById('spot-selected-count');
+
+  function updateSelectedCount() {
+    if (!countEl) return;
+    countEl.textContent = document.querySelectorAll('.spot-checkbox:checked').length;
+  }
+  checkboxes.forEach(cb => cb.addEventListener('change', updateSelectedCount));
+  updateSelectedCount();
+
+  const searchInput = document.getElementById('spot-search');
+  const noResults = document.getElementById('spot-no-results');
+  if (!searchInput) return;
+
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.trim().toLowerCase();
+    let anyVisible = false;
+
+    document.querySelectorAll('.spot-row').forEach(row => {
+      const match = !q || row.dataset.name.includes(q) || row.dataset.city.includes(q);
+      row.style.display = match ? '' : 'none';
+      if (match) anyVisible = true;
+    });
+
+    // A city header stays visible only while at least one spot under it
+    // still matches — otherwise a search hides every spot in a city but
+    // leaves its now-empty header behind.
+    document.querySelectorAll('[data-city-header]').forEach(header => {
+      let el = header.nextElementSibling;
+      let hasVisibleSpot = false;
+      while (el && !el.hasAttribute('data-city-header')) {
+        if (el.classList.contains('spot-row') && el.style.display !== 'none') hasVisibleSpot = true;
+        el = el.nextElementSibling;
+      }
+      header.style.display = hasVisibleSpot ? '' : 'none';
+    });
+
+    if (noResults) noResults.classList.toggle('d-none', anyVisible);
+  });
+})();
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

@@ -9,7 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') { csrf_verify(); }
 // activate/deactivate, delete.
 // ============================================================
 $page_title  = 'Manage Spots';
-$active_page = '';
+$active_page = 'admin-spots';
 
 
 if (!is_logged_in()) { header('Location: ' . APP_URL . '/pages/login.php'); exit; }

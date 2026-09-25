@@ -131,32 +131,32 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
       <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-1">
         <?php if ($user && ($user['role'] ?? '') === 'admin'): ?>
         <li class="nav-item">
-          <a class="nav-link active" href="<?= APP_URL ?>/pages/admin-dashboard.php">
+          <a class="nav-link <?= $active_page === 'admin-dashboard' ? 'active' : '' ?>" href="<?= APP_URL ?>/pages/admin-dashboard.php">
             <i class="bi bi-shield-check me-1"></i>Admin Dashboard
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="<?= APP_URL ?>/pages/admin-packages.php">
+          <a class="nav-link <?= $active_page === 'admin-packages' ? 'active' : '' ?>" href="<?= APP_URL ?>/pages/admin-packages.php">
             <i class="bi bi-box-seam me-1"></i>Manage Packages
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="<?= APP_URL ?>/pages/admin-spots.php">
+          <a class="nav-link <?= $active_page === 'admin-spots' ? 'active' : '' ?>" href="<?= APP_URL ?>/pages/admin-spots.php">
             <i class="bi bi-geo-alt me-1"></i>Manage Spots
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="<?= APP_URL ?>/pages/admin-spot-photos.php">
+          <a class="nav-link <?= $active_page === 'admin-spot-photos' ? 'active' : '' ?>" href="<?= APP_URL ?>/pages/admin-spot-photos.php">
             <i class="bi bi-images me-1"></i>Spot Photos
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="<?= APP_URL ?>/pages/admin-hotel-photos.php">
+          <a class="nav-link <?= $active_page === 'admin-hotel-photos' ? 'active' : '' ?>" href="<?= APP_URL ?>/pages/admin-hotel-photos.php">
             <i class="bi bi-images me-1"></i>Hotel Photos
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="<?= APP_URL ?>/pages/admin-analytics.php">
+          <a class="nav-link <?= $active_page === 'admin-analytics' ? 'active' : '' ?>" href="<?= APP_URL ?>/pages/admin-analytics.php">
             <i class="bi bi-bar-chart-line me-1"></i>Analytics
           </a>
         </li>

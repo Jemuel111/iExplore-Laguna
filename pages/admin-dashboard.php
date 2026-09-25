@@ -8,7 +8,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') { csrf_verify(); }
 // Approve / reject shop & hotel registrations
 // ============================================================
 $page_title  = 'Admin Dashboard';
-$active_page = '';
+$active_page = 'admin-dashboard';
 
 
 if (!is_logged_in()) { header('Location: ' . APP_URL . '/pages/login.php'); exit; }

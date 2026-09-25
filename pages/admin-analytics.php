@@ -7,7 +7,7 @@ require_once __DIR__ . '/../includes/helpers.php';
 // iEXPLORE LAGUNA — Admin Analytics
 // ============================================================
 $page_title  = 'Analytics';
-$active_page = '';
+$active_page = 'admin-analytics';
 
 if (!is_logged_in()) { header('Location: ' . APP_URL . '/pages/login.php'); exit; }
 $u = current_user();

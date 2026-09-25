@@ -8,7 +8,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') { csrf_verify(); }
 // Upload multiple photos at once for any hotel
 // ============================================================
 $page_title  = 'Manage Hotel Content';
-$active_page = '';
+$active_page = 'admin-hotel-photos';
 
 
 if (!is_logged_in()) { header('Location: ' . APP_URL . '/pages/login.php'); exit; }
@@ -215,16 +215,37 @@ require_once __DIR__ . '/../includes/header.php';
       <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
         <i class="bi bi-building me-2"></i>Select a Hotel
       </h6>
-      <form method="GET">
-        <select class="form-select mb-2" name="hotel_id" onchange="this.form.submit()">
-          <option value="">Choose a hotel…</option>
-          <?php foreach ($hotels as $ht): ?>
-          <option value="<?= $ht['id'] ?>" <?= $hotel_id==$ht['id']?'selected':'' ?>>
-            <?= e($ht['name']) ?> — <?= e($ht['city_name']) ?> (<?= $ht['photo_count'] ?> photo<?= $ht['photo_count']!=1?'s':'' ?>)
-          </option>
-          <?php endforeach; ?>
-        </select>
-      </form>
+      <div class="position-relative mb-2">
+        <i class="bi bi-search position-absolute top-50 translate-middle-y text-muted" style="left:.6rem;font-size:.8rem"></i>
+        <input type="text" id="picker-search" class="form-control form-control-sm" style="padding-left:1.8rem"
+               placeholder="Search hotels or city…">
+      </div>
+      <div style="max-height:400px;overflow-y:auto" id="picker-list">
+        <?php $lastCity = null; foreach ($hotels as $ht):
+          $isActive = $hotel_id == $ht['id'];
+          $cityChanged = $ht['city_name'] !== $lastCity;
+          $lastCity = $ht['city_name'];
+        ?>
+        <?php if ($cityChanged): ?>
+        <div class="small fw-bold text-uppercase mt-2 mb-1" data-city-header
+             style="color:var(--maroon-dark);letter-spacing:.04em;font-size:.7rem">
+          <?= e($ht['city_name']) ?>
+        </div>
+        <?php endif; ?>
+        <a href="?hotel_id=<?= $ht['id'] ?>" class="d-flex align-items-center justify-content-between gap-2 p-2 mb-1 text-decoration-none picker-row<?= $isActive ? ' picker-row-active' : '' ?>"
+           data-name="<?= e(mb_strtolower($ht['name'])) ?>" data-city="<?= e(mb_strtolower($ht['city_name'])) ?>"
+           style="border:1.5px solid <?= $isActive ? 'var(--maroon-mid)' : 'var(--border)' ?>;border-radius:var(--radius-sm);background:<?= $isActive ? 'var(--maroon-pale)' : '#fff' ?>;color:inherit">
+          <span style="font-size:.86rem;min-width:0">
+            <strong><?= e($ht['name']) ?></strong>
+            <span class="text-muted"> · <?= e($ht['city_name']) ?></span>
+          </span>
+          <span class="badge rounded-pill flex-shrink-0" style="background:<?= $ht['photo_count']>0 ? 'var(--maroon-pale)' : '#eee' ?>;color:var(--maroon-dark);font-size:.7rem">
+            <i class="bi bi-camera me-1"></i><?= $ht['photo_count'] ?>
+          </span>
+        </a>
+        <?php endforeach; ?>
+        <div id="picker-no-results" class="text-muted small text-center py-3 d-none">No hotels match your search.</div>
+      </div>
     </div>
 
     <?php if ($selected_hotel): ?>
@@ -378,5 +399,40 @@ require_once __DIR__ . '/../includes/header.php';
 
 </div>
 </div>
+
+<script>
+// ── Hotel picker: live search/filter over the city-grouped list ────
+(function () {
+  const searchInput = document.getElementById('picker-search');
+  const noResults = document.getElementById('picker-no-results');
+  if (!searchInput) return;
+
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.trim().toLowerCase();
+    let anyVisible = false;
+
+    document.querySelectorAll('.picker-row').forEach(row => {
+      const match = !q || row.dataset.name.includes(q) || row.dataset.city.includes(q);
+      row.style.display = match ? '' : 'none';
+      if (match) anyVisible = true;
+    });
+
+    document.querySelectorAll('[data-city-header]').forEach(header => {
+      let el = header.nextElementSibling;
+      let hasVisibleRow = false;
+      while (el && !el.hasAttribute('data-city-header')) {
+        if (el.classList.contains('picker-row') && el.style.display !== 'none') hasVisibleRow = true;
+        el = el.nextElementSibling;
+      }
+      header.style.display = hasVisibleRow ? '' : 'none';
+    });
+
+    if (noResults) noResults.classList.toggle('d-none', anyVisible);
+  });
+
+  const active = document.querySelector('.picker-row-active');
+  if (active) active.scrollIntoView({ block: 'center' });
+})();
+</script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
