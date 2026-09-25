@@ -44,8 +44,20 @@ function site_settings(): array {
     static $settings = null;
     if ($settings !== null) return $settings;
 
-    ensure_site_settings_table();
-    $rows = db_fetch_all("SELECT setting_key, setting_value FROM site_settings");
+    // This runs on EVERY page load site-wide (header.php calls it on
+    // every request), so calling ensure_site_settings_table() up front
+    // unconditionally meant a CREATE TABLE IF NOT EXISTS round trip to
+    // the database on every single page view, forever — pure overhead
+    // once the table has existed since the initial schema.sql migration,
+    // which it always does after first setup. Try the plain SELECT
+    // first; only pay for the table-creation check on the rare/first
+    // request where the table is genuinely missing.
+    try {
+        $rows = db_fetch_all("SELECT setting_key, setting_value FROM site_settings");
+    } catch (Throwable $e) {
+        ensure_site_settings_table();
+        $rows = db_fetch_all("SELECT setting_key, setting_value FROM site_settings");
+    }
     $settings = [];
     foreach ($rows as $row) {
         $settings[$row['setting_key']] = $row['setting_value'];
@@ -64,13 +76,24 @@ function site_settings(): array {
 
 /** Update one site setting. */
 function set_site_setting(string $key, string $value): void {
-    ensure_site_settings_table();
-    db_execute(
-        "INSERT INTO site_settings (setting_key, setting_value)
-         VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)",
-        [$key, $value]
-    );
+    // Same reasoning as site_settings() above: only create the table on
+    // the rare occasion it's actually missing, not on every save.
+    try {
+        db_execute(
+            "INSERT INTO site_settings (setting_key, setting_value)
+             VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)",
+            [$key, $value]
+        );
+    } catch (Throwable $e) {
+        ensure_site_settings_table();
+        db_execute(
+            "INSERT INTO site_settings (setting_key, setting_value)
+             VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)",
+            [$key, $value]
+        );
+    }
 }
 
 /** Only allow CSS color values that are safe to put in an inline style. */
@@ -194,7 +217,30 @@ function ensure_user_demographic_columns(): void {
  * behavior alone can't prove someone physically went there) — kept as
  * a clearly separate, honestly-labeled metric from spot_checkins below.
  */
+/**
+ * Cheap existence check so the ensure_*_table() functions below can skip
+ * their CREATE TABLE IF NOT EXISTS statement once a table is already
+ * known to exist. Every one of these functions runs on a page a visitor
+ * hits often (spot pages, hotel pages, reviews), and a DDL statement on
+ * every single request — forever, even though the table has existed
+ * since the initial schema.sql migration — is pure wasted latency.
+ * Falls back to running the CREATE TABLE on the rare/first request
+ * where a table is genuinely missing.
+ */
+function table_already_exists(string $table): bool {
+    static $known = [];
+    if (isset($known[$table])) return $known[$table];
+    try {
+        db_fetch_all("SELECT 1 FROM `$table` LIMIT 1");
+        return $known[$table] = true;
+    } catch (Throwable $e) {
+        return $known[$table] = false;
+    }
+}
+
 function ensure_spot_views_table(): void {
+    if (table_already_exists('spot_views')) return;
+
     db()->exec(
         "CREATE TABLE IF NOT EXISTS spot_views (
             id INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -214,6 +260,7 @@ function ensure_spot_views_table(): void {
  * should be trusted as "people who really went there."
  */
 function ensure_spot_checkins_table(): void {
+    if (table_already_exists('spot_checkins')) return;
     db()->exec(
         "CREATE TABLE IF NOT EXISTS spot_checkins (
             id INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -678,6 +725,7 @@ function db_last_id(): string {
  * spot_reviews table exactly to avoid FK type-mismatch errors (MySQL 150).
  */
 function ensure_hotel_reviews_table(): void {
+    if (table_already_exists('hotel_reviews')) return;
     db()->exec(
         "CREATE TABLE IF NOT EXISTS hotel_reviews (
             id INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -709,6 +757,7 @@ function ensure_hotel_reviews_table(): void {
  * first without duplicating the CREATE TABLE statement.
  */
 function ensure_hotel_photos_table(): void {
+    if (table_already_exists('hotel_photos')) return;
     db()->exec(
         "CREATE TABLE IF NOT EXISTS hotel_photos (
             id INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -724,6 +773,7 @@ function ensure_hotel_photos_table(): void {
 }
 
 function ensure_hotel_amenities_table(): void {
+    if (table_already_exists('hotel_amenities')) return;
     db()->exec(
         "CREATE TABLE IF NOT EXISTS hotel_amenities (
             id INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -743,6 +793,7 @@ function ensure_hotel_amenities_table(): void {
  * one shared table avoids duplicating this twice.
  */
 function ensure_review_photos_table(): void {
+    if (table_already_exists('review_photos')) return;
     db()->exec(
         "CREATE TABLE IF NOT EXISTS review_photos (
             id INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
