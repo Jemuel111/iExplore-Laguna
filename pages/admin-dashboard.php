@@ -123,22 +123,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $transport_type = trim((string) input('transport_type', 'post', ''));
         $fare_php = (float) input('fare_php', 'post', 0);
         $notes = trim((string) input('notes', 'post', ''));
+        // Optional: this form used to have no way to record distance/time
+        // at all, so a stored fare with no distance still showed
+        // "Not on file" / "Varies" in the planner's Route Info panel even
+        // though a real fare existed. Left blank, these stay NULL — same
+        // as before, and the planner's existing fallback still applies.
+        $distance_raw = trim((string) input('distance_km', 'post', ''));
+        $duration_raw = trim((string) input('duration_min', 'post', ''));
+        $distance_km = $distance_raw !== '' ? (float) $distance_raw : null;
+        $duration_min = $duration_raw !== '' ? (int) $duration_raw : null;
         $allowed_types = ['jeepney','bus','tricycle','fx_uv','private_car'];
         if (!$origin_city_id || !$dest_city_id || $origin_city_id === $dest_city_id) { $_SESSION['flash']['danger']='Please choose two different cities.'; header('Location: '.APP_URL.'/pages/admin-dashboard.php#transport-fares'); exit; }
         if (!in_array($transport_type, $allowed_types, true)) { $_SESSION['flash']['danger']='Please choose a valid transportation type.'; header('Location: '.APP_URL.'/pages/admin-dashboard.php#transport-fares'); exit; }
         if ($fare_php < 0 || $fare_php > 10000) { $_SESSION['flash']['danger']='Please enter a valid fare between ₱0 and ₱10,000.'; header('Location: '.APP_URL.'/pages/admin-dashboard.php#transport-fares'); exit; }
+        if ($distance_km !== null && ($distance_km < 0 || $distance_km > 500)) { $_SESSION['flash']['danger']='Please enter a valid distance between 0 and 500 km.'; header('Location: '.APP_URL.'/pages/admin-dashboard.php#transport-fares'); exit; }
+        if ($duration_min !== null && ($duration_min < 0 || $duration_min > 1440)) { $_SESSION['flash']['danger']='Please enter a valid travel time between 0 and 1440 minutes.'; header('Location: '.APP_URL.'/pages/admin-dashboard.php#transport-fares'); exit; }
         $origin = db_fetch_one("SELECT id,name FROM cities WHERE id=?",[$origin_city_id]);
         $dest = db_fetch_one("SELECT id,name FROM cities WHERE id=?",[$dest_city_id]);
         if (!$origin || !$dest) { $_SESSION['flash']['danger']='One of the selected cities could not be found.'; header('Location: '.APP_URL.'/pages/admin-dashboard.php#transport-fares'); exit; }
         if ($route_id) {
             $existing=db_fetch_one("SELECT id FROM routes WHERE id=?",[$route_id]);
             if (!$existing) { $_SESSION['flash']['danger']='The selected fare record no longer exists.'; header('Location: '.APP_URL.'/pages/admin-dashboard.php#transport-fares'); exit; }
-            db_execute("UPDATE routes SET origin_city_id=?, dest_city_id=?, transport_type=?, fare_php=?, notes=? WHERE id=?",[$origin_city_id,$dest_city_id,$transport_type,$fare_php,$notes!==''?$notes:null,$route_id]);
+            db_execute("UPDATE routes SET origin_city_id=?, dest_city_id=?, transport_type=?, fare_php=?, distance_km=?, duration_min=?, notes=? WHERE id=?",[$origin_city_id,$dest_city_id,$transport_type,$fare_php,$distance_km,$duration_min,$notes!==''?$notes:null,$route_id]);
             $_SESSION['flash']['success']="Fare updated: {$origin['name']} → {$dest['name']}.";
         } else {
             $duplicate=db_fetch_one("SELECT id FROM routes WHERE origin_city_id=? AND dest_city_id=? AND transport_type=?",[$origin_city_id,$dest_city_id,$transport_type]);
-            if ($duplicate) { db_execute("UPDATE routes SET fare_php=?, notes=? WHERE id=?",[$fare_php,$notes!==''?$notes:null,$duplicate['id']]); $_SESSION['flash']['success']="Existing fare updated: {$origin['name']} → {$dest['name']}."; }
-            else { db_execute("INSERT INTO routes (origin_city_id,dest_city_id,transport_type,fare_php,notes) VALUES (?,?,?,?,?)",[$origin_city_id,$dest_city_id,$transport_type,$fare_php,$notes!==''?$notes:null]); $_SESSION['flash']['success']="Fare added: {$origin['name']} → {$dest['name']}."; }
+            if ($duplicate) { db_execute("UPDATE routes SET fare_php=?, distance_km=?, duration_min=?, notes=? WHERE id=?",[$fare_php,$distance_km,$duration_min,$notes!==''?$notes:null,$duplicate['id']]); $_SESSION['flash']['success']="Existing fare updated: {$origin['name']} → {$dest['name']}."; }
+            else { db_execute("INSERT INTO routes (origin_city_id,dest_city_id,transport_type,fare_php,distance_km,duration_min,notes) VALUES (?,?,?,?,?,?,?)",[$origin_city_id,$dest_city_id,$transport_type,$fare_php,$distance_km,$duration_min,$notes!==''?$notes:null]); $_SESSION['flash']['success']="Fare added: {$origin['name']} → {$dest['name']}."; }
         }
         header('Location: '.APP_URL.'/pages/admin-dashboard.php#transport-fares'); exit;
     }
@@ -307,7 +318,7 @@ $total_users            = db_fetch_one("SELECT COUNT(*) n FROM users")['n'] ?? 0
 $site_settings = site_settings();
 
 $cities = db_fetch_all("SELECT id,name FROM cities ORDER BY name");
-$route_fares = db_fetch_all("SELECT r.id,r.origin_city_id,r.dest_city_id,r.transport_type,r.fare_php,r.notes,o.name AS origin_name,d.name AS dest_name FROM routes r JOIN cities o ON r.origin_city_id=o.id JOIN cities d ON r.dest_city_id=d.id ORDER BY o.name,d.name,r.fare_php ASC");
+$route_fares = db_fetch_all("SELECT r.id,r.origin_city_id,r.dest_city_id,r.transport_type,r.fare_php,r.distance_km,r.duration_min,r.notes,o.name AS origin_name,d.name AS dest_name FROM routes r JOIN cities o ON r.origin_city_id=o.id JOIN cities d ON r.dest_city_id=d.id ORDER BY o.name,d.name,r.fare_php ASC");
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
@@ -581,6 +592,26 @@ require_once __DIR__ . '/../includes/header.php';
                 </div>
               </div>
 
+              <div class="row g-3 mb-3">
+                <div class="col-6">
+                  <label class="form-label fw-semibold">Distance <span class="text-muted fw-normal">(optional)</span></label>
+                  <div class="input-group">
+                    <input type="number" name="distance_km" id="fare_distance" class="form-control" min="0" max="500" step="0.1" placeholder="e.g. 12.5">
+                    <span class="input-group-text">km</span>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <label class="form-label fw-semibold">Travel time <span class="text-muted fw-normal">(optional)</span></label>
+                  <div class="input-group">
+                    <input type="number" name="duration_min" id="fare_duration" class="form-control" min="0" max="1440" step="1" placeholder="e.g. 25">
+                    <span class="input-group-text">min</span>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <div class="small text-muted">Leave blank if you're not sure — the planner will show "Not on file" instead of a wrong number.</div>
+                </div>
+              </div>
+
               <div class="mb-3">
                 <label class="form-label fw-semibold">Notes <span class="text-muted fw-normal">(optional)</span></label>
                 <textarea name="notes" id="fare_notes" class="form-control" rows="3" maxlength="500" placeholder="e.g. Regular passenger fare; verify current fare locally."></textarea>
@@ -640,6 +671,7 @@ require_once __DIR__ . '/../includes/header.php';
                       <th>Route</th>
                       <th>Transport</th>
                       <th>Fare</th>
+                      <th>Distance / Time</th>
                       <th class="text-end">Actions</th>
                     </tr>
                   </thead>
@@ -659,6 +691,10 @@ require_once __DIR__ . '/../includes/header.php';
                           </span>
                         </td>
                         <td class="fw-bold">₱<?= number_format((float)$r['fare_php'],2) ?></td>
+                        <td class="small text-muted">
+                          <?php if ($r['distance_km'] !== null): ?><?= number_format((float)$r['distance_km'],1) ?> km<?php else: ?>&mdash;<?php endif; ?>
+                          <?php if ($r['duration_min'] !== null): ?> · <?= (int)$r['duration_min'] ?> min<?php endif; ?>
+                        </td>
                         <td class="text-end text-nowrap">
                           <button type="button" class="btn btn-sm btn-outline-secondary edit-route-fare"
                             data-id="<?= (int)$r['id'] ?>"
@@ -666,6 +702,8 @@ require_once __DIR__ . '/../includes/header.php';
                             data-dest="<?= (int)$r['dest_city_id'] ?>"
                             data-transport="<?= e($r['transport_type']) ?>"
                             data-fare="<?= e((string)$r['fare_php']) ?>"
+                            data-distance="<?= e($r['distance_km'] !== null ? (string)$r['distance_km'] : '') ?>"
+                            data-duration="<?= e($r['duration_min'] !== null ? (string)$r['duration_min'] : '') ?>"
                             data-notes="<?= e((string)($r['notes']??'')) ?>">
                             <i class="bi bi-pencil me-1"></i>Edit
                           </button>
@@ -1102,6 +1140,8 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('fare_dest').value = button.dataset.dest || '';
       document.getElementById('fare_transport').value = button.dataset.transport || 'jeepney';
       document.getElementById('fare_php').value = button.dataset.fare || '';
+      document.getElementById('fare_distance').value = button.dataset.distance || '';
+      document.getElementById('fare_duration').value = button.dataset.duration || '';
       document.getElementById('fare_notes').value = button.dataset.notes || '';
       document.getElementById('fareSubmitLabel').textContent = 'Update Fare';
       document.getElementById('fareCancelEdit').style.display = 'inline-block';
