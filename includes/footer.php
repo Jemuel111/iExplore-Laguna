@@ -13,7 +13,7 @@
       <div class="col-lg-4">
         <div class="d-flex align-items-center gap-2 mb-3">
           <?php if (!empty($__site_settings['logo_path'])): ?>
-        <img src="<?= APP_URL . '/' . ltrim(e($__site_settings['logo_path']), '/') ?>" alt="<?= e(APP_NAME) ?> logo" class="brand-logo-sm"
+        <img src="<?= '/' . ltrim(e($__site_settings['logo_path']), '/') ?>" alt="<?= e(APP_NAME) ?> logo" class="brand-logo-sm"
              onerror="this.style.display='none';this.nextElementSibling.style.display=''">
         <span class="brand-icon-sm" style="display:none"><i class="bi bi-map-fill"></i></span>
       <?php else: ?>

@@ -403,7 +403,7 @@ require_once __DIR__ . '/../includes/header.php';
 
             <?php if (!empty($site_settings['logo_path'])): ?>
               <div class="p-3 mb-3 text-center" style="border:1px solid var(--border);border-radius:var(--radius);background:#fff">
-                <img src="<?= APP_URL . '/' . ltrim(e($site_settings['logo_path']), '/') ?>"
+                <img src="<?= '/' . ltrim(e($site_settings['logo_path']), '/') ?>"
                      alt="Current website logo" style="max-height:110px;max-width:220px;object-fit:contain;margin:auto">
                 <div class="small text-muted mt-2">Current logo</div>
               </div>
