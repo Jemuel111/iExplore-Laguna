@@ -707,12 +707,13 @@ require_once __DIR__ . '/../includes/header.php';
                             data-notes="<?= e((string)($r['notes']??'')) ?>">
                             <i class="bi bi-pencil me-1"></i>Edit
                           </button>
-                          <form method="post" class="d-inline" onsubmit="return confirm('Remove this transportation fare? The planner will fall back to an estimated fare for this route.')">
-                            <?= csrf_field() ?>
-                            <input type="hidden" name="action" value="delete_route_fare">
-                            <input type="hidden" name="route_id" value="<?= (int)$r['id'] ?>">
-                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Remove</button>
-                          </form>
+                          <button type="button" class="btn btn-sm btn-outline-danger remove-route-fare"
+                            data-id="<?= (int)$r['id'] ?>"
+                            data-route="<?= e($r['origin_name'].' → '.$r['dest_name']) ?>"
+                            data-transport="<?= e($transportLabel) ?>"
+                            data-fare="<?= e((float)$r['fare_php'] > 0 ? '₱'.number_format((float)$r['fare_php'],2) : 'Own vehicle') ?>">
+                            <i class="bi bi-trash me-1"></i>Remove
+                          </button>
                         </td>
                       </tr>
                     <?php endforeach; ?>
@@ -728,6 +729,35 @@ require_once __DIR__ . '/../includes/header.php';
                 <ul class="pagination pagination-app justify-content-center flex-wrap mb-0" id="fare-page-list"></ul>
                 <p class="text-center text-muted small mt-2 mb-0" id="fare-range-label"></p>
               </nav>
+
+              <!-- Shared "Remove fare?" confirmation. One modal serves every row; the
+                   Remove buttons above fill in the route details and the route_id. -->
+              <div class="modal fade" id="removeFareModal" tabindex="-1" aria-labelledby="removeFareModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                  <div class="modal-content" style="border-radius:var(--radius);overflow:hidden;border:none">
+                    <form method="post" id="removeFareForm">
+                      <?= csrf_field() ?>
+                      <input type="hidden" name="action" value="delete_route_fare">
+                      <input type="hidden" name="route_id" id="removeFareRouteId" value="0">
+                      <div class="modal-body text-center p-4 pb-3">
+                        <div style="width:64px;height:64px;border-radius:50%;background:#fee2e2;color:#a61c1c;display:flex;align-items:center;justify-content:center;font-size:1.7rem;margin:0 auto 1rem">
+                          <i class="bi bi-trash3"></i>
+                        </div>
+                        <h5 class="fw-bold mb-3" id="removeFareModalLabel" style="font-family:'Playfair Display',serif">Remove this fare?</h5>
+                        <div class="text-start p-3 mb-3" style="background:var(--sand);border:1px solid var(--border);border-radius:var(--radius-sm)">
+                          <div class="fw-semibold" id="removeFareRoute"></div>
+                          <div class="small text-muted mt-1" id="removeFareMeta"></div>
+                        </div>
+                        <p class="text-muted small mb-0">The Trip Planner will no longer show this fare for this route. This can&rsquo;t be undone &mdash; you&rsquo;d need to add it again.</p>
+                      </div>
+                      <div class="modal-footer justify-content-center border-0 pt-0 pb-4 gap-2">
+                        <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger px-4" id="removeFareConfirm"><i class="bi bi-trash me-1"></i>Yes, remove</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
 
               <script>
               // Saved-fares table: real pagination (prev / numbered pages / next)
@@ -1231,6 +1261,46 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('fareSubmitLabel').textContent = 'Save Fare';
     document.getElementById('fareCancelEdit').style.display = 'none';
   });
+
+  // ── Remove-fare confirmation modal ─────────────────────────
+  // Replaces the browser's plain confirm() popup. Bootstrap's JS loads in
+  // the footer (after this page's markup), which is why this sits inside
+  // DOMContentLoaded rather than running inline next to the table.
+  const removeModalEl = document.getElementById('removeFareModal');
+  if (removeModalEl) {
+    // Park the modal on <body>: left inside the fading tab pane, its
+    // backdrop (which Bootstrap appends to <body>) can end up on top of it.
+    document.body.appendChild(removeModalEl);
+    const removeModal = new bootstrap.Modal(removeModalEl);
+    const removeForm    = document.getElementById('removeFareForm');
+    const removeIdInput = document.getElementById('removeFareRouteId');
+    const removeRoute   = document.getElementById('removeFareRoute');
+    const removeMeta    = document.getElementById('removeFareMeta');
+    const removeConfirm = document.getElementById('removeFareConfirm');
+
+    // Delegated, so it keeps working for rows on every page of the
+    // paginated table (rows are hidden/shown, never re-created).
+    document.getElementById('fare-table-body')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('.remove-route-fare');
+      if (!btn) return;
+      removeIdInput.value = btn.dataset.id || '0';
+      removeRoute.textContent = btn.dataset.route || '';
+      removeMeta.textContent = [btn.dataset.transport, btn.dataset.fare].filter(Boolean).join(' · ');
+      removeModal.show();
+    });
+
+    // Guard against a double-click sending the delete twice.
+    removeForm.addEventListener('submit', () => {
+      removeConfirm.disabled = true;
+      removeConfirm.innerHTML = 'Removing…';
+    });
+
+    // Reset the button if the modal is dismissed and reopened without submitting.
+    removeModalEl.addEventListener('hidden.bs.modal', () => {
+      removeConfirm.disabled = false;
+      removeConfirm.innerHTML = '<i class="bi bi-trash me-1"></i>Yes, remove';
+    });
+  }
 });
 </script>
 
