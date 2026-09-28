@@ -645,7 +645,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <p class="text-muted small mb-0 mt-1">Review and maintain the fares currently available to the Trip Planner.</p>
               </div>
               <span class="badge border text-body" style="background:#fff;border-color:var(--border)!important">
-                <span id="fare-visible-count"><?= count($route_fares) ?></span> / <?= count($route_fares) ?> shown
+                <span id="fare-count-badge"><?= count($route_fares) ?> routes</span>
               </span>
             </div>
 
@@ -658,7 +658,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <div class="small">Add your first city-to-city fare using the form.</div>
               </div>
             <?php else: ?>
-              <div class="input-group mb-3">
+              <div class="input-group mb-3" id="fare-search-group" style="scroll-margin-top:100px">
                 <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
                 <input type="text" id="fare-search" class="form-control"
                        placeholder="Search by city or transport type (e.g. &quot;Calamba&quot; or &quot;jeepney&quot;)…">
@@ -720,62 +720,137 @@ require_once __DIR__ . '/../includes/header.php';
                 </table>
               </div>
 
-              <div class="text-center mt-3">
-                <button type="button" id="fare-show-more" class="btn btn-outline-secondary btn-sm">
-                  Show more <i class="bi bi-chevron-down ms-1"></i>
-                </button>
-                <div id="fare-no-results" class="text-muted small py-3 d-none">
-                  <i class="bi bi-search me-1"></i>No fares match "<span id="fare-no-results-query"></span>".
-                </div>
+              <div id="fare-no-results" class="text-muted small text-center py-3 d-none">
+                <i class="bi bi-search me-1"></i>No fares match "<span id="fare-no-results-query"></span>".
               </div>
 
+              <nav id="fare-pagination" class="mt-3 d-none" aria-label="Saved fares pagination">
+                <ul class="pagination pagination-app justify-content-center flex-wrap mb-0" id="fare-page-list"></ul>
+                <p class="text-center text-muted small mt-2 mb-0" id="fare-range-label"></p>
+              </nav>
+
               <script>
+              // Saved-fares table: real pagination (prev / numbered pages / next)
+              // instead of a "Show more" button that only ever made the list longer.
+              // Search still works — it filters first, then the matches are paginated.
               (function () {
-                const PAGE_SIZE = 20;
-                const rows = Array.from(document.querySelectorAll('#fare-table-body .fare-row'));
+                const PAGE_SIZE = 15;
+                const STORAGE_KEY = 'adminFaresPage';
+                const allRows = Array.from(document.querySelectorAll('#fare-table-body .fare-row'));
                 const searchInput = document.getElementById('fare-search');
-                const showMoreBtn = document.getElementById('fare-show-more');
-                const visibleCountEl = document.getElementById('fare-visible-count');
+                const searchGroup = document.getElementById('fare-search-group');
+                const pageList = document.getElementById('fare-page-list');
+                const pagination = document.getElementById('fare-pagination');
+                const rangeLabel = document.getElementById('fare-range-label');
+                const badge = document.getElementById('fare-count-badge');
                 const noResultsEl = document.getElementById('fare-no-results');
                 const noResultsQueryEl = document.getElementById('fare-no-results-query');
-                let shownCount = PAGE_SIZE;
 
-                function renderPaged() {
-                  rows.forEach((row, i) => { row.style.display = i < shownCount ? '' : 'none'; });
-                  visibleCountEl.textContent = Math.min(shownCount, rows.length);
-                  showMoreBtn.classList.toggle('d-none', shownCount >= rows.length);
-                  noResultsEl.classList.add('d-none');
+                let filtered = allRows.slice();
+                let page = 1;
+
+                function totalPages() {
+                  return Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
                 }
 
-                function renderSearch(query) {
-                  let matches = 0;
-                  rows.forEach(row => {
-                    const isMatch = row.dataset.search.includes(query);
-                    row.style.display = isMatch ? '' : 'none';
-                    if (isMatch) matches++;
-                  });
-                  visibleCountEl.textContent = matches;
-                  showMoreBtn.classList.add('d-none'); // pagination doesn't apply while filtering
-                  noResultsEl.classList.toggle('d-none', matches > 0);
-                  noResultsQueryEl.textContent = query;
+                function pageItem(html, target, opts = {}) {
+                  const li = document.createElement('li');
+                  li.className = 'page-item' + (opts.active ? ' active' : '') + (opts.disabled ? ' disabled' : '');
+                  const btn = document.createElement('button');
+                  btn.type = 'button';
+                  btn.className = 'page-link';
+                  btn.innerHTML = html;
+                  if (opts.label) btn.setAttribute('aria-label', opts.label);
+                  if (opts.active) btn.setAttribute('aria-current', 'page');
+                  if (!opts.disabled) btn.addEventListener('click', () => goTo(target));
+                  li.appendChild(btn);
+                  return li;
                 }
 
-                showMoreBtn.addEventListener('click', () => {
-                  shownCount = Math.min(shownCount + PAGE_SIZE, rows.length);
-                  renderPaged();
-                });
+                function ellipsisItem() {
+                  const li = document.createElement('li');
+                  li.className = 'page-item disabled';
+                  li.innerHTML = '<span class="page-link">&hellip;</span>';
+                  return li;
+                }
+
+                function renderPageButtons(pages) {
+                  pageList.innerHTML = '';
+                  pageList.appendChild(pageItem('<i class="bi bi-chevron-left"></i>', page - 1,
+                    { disabled: page <= 1, label: 'Previous page' }));
+
+                  // Same windowing as the Spots / Hotels pages: first, last,
+                  // and two either side of the current page, with ellipses.
+                  const range = 2;
+                  const start = Math.max(1, page - range);
+                  const end = Math.min(pages, page + range);
+                  if (start > 1) {
+                    pageList.appendChild(pageItem('1', 1));
+                    if (start > 2) pageList.appendChild(ellipsisItem());
+                  }
+                  for (let i = start; i <= end; i++) {
+                    pageList.appendChild(pageItem(String(i), i, { active: i === page }));
+                  }
+                  if (end < pages) {
+                    if (end < pages - 1) pageList.appendChild(ellipsisItem());
+                    pageList.appendChild(pageItem(String(pages), pages));
+                  }
+
+                  pageList.appendChild(pageItem('<i class="bi bi-chevron-right"></i>', page + 1,
+                    { disabled: page >= pages, label: 'Next page' }));
+                }
+
+                function render() {
+                  const pages = totalPages();
+                  page = Math.min(Math.max(1, page), pages);
+                  const start = (page - 1) * PAGE_SIZE;
+                  const end = Math.min(start + PAGE_SIZE, filtered.length);
+
+                  const visible = new Set(filtered.slice(start, end));
+                  allRows.forEach(row => { row.style.display = visible.has(row) ? '' : 'none'; });
+
+                  const searching = searchInput.value.trim() !== '';
+                  badge.textContent = searching
+                    ? `${filtered.length} of ${allRows.length} routes`
+                    : `${allRows.length} routes`;
+
+                  noResultsEl.classList.toggle('d-none', filtered.length > 0);
+                  pagination.classList.toggle('d-none', filtered.length <= PAGE_SIZE);
+                  rangeLabel.textContent = filtered.length
+                    ? `Showing ${start + 1}\u2013${end} of ${filtered.length} route${filtered.length !== 1 ? 's' : ''}`
+                    : '';
+                  renderPageButtons(pages);
+
+                  // Remember the page (only when not searching) so saving,
+                  // editing or removing a fare — each of which reloads the
+                  // page — doesn't dump you back on page 1 of a long list.
+                  if (!searching) {
+                    try { sessionStorage.setItem(STORAGE_KEY, String(page)); } catch (e) {}
+                  }
+                }
+
+                function goTo(target) {
+                  page = target;
+                  render();
+                  // The table just changed under the cursor — bring its top
+                  // back into view rather than leaving you at the page footer.
+                  searchGroup.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
 
                 searchInput.addEventListener('input', () => {
-                  const query = searchInput.value.trim().toLowerCase();
-                  if (query) {
-                    renderSearch(query);
-                  } else {
-                    shownCount = PAGE_SIZE;
-                    renderPaged();
-                  }
+                  const raw = searchInput.value.trim();
+                  const query = raw.toLowerCase();
+                  filtered = query ? allRows.filter(r => r.dataset.search.includes(query)) : allRows.slice();
+                  noResultsQueryEl.textContent = raw;
+                  page = 1;
+                  render();
                 });
 
-                renderPaged();
+                try {
+                  const saved = parseInt(sessionStorage.getItem(STORAGE_KEY), 10);
+                  if (saved > 0) page = saved;
+                } catch (e) {}
+                render();
               })();
               </script>
             <?php endif; ?>
