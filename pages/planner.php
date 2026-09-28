@@ -1761,7 +1761,7 @@ async function renderItinerary(routeData, spots, days, forceIncludeAll = false) 
           : '';
         const desc = (fare
           ? `${fare.fare_php > 0 ? '₱'+parseFloat(fare.fare_php).toFixed(2) : 'Own vehicle'} · ${fare.distance_km} km · ${formatDuration(travelMins)} from ${lastPoint.cityName}`
-          : `${distanceTimeLabel(interCityKm)} from ${lastPoint.cityName} · no fixed fare on file — try tricycle/habal-habal and negotiate`) + trafficNote;
+          : `${distanceTimeLabel(interCityKm)} from ${lastPoint.cityName} · no fixed fare on file — try tricycle and negotiate`) + trafficNote;
 
         events.push({
           t: time,
@@ -1805,7 +1805,7 @@ async function renderItinerary(routeData, spots, days, forceIncludeAll = false) 
         const nearbyFood = await getNearbyFood(spot.city_id, spot.latitude, spot.longitude);
         const lunchDesc = nearbyFood
           ? `${SHOP_CATEGORY_LABELS[nearbyFood.category] || 'Eatery'} <strong>${nearbyFood.name}</strong> is about ${nearbyFood.distance_km < 1 ? Math.round(nearbyFood.distance_km*1000)+'m' : nearbyFood.distance_km.toFixed(1)+' km'} from ${spot.name} — good spot for lunch.`
-          : `No listed eateries near ${spot.name} yet — ask locally, or try Laguna specialties like buko pie, kesong puti, or fresh bangus.`;
+          : `No listed eateries near ${spot.name} yet — ask locally.`;
 
         events.push({
           t: time,
@@ -1823,7 +1823,7 @@ async function renderItinerary(routeData, spots, days, forceIncludeAll = false) 
       const nearbyFood = await getNearbyFood(lastPoint.cityId, lastPoint.latitude, lastPoint.longitude);
       const lunchDesc = nearbyFood
         ? `${SHOP_CATEGORY_LABELS[nearbyFood.category] || 'Eatery'} <strong>${nearbyFood.name}</strong> is about ${nearbyFood.distance_km < 1 ? Math.round(nearbyFood.distance_km*1000)+'m' : nearbyFood.distance_km.toFixed(1)+' km'} away — good spot for lunch.`
-        : `No listed eateries nearby yet — ask locally, or try Laguna specialties like buko pie, kesong puti, or fresh bangus.`;
+        : `No listed eateries nearby yet — ask locally.`;
       events.push({ t: time, html: itineraryItem(minutesToLabel(time), 'bi-cup-hot', 'Lunch Break', lunchDesc) });
       time += LUNCH_MIN;
     }
