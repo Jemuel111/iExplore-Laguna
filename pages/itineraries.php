@@ -160,7 +160,12 @@ require_once __DIR__ . '/../includes/header.php';
 
 <script>
 async function deleteItinerary(id, btn) {
-  if (!confirm('Delete this itinerary?')) return;
+  if (!(await confirmModal({
+    title: 'Delete this itinerary?',
+    body: "This can't be undone. You'd need to plan it again from scratch.",
+    confirmLabel: 'Yes, delete', confirmClass: 'btn-danger',
+    icon: 'bi-trash3', iconBg: '#fee2e2', iconColor: '#a61c1c',
+  }))) return;
   const API_BASE = '<?= APP_URL ?>/api/';
   const res = await fetch(API_BASE + `itineraries.php?action=delete&id=${id}`, {
     method: 'POST',
@@ -172,6 +177,79 @@ async function deleteItinerary(id, btn) {
   } else {
     IExploreApp.toast('Could not delete. Try again.', 'error');
   }
+}
+</script>
+
+<!-- Generic confirmation modal, replacing this page's plain browser confirm() popups. -->
+<div class="modal fade" id="genericConfirmModal" tabindex="-1" aria-labelledby="genericConfirmTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:var(--radius);overflow:hidden;border:none">
+      <div class="modal-body text-center p-4 pb-3">
+        <div id="genericConfirmIcon" style="width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.7rem;margin:0 auto 1rem">
+          <i class="bi" id="genericConfirmIconInner"></i>
+        </div>
+        <h5 class="fw-bold mb-3" id="genericConfirmTitle" style="font-family:'Playfair Display',serif"></h5>
+        <div id="genericConfirmBox" class="text-start p-3 mb-3" style="background:var(--sand);border:1px solid var(--border);border-radius:var(--radius-sm)">
+          <div class="fw-semibold" id="genericConfirmName"></div>
+          <div class="small text-muted mt-1" id="genericConfirmMeta"></div>
+        </div>
+        <p class="text-muted small mb-0" id="genericConfirmBody"></p>
+      </div>
+      <div class="modal-footer justify-content-center border-0 pt-0 pb-4 gap-2">
+        <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn px-4" id="genericConfirmBtn"></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Promise-based drop-in replacement for window.confirm(), styled to match
+// the rest of the site instead of the browser's plain popup. Usage inside
+// any async function: if (!(await confirmModal({ title: '...' }))) return;
+function confirmModal(opts) {
+  opts = opts || {};
+  return new Promise((resolve) => {
+    const modalEl = document.getElementById('genericConfirmModal');
+    if (!modalEl || !window.bootstrap) { resolve(window.confirm(opts.title || 'Are you sure?')); return; }
+
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    document.getElementById('genericConfirmIcon').style.background = opts.iconBg || '#fee2e2';
+    const iconInner = document.getElementById('genericConfirmIconInner');
+    iconInner.className = 'bi ' + (opts.icon || 'bi-question-circle');
+    iconInner.style.color = opts.iconColor || '#a61c1c';
+    document.getElementById('genericConfirmTitle').textContent = opts.title || 'Are you sure?';
+
+    const nameEl = document.getElementById('genericConfirmName');
+    const metaEl = document.getElementById('genericConfirmMeta');
+    const boxEl  = document.getElementById('genericConfirmBox');
+    nameEl.textContent = opts.name || '';
+    metaEl.textContent = opts.meta || '';
+    // Hide the empty info box entirely when there's nothing specific to show
+    // (e.g. the login-redirect prompt has no "item" to name).
+    boxEl.style.display = (opts.name || opts.meta) ? '' : 'none';
+    document.getElementById('genericConfirmBody').textContent = opts.body || '';
+
+    const btn = document.getElementById('genericConfirmBtn');
+    btn.className = 'btn px-4 ' + (opts.confirmClass || 'btn-danger');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>' + (opts.confirmLabel || 'Confirm');
+
+    let settled = false;
+    function finish(result) {
+      if (settled) return;
+      settled = true;
+      btn.removeEventListener('click', onConfirm);
+      modalEl.removeEventListener('hidden.bs.modal', onHidden);
+      resolve(result);
+    }
+    function onConfirm() { finish(true); modal.hide(); }
+    function onHidden() { finish(false); }
+
+    btn.addEventListener('click', onConfirm);
+    modalEl.addEventListener('hidden.bs.modal', onHidden);
+    modal.show();
+  });
 }
 </script>
 

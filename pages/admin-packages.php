@@ -321,9 +321,13 @@ require_once __DIR__ . '/../includes/header.php';
               <i class="bi <?= $p['is_active']?'bi-eye-slash':'bi-eye' ?>"></i>
             </button>
           </form>
-          <form method="POST" onsubmit="return confirm('Delete this package permanently?')"><?= csrf_field() ?>
+          <form method="POST"><?= csrf_field() ?>
             <input type="hidden" name="action" value="delete_package"><input type="hidden" name="package_id" value="<?= $p['id'] ?>">
-            <button class="btn btn-sm btn-outline-danger" style="font-size:.72rem;padding:.25rem .6rem"><i class="bi bi-trash"></i></button>
+            <button type="button" class="btn btn-sm btn-outline-danger js-confirm-action" style="font-size:.72rem;padding:.25rem .6rem"
+              data-icon="bi-trash3" data-icon-bg="#fee2e2" data-icon-color="#a61c1c"
+              data-title="Delete this package?" data-name="<?= e($p['title']) ?>"
+              data-body="This can't be undone."
+              data-confirm-label="Yes, delete" data-confirm-class="btn-danger"><i class="bi bi-trash"></i></button>
           </form>
         </div>
       </div>
@@ -396,6 +400,88 @@ function filterRooms() {
     if (noResults) noResults.classList.toggle('d-none', anyVisible);
   });
 })();
+</script>
+
+<!-- Generic confirmation modal, replacing this page's plain browser confirm() popups. -->
+<div class="modal fade" id="genericConfirmModal" tabindex="-1" aria-labelledby="genericConfirmTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:var(--radius);overflow:hidden;border:none">
+      <div class="modal-body text-center p-4 pb-3">
+        <div id="genericConfirmIcon" style="width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.7rem;margin:0 auto 1rem">
+          <i class="bi" id="genericConfirmIconInner"></i>
+        </div>
+        <h5 class="fw-bold mb-3" id="genericConfirmTitle" style="font-family:'Playfair Display',serif"></h5>
+        <div class="text-start p-3 mb-3" style="background:var(--sand);border:1px solid var(--border);border-radius:var(--radius-sm)">
+          <div class="fw-semibold" id="genericConfirmName"></div>
+          <div class="small text-muted mt-1" id="genericConfirmMeta"></div>
+        </div>
+        <p class="text-muted small mb-0" id="genericConfirmBody"></p>
+      </div>
+      <div class="modal-footer justify-content-center border-0 pt-0 pb-4 gap-2">
+        <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn px-4" id="genericConfirmBtn"></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // ── Generic confirmation modal wiring ─────────────────────────
+  // A trigger button supplies its own nearby <form> (found via closest())
+  // plus data-* attributes describing what to show; confirming just
+  // submits that form, so each action's existing hidden fields (action,
+  // *_id, CSRF token) are untouched. Delegated on the document, since
+  // these buttons can live inside dynamically-shown panels.
+  const genericModalEl = document.getElementById('genericConfirmModal');
+  if (!genericModalEl) return;
+  document.body.appendChild(genericModalEl); // avoid backdrop z-index issues if nested in a positioned/faded container
+  const genericModal = new bootstrap.Modal(genericModalEl);
+  const iconWrap    = document.getElementById('genericConfirmIcon');
+  const iconInner   = document.getElementById('genericConfirmIconInner');
+  const titleEl     = document.getElementById('genericConfirmTitle');
+  const nameEl      = document.getElementById('genericConfirmName');
+  const metaEl      = document.getElementById('genericConfirmMeta');
+  const bodyEl      = document.getElementById('genericConfirmBody');
+  const confirmBtn  = document.getElementById('genericConfirmBtn');
+  let pendingForm = null;
+  let defaultConfirmHtml = '';
+
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.js-confirm-action');
+    if (!btn) return;
+    pendingForm = btn.closest('form');
+    if (!pendingForm) return;
+
+    iconWrap.style.background = btn.dataset.iconBg || '#fee2e2';
+    iconInner.className = 'bi ' + (btn.dataset.icon || 'bi-question-circle');
+    iconInner.style.color = btn.dataset.iconColor || '#a61c1c';
+    titleEl.textContent = btn.dataset.title || 'Are you sure?';
+    nameEl.textContent = btn.dataset.name || '';
+    metaEl.textContent = btn.dataset.meta || '';
+    bodyEl.textContent = btn.dataset.body || '';
+
+    confirmBtn.className = 'btn px-4 ' + (btn.dataset.confirmClass || 'btn-danger');
+    defaultConfirmHtml = '<i class="bi bi-check-lg me-1"></i>' + (btn.dataset.confirmLabel || 'Confirm');
+    confirmBtn.innerHTML = defaultConfirmHtml;
+    confirmBtn.disabled = false;
+
+    genericModal.show();
+  });
+
+  confirmBtn.addEventListener('click', () => {
+    if (!pendingForm) return;
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = 'Working…';
+    pendingForm.submit();
+  });
+
+  genericModalEl.addEventListener('hidden.bs.modal', () => {
+    confirmBtn.disabled = false;
+    if (defaultConfirmHtml) confirmBtn.innerHTML = defaultConfirmHtml;
+    pendingForm = null;
+  });
+});
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
