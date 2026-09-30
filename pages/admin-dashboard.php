@@ -509,10 +509,16 @@ require_once __DIR__ . '/../includes/header.php';
                 </button>
               </form>
 
-              <form method="post" class="d-inline" onsubmit="return confirm('Restore the default iExplore Laguna colors? Your uploaded logo will not be changed.');">
+              <form method="post" class="d-inline" id="resetThemeForm">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="reset_site_theme">
-                <button type="submit" class="btn btn-outline-secondary">
+                <button type="button" class="btn btn-outline-secondary js-confirm-action"
+                  data-icon="bi-arrow-counterclockwise" data-icon-bg="#fef3c7" data-icon-color="#92400e"
+                  data-title="Restore default colors?"
+                  data-name="iExplore Laguna default theme"
+                  data-meta="Maroon, terracotta and sand"
+                  data-body="Your current color choices will be replaced. Your uploaded logo will not be changed."
+                  data-confirm-label="Restore Defaults" data-confirm-class="btn-primary-app">
                   <i class="bi bi-arrow-counterclockwise me-1"></i>Restore Default Colors
                 </button>
               </form>
@@ -759,6 +765,34 @@ require_once __DIR__ . '/../includes/header.php';
                 </div>
               </div>
 
+              <!-- Generic confirmation modal, reused by every "are you sure?" action on
+                   this page except fare removal (which needs its own dynamic route_id
+                   field). A trigger button supplies its own <form> (found via closest())
+                   plus data-* attributes describing what to show; confirming just submits
+                   that form, so each action's existing hidden fields (action, shop_id,
+                   hotel_id, csrf token) are untouched. -->
+              <div class="modal fade" id="genericConfirmModal" tabindex="-1" aria-labelledby="genericConfirmTitle" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                  <div class="modal-content" style="border-radius:var(--radius);overflow:hidden;border:none">
+                    <div class="modal-body text-center p-4 pb-3">
+                      <div id="genericConfirmIcon" style="width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.7rem;margin:0 auto 1rem">
+                        <i class="bi" id="genericConfirmIconInner"></i>
+                      </div>
+                      <h5 class="fw-bold mb-3" id="genericConfirmTitle" style="font-family:'Playfair Display',serif"></h5>
+                      <div class="text-start p-3 mb-3" style="background:var(--sand);border:1px solid var(--border);border-radius:var(--radius-sm)">
+                        <div class="fw-semibold" id="genericConfirmName"></div>
+                        <div class="small text-muted mt-1" id="genericConfirmMeta"></div>
+                      </div>
+                      <p class="text-muted small mb-0" id="genericConfirmBody"></p>
+                    </div>
+                    <div class="modal-footer justify-content-center border-0 pt-0 pb-4 gap-2">
+                      <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+                      <button type="button" class="btn px-4" id="genericConfirmBtn"></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <script>
               // Saved-fares table: real pagination (prev / numbered pages / next)
               // instead of a "Show more" button that only ever made the list longer.
@@ -926,10 +960,16 @@ require_once __DIR__ . '/../includes/header.php';
                     <i class="bi bi-check-lg me-1"></i>Approve
                   </button>
                 </form>
-                <form method="POST" onsubmit="return confirm('Reject this shop registration?')"><?= csrf_field() ?>
+                <form method="POST"><?= csrf_field() ?>
                   <input type="hidden" name="action"  value="reject_shop">
                   <input type="hidden" name="shop_id" value="<?= $s['id'] ?>">
-                  <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill);padding:.4rem 1rem">
+                  <button type="button" class="btn btn-sm btn-outline-danger js-confirm-action" style="border-radius:var(--radius-pill);padding:.4rem 1rem"
+                    data-icon="bi-x-circle" data-icon-bg="#fee2e2" data-icon-color="#a61c1c"
+                    data-title="Reject this shop?"
+                    data-name="<?= e($s['name']) ?>"
+                    data-meta="<?= e($s['owner_name'].' · '.$s['city_name']) ?>"
+                    data-body="The owner will need to re-submit their registration to be listed again."
+                    data-confirm-label="Yes, reject" data-confirm-class="btn-danger">
                     <i class="bi bi-x-lg me-1"></i>Reject
                   </button>
                 </form>
@@ -975,10 +1015,16 @@ require_once __DIR__ . '/../includes/header.php';
                 &nbsp;·&nbsp;<i class="bi bi-person-circle me-1"></i><?= e($s['owner_name']) ?>
               </div>
             </div>
-            <form method="POST" onsubmit="return confirm('Unpublish this shop? It will be hidden from tourists until re-approved.')" class="flex-shrink-0"><?= csrf_field() ?>
+            <form method="POST" class="flex-shrink-0"><?= csrf_field() ?>
               <input type="hidden" name="action"  value="revoke_shop">
               <input type="hidden" name="shop_id" value="<?= $s['id'] ?>">
-              <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill);font-size:.78rem;padding:.3rem .8rem">
+              <button type="button" class="btn btn-sm btn-outline-danger js-confirm-action" style="border-radius:var(--radius-pill);font-size:.78rem;padding:.3rem .8rem"
+                data-icon="bi-eye-slash" data-icon-bg="#fee2e2" data-icon-color="#a61c1c"
+                data-title="Unpublish this shop?"
+                data-name="<?= e($s['name']) ?>"
+                data-meta="<?= e($s['city_name']) ?>"
+                data-body="It will be hidden from tourists until re-approved."
+                data-confirm-label="Yes, unpublish" data-confirm-class="btn-danger">
                 <i class="bi bi-eye-slash me-1"></i>Unpublish
               </button>
             </form>
@@ -1076,10 +1122,16 @@ require_once __DIR__ . '/../includes/header.php';
                     <i class="bi bi-check-lg me-1"></i>Approve
                   </button>
                 </form>
-                <form method="POST" onsubmit="return confirm('Reject this hotel registration?')"><?= csrf_field() ?>
+                <form method="POST"><?= csrf_field() ?>
                   <input type="hidden" name="action"   value="reject_hotel">
                   <input type="hidden" name="hotel_id" value="<?= $h['id'] ?>">
-                  <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill);padding:.4rem 1rem">
+                  <button type="button" class="btn btn-sm btn-outline-danger js-confirm-action" style="border-radius:var(--radius-pill);padding:.4rem 1rem"
+                    data-icon="bi-x-circle" data-icon-bg="#fee2e2" data-icon-color="#a61c1c"
+                    data-title="Reject this hotel?"
+                    data-name="<?= e($h['name']) ?>"
+                    data-meta="<?= e($h['city_name']) ?>"
+                    data-body="The owner will need to re-submit their registration to be listed again."
+                    data-confirm-label="Yes, reject" data-confirm-class="btn-danger">
                     <i class="bi bi-x-lg me-1"></i>Reject
                   </button>
                 </form>
@@ -1129,10 +1181,16 @@ require_once __DIR__ . '/../includes/header.php';
                 <?php endif; ?>
               </div>
             </div>
-            <form method="POST" onsubmit="return confirm('Unpublish this hotel? It will be hidden from tourists until re-approved.')" class="flex-shrink-0"><?= csrf_field() ?>
+            <form method="POST" class="flex-shrink-0"><?= csrf_field() ?>
               <input type="hidden" name="action"   value="revoke_hotel">
               <input type="hidden" name="hotel_id" value="<?= $h['id'] ?>">
-              <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill);font-size:.78rem;padding:.3rem .8rem">
+              <button type="button" class="btn btn-sm btn-outline-danger js-confirm-action" style="border-radius:var(--radius-pill);font-size:.78rem;padding:.3rem .8rem"
+                data-icon="bi-eye-slash" data-icon-bg="#fee2e2" data-icon-color="#a61c1c"
+                data-title="Unpublish this hotel?"
+                data-name="<?= e($h['name']) ?>"
+                data-meta="<?= e($h['city_name']) ?>"
+                data-body="It will be hidden from tourists until re-approved."
+                data-confirm-label="Yes, unpublish" data-confirm-class="btn-danger">
                 <i class="bi bi-eye-slash me-1"></i>Unpublish
               </button>
             </form>
@@ -1299,6 +1357,63 @@ document.addEventListener('DOMContentLoaded', () => {
     removeModalEl.addEventListener('hidden.bs.modal', () => {
       removeConfirm.disabled = false;
       removeConfirm.innerHTML = '<i class="bi bi-trash me-1"></i>Yes, remove';
+    });
+  }
+
+  // ── Generic confirmation modal ──────────────────────────────
+  // Covers: Restore Default Colors, Reject shop/hotel, Unpublish shop/hotel.
+  const genericModalEl = document.getElementById('genericConfirmModal');
+  if (genericModalEl) {
+    document.body.appendChild(genericModalEl); // same backdrop-layering reason as the fare modal
+    const genericModal   = new bootstrap.Modal(genericModalEl);
+    const iconWrap        = document.getElementById('genericConfirmIcon');
+    const iconInner        = document.getElementById('genericConfirmIconInner');
+    const titleEl          = document.getElementById('genericConfirmTitle');
+    const nameEl            = document.getElementById('genericConfirmName');
+    const metaEl              = document.getElementById('genericConfirmMeta');
+    const bodyEl                = document.getElementById('genericConfirmBody');
+    const confirmBtn              = document.getElementById('genericConfirmBtn');
+    let pendingForm = null;
+    let defaultConfirmHtml = '';
+
+    // Delegated on the whole document: these buttons live in several
+    // different tabs/panes (Site Settings, Shops, Hotels), not one shared
+    // container the way the fare rows do.
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.js-confirm-action');
+      if (!btn) return;
+      pendingForm = btn.closest('form');
+      if (!pendingForm) return;
+
+      iconWrap.style.background = btn.dataset.iconBg || '#fee2e2';
+      iconInner.className = 'bi ' + (btn.dataset.icon || 'bi-question-circle');
+      iconInner.style.color = btn.dataset.iconColor || '#a61c1c';
+      titleEl.textContent = btn.dataset.title || 'Are you sure?';
+      nameEl.textContent = btn.dataset.name || '';
+      metaEl.textContent = btn.dataset.meta || '';
+      bodyEl.textContent = btn.dataset.body || '';
+
+      confirmBtn.className = 'btn px-4 ' + (btn.dataset.confirmClass || 'btn-danger');
+      defaultConfirmHtml = '<i class="bi bi-check-lg me-1"></i>' + (btn.dataset.confirmLabel || 'Confirm');
+      confirmBtn.innerHTML = defaultConfirmHtml;
+      confirmBtn.disabled = false;
+
+      genericModal.show();
+    });
+
+    confirmBtn.addEventListener('click', () => {
+      if (!pendingForm) return;
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = 'Working…';
+      pendingForm.submit();
+    });
+
+    // Reset if dismissed without confirming, so a later different action
+    // doesn't inherit a disabled/"Working…" button from a cancelled one.
+    genericModalEl.addEventListener('hidden.bs.modal', () => {
+      confirmBtn.disabled = false;
+      if (defaultConfirmHtml) confirmBtn.innerHTML = defaultConfirmHtml;
+      pendingForm = null;
     });
   }
 });
