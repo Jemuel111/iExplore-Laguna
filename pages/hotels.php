@@ -49,6 +49,13 @@ if (!empty($filter_amenities)) {
 
 $where_sql = implode(' AND ', $where);
 
+// Guest rating = live average of approved reviews (hotels.star_rating stays the
+// official star class and is not overwritten). Computed on the fly, so it can't go stale.
+ensure_hotel_reviews_table();
+$guest_join = "LEFT JOIN (SELECT hotel_id, AVG(rating) AS avg_rating, COUNT(*) AS review_count
+                           FROM hotel_reviews WHERE is_approved = 1 GROUP BY hotel_id) gr
+                 ON gr.hotel_id = h.id";
+
 if ($filter_sort === 'price_asc') {
     $order_sql = 'h.price_min ASC';
 } elseif ($filter_sort === 'price_desc') {
@@ -56,7 +63,9 @@ if ($filter_sort === 'price_asc') {
 } elseif ($filter_sort === 'name') {
     $order_sql = 'h.name ASC';
 } else {
-    $order_sql = 'h.star_rating DESC, h.price_min ASC';
+    // "Top Rated": guest reviews weighted against the star class (counts as 3 votes),
+    // so one lone review can't outrank an established hotel.
+    $order_sql = '((COALESCE(gr.avg_rating * gr.review_count, 0) + h.star_rating * 3) / (COALESCE(gr.review_count, 0) + 3)) DESC, h.price_min ASC';
 }
 
 // Total count
@@ -70,9 +79,11 @@ $page = min($page, $total_pages);
 $offset = ($page - 1) * $per_page;
 
 $hotels = db_fetch_all(
-    "SELECT h.*, c.name AS city_name, c.slug AS city_slug
+    "SELECT h.*, c.name AS city_name, c.slug AS city_slug,
+            gr.avg_rating, COALESCE(gr.review_count, 0) AS review_count
      FROM hotels h
      JOIN cities c ON h.city_id = c.id
+     {$guest_join}
      WHERE {$where_sql}
      ORDER BY {$order_sql}
      LIMIT {$per_page} OFFSET {$offset}",
@@ -83,9 +94,11 @@ $hotels = db_fetch_all(
 $map_hotels = [];
 if ($view_mode === 'map') {
     $map_hotels = db_fetch_all(
-        "SELECT h.id, h.name, h.star_rating, h.price_min, h.latitude, h.longitude, c.name AS city_name
+        "SELECT h.id, h.name, h.star_rating, h.price_min, h.latitude, h.longitude, c.name AS city_name,
+                gr.avg_rating, COALESCE(gr.review_count, 0) AS review_count
          FROM hotels h
          JOIN cities c ON h.city_id = c.id
+         {$guest_join}
          WHERE {$where_sql} AND h.latitude IS NOT NULL AND h.longitude IS NOT NULL
          ORDER BY {$order_sql}",
         $params
@@ -341,6 +354,11 @@ $base_qs = http_build_query(array_filter([
             <div class="mb-1" style="color:var(--sand-dark);font-size:.85rem">
               <?= str_repeat('★', $hotel['star_rating']) . str_repeat('☆', 5 - $hotel['star_rating']) ?>
               <small class="text-muted ms-1"><?= $hotel['star_rating'] ?>-star</small>
+              <?php if (!empty($hotel['review_count'])): ?>
+                <span class="ms-2 small fw-semibold" style="color:var(--charcoal)"><i class="bi bi-star-fill" style="color:var(--sand-dark)"></i> <?= number_format((float)$hotel['avg_rating'], 1) ?> <span class="text-muted fw-normal">(<?= (int)$hotel['review_count'] ?>)</span></span>
+              <?php else: ?>
+                <span class="ms-2 small text-muted">No reviews yet</span>
+              <?php endif; ?>
             </div>
             <a href="hotel.php?id=<?= $hotel['id'] ?>" class="text-decoration-none" style="color:inherit">
               <h5 class="card-title-app mb-1" style="font-size:.98rem"><?= e($hotel['name']) ?></h5>
@@ -405,6 +423,11 @@ $base_qs = http_build_query(array_filter([
             <div>
               <div class="mb-0" style="color:var(--sand-dark);font-size:.8rem">
                 <?= str_repeat('★',$hotel['star_rating']) . str_repeat('☆',5-$hotel['star_rating']) ?>
+                <?php if (!empty($hotel['review_count'])): ?>
+                <span class="ms-2 small fw-semibold" style="color:var(--charcoal)"><i class="bi bi-star-fill" style="color:var(--sand-dark)"></i> <?= number_format((float)$hotel['avg_rating'], 1) ?> <span class="text-muted fw-normal">(<?= (int)$hotel['review_count'] ?>)</span></span>
+              <?php else: ?>
+                <span class="ms-2 small text-muted">No reviews yet</span>
+              <?php endif; ?>
               </div>
               <h6 class="mb-0 fw-bold" style="font-family:'Playfair Display',serif;font-size:.95rem">
                 <?= e($hotel['name']) ?>
@@ -515,13 +538,16 @@ document.addEventListener('DOMContentLoaded', function() {
   hotelPins.forEach(h => {
     hotelBounds.push([h.latitude, h.longitude]);
     const stars = '★'.repeat(h.star_rating || 0);
+    const guest = Number(h.review_count) > 0
+      ? `<br><span style="font-size:.85rem">★ ${Number(h.avg_rating).toFixed(1)} <span style="color:#666">(${h.review_count} review${Number(h.review_count) === 1 ? '' : 's'})</span></span>`
+      : '';
     const price = h.price_min ? '₱' + Number(h.price_min).toLocaleString() + '+/night' : 'Price varies';
     L.marker([h.latitude, h.longitude], { icon: hotelPinIcon })
       .addTo(hotelsMap)
       .bindPopup(`
         <div style="min-width:160px">
           <strong>${h.name}</strong><br>
-          <span style="color:#e9c46a">${stars}</span><br>
+          <span style="color:#e9c46a">${stars}</span>${guest}<br>
           <span style="font-size:.85rem;color:#666">${h.city_name} · ${price}</span><br>
           <a href="<?= APP_URL ?>/pages/hotel.php?id=${h.id}"
              style="display:inline-block;margin-top:.4rem;padding:.25rem .7rem;background:var(--maroon-mid);color:#fff;

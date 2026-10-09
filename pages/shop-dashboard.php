@@ -22,6 +22,9 @@ if (!$shop) { header('Location: ' . APP_URL . '/pages/register-shop.php?step=2')
 
 $sid = $shop['id'];
 
+// Product categories shown in the dashboard (add form, filter, grouping).
+$PRODUCT_CATEGORIES = ['Main Course', 'Side Dishes', 'Snacks', 'Drinks', 'Desserts', 'Others'];
+
 // Handle POST actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = input('action', 'post', '');
@@ -31,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pname  = trim(input('pname',  'post', ''));
         $price  = (float) input('price',  'post', 0);
         $cat    = trim(input('pcat',   'post', ''));
+        if (!in_array($cat, $PRODUCT_CATEGORIES, true)) { $cat = 'Others'; }
         $pdesc  = trim(input('pdesc',  'post', ''));
         $stock  = (int) input('stock',  'post', 999);
         if ($pname && $price > 0) {
@@ -127,6 +131,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $next = db_fetch_one("SELECT url FROM product_photos WHERE product_id=? ORDER BY sort_order LIMIT 1", [$photo['product_id']]);
                 db_execute("UPDATE shop_products SET image_url=? WHERE id=?", [$next['url'] ?? null, $photo['product_id']]);
             }
+        }
+        header('Location: ' . APP_URL . '/pages/shop-dashboard.php#products'); exit;
+    }
+
+    // ── Change a product's category ───────────────────────────
+    if ($action === 'set_product_category') {
+        $pid = (int) input('product_id', 'post', 0);
+        $cat = trim(input('pcat', 'post', ''));
+        if (in_array($cat, $PRODUCT_CATEGORIES, true)) {
+            db_execute("UPDATE shop_products SET category = ? WHERE id = ? AND shop_id = ?", [$cat, $pid, $sid]);
+            $_SESSION['flash']['success'] = 'Category updated.';
         }
         header('Location: ' . APP_URL . '/pages/shop-dashboard.php#products'); exit;
     }
@@ -256,7 +271,46 @@ $orders = db_fetch_all(
 // Stats
 $today_orders  = db_fetch_one("SELECT COUNT(*) n FROM orders WHERE shop_id=? AND DATE(created_at)=CURDATE()", [$sid])['n'] ?? 0;
 $pending_count = db_fetch_one("SELECT COUNT(*) n FROM orders WHERE shop_id=? AND status='pending'", [$sid])['n'] ?? 0;
-$total_revenue = db_fetch_one("SELECT COALESCE(SUM(total_amount),0) n FROM orders WHERE shop_id=? AND status='picked_up'", [$sid])['n'] ?? 0;
+// Revenue = completed (picked-up) orders only, bucketed by the day they were picked up.
+$rev = db_fetch_one(
+    "SELECT
+        COALESCE(SUM(CASE WHEN DATE(ts) = CURDATE() THEN total_amount END), 0)                               AS day_rev,
+        SUM(DATE(ts) = CURDATE())                                                                            AS day_cnt,
+        COALESCE(SUM(CASE WHEN YEARWEEK(ts, 1) = YEARWEEK(CURDATE(), 1) THEN total_amount END), 0)           AS week_rev,
+        SUM(YEARWEEK(ts, 1) = YEARWEEK(CURDATE(), 1))                                                        AS week_cnt,
+        COALESCE(SUM(CASE WHEN YEAR(ts) = YEAR(CURDATE()) AND MONTH(ts) = MONTH(CURDATE())
+                          THEN total_amount END), 0)                                                         AS month_rev,
+        SUM(YEAR(ts) = YEAR(CURDATE()) AND MONTH(ts) = MONTH(CURDATE()))                                    AS month_cnt,
+        COALESCE(SUM(total_amount), 0)                                                                       AS all_rev,
+        COUNT(*)                                                                                             AS all_cnt
+     FROM (SELECT total_amount, COALESCE(picked_up_at, updated_at) AS ts
+             FROM orders WHERE shop_id = ? AND status = 'picked_up') t",
+    [$sid]
+) ?: [];
+$revenue_cards = [
+    ['bi-sun',            'Today',      $rev['day_rev']   ?? 0, $rev['day_cnt']   ?? 0, date('M j')],
+    ['bi-calendar-week',  'This Week',  $rev['week_rev']  ?? 0, $rev['week_cnt']  ?? 0, 'Mon – Sun'],
+    ['bi-calendar-month', 'This Month', $rev['month_rev'] ?? 0, $rev['month_cnt'] ?? 0, date('F Y')],
+    ['bi-cash-stack',     'All Time',   $rev['all_rev']   ?? 0, $rev['all_cnt']   ?? 0, 'Since opening'],
+];
+
+// Group products by category: preset categories first (in order), then any
+// older free-text categories, then anything uncategorised.
+$product_groups = [];
+foreach ($PRODUCT_CATEGORIES as $c) { $product_groups[$c] = []; }
+$legacy = [];
+foreach ($products as $p) {
+    $c = trim((string) ($p['category'] ?? ''));
+    $match = null;
+    foreach ($PRODUCT_CATEGORIES as $pc) { if (strcasecmp($pc, $c) === 0) { $match = $pc; break; } }
+    if ($match !== null)  { $product_groups[$match][] = $p; }
+    elseif ($c !== '')    { $legacy[$c][] = $p; }
+    else                  { $legacy['Uncategorized'][] = $p; }
+}
+ksort($legacy, SORT_NATURAL | SORT_FLAG_CASE);
+if (isset($legacy['Uncategorized'])) { $u_ = $legacy['Uncategorized']; unset($legacy['Uncategorized']); $legacy['Uncategorized'] = $u_; }
+foreach ($legacy as $c => $list) { $product_groups[$c] = $list; }
+$product_groups = array_filter($product_groups, fn($l) => !empty($l));
 $total_products = count($products);
 
 // Order status colors/icons/labels now come from the shared
@@ -314,10 +368,9 @@ require_once __DIR__ . '/../includes/header.php';
       ['bi-box-seam',        "Today's Orders",   $today_orders],
       ['bi-hourglass-split', 'Pending Orders',   $pending_count],
       ['bi-bag',             'Products Listed',  $total_products],
-      ['bi-cash-stack',      'Total Revenue',    '₱'.number_format($total_revenue,2)],
     ];
     foreach ($stats as [$ico,$lbl,$val]): ?>
-    <div class="col-6 col-lg-3">
+    <div class="col-4">
       <div class="stat-item">
         <div class="stat-item-icon"><i class="bi <?= $ico ?>"></i></div>
         <div class="stat-num" style="font-size:1.5rem"><?= $val ?></div>
@@ -326,6 +379,22 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
     <?php endforeach; ?>
     </div>
+  </div>
+
+  <!-- Revenue: day / week / month -->
+  <div class="row g-3 mb-4">
+    <?php foreach ($revenue_cards as [$rIco, $rLbl, $rAmt, $rCnt, $rSub]): ?>
+    <div class="col-6 col-lg-3">
+      <div class="h-100 p-3" style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius)">
+        <div class="d-flex align-items-center justify-content-between mb-1">
+          <span class="small fw-semibold text-muted text-uppercase" style="letter-spacing:.04em"><?= $rLbl ?> revenue</span>
+          <i class="bi <?= $rIco ?>" style="color:var(--maroon-mid)"></i>
+        </div>
+        <div class="fw-bold" style="font-size:1.45rem;color:var(--maroon-dark)">₱<?= number_format((float)$rAmt, 2) ?></div>
+        <div class="small text-muted"><?= (int)$rCnt ?> completed order<?= (int)$rCnt === 1 ? '' : 's' ?> · <?= e($rSub) ?></div>
+      </div>
+    </div>
+    <?php endforeach; ?>
   </div>
 
 
@@ -577,7 +646,11 @@ require_once __DIR__ . '/../includes/header.php';
               </div>
               <div class="mb-3">
                 <label class="form-label">Category</label>
-                <input type="text" class="form-control" name="pcat" placeholder="e.g. Drinks, Snacks, Meals">
+                <select class="form-select" name="pcat">
+                  <?php foreach ($PRODUCT_CATEGORIES as $pc): ?>
+                    <option value="<?= e($pc) ?>"><?= e($pc) ?></option>
+                  <?php endforeach; ?>
+                </select>
               </div>
               <div class="mb-3">
                 <label class="form-label">Description</label>
@@ -605,8 +678,28 @@ require_once __DIR__ . '/../includes/header.php';
             <p class="text-muted">Add your first product using the form.</p>
           </div>
           <?php else: ?>
+          <!-- Category filter -->
+          <div class="d-flex flex-wrap gap-2 mb-3" id="category-filter">
+            <button type="button" class="btn btn-sm cat-pill active" data-cat="__all"
+                    style="border-radius:var(--radius-pill);font-size:.78rem">All (<?= count($products) ?>)</button>
+            <?php foreach ($product_groups as $cName => $cList): ?>
+              <button type="button" class="btn btn-sm cat-pill" data-cat="<?= e($cName) ?>"
+                      style="border-radius:var(--radius-pill);font-size:.78rem"><?= e($cName) ?> (<?= count($cList) ?>)</button>
+            <?php endforeach; ?>
+          </div>
+          <style>
+            .cat-pill{background:#fff;border:1.5px solid var(--border);color:var(--maroon-dark);font-weight:600}
+            .cat-pill.active{background:var(--maroon-mid);border-color:var(--maroon-mid);color:#fff}
+          </style>
+
+          <div>
+          <?php foreach ($product_groups as $cName => $cList): ?>
+          <div class="product-cat-group mb-4" data-cat="<?= e($cName) ?>">
+            <h6 class="fw-bold mb-2" style="color:var(--maroon-dark);font-family:'Playfair Display',serif">
+              <?= e($cName) ?> <span class="text-muted fw-normal small">· <?= count($cList) ?></span>
+            </h6>
           <div class="d-flex flex-column gap-2">
-            <?php foreach ($products as $p): $pPhotos = $product_photos[$p['id']] ?? []; ?>
+            <?php foreach ($cList as $p): $pPhotos = $product_photos[$p['id']] ?? []; ?>
             <div style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;
                         opacity:<?= $p['is_available'] ? '1' : '.55' ?>">
               <div class="d-flex align-items-center gap-3 p-3">
@@ -620,9 +713,21 @@ require_once __DIR__ . '/../includes/header.php';
                 <?php endif; ?>
                 <div class="flex-grow-1 min-w-0">
                   <div class="fw-bold" style="font-size:.93rem"><?= e($p['name']) ?></div>
-                  <div class="text-muted small">
-                    <?= $p['category'] ? e($p['category']).' · ' : '' ?>
-                    Stock: <?= $p['stock'] >= 999 ? '∞' : $p['stock'] ?>
+                  <div class="text-muted small d-flex align-items-center flex-wrap gap-2">
+                    <form method="POST" class="m-0"><?= csrf_field() ?>
+                      <input type="hidden" name="action" value="set_product_category">
+                      <input type="hidden" name="product_id" value="<?= $p['id'] ?>">
+                      <select name="pcat" class="form-select form-select-sm" style="width:auto;font-size:.75rem;padding:.1rem 1.6rem .1rem .5rem"
+                              onchange="this.form.submit()" title="Change category">
+                        <?php if (!in_array($cName, $PRODUCT_CATEGORIES, true)): ?>
+                          <option selected disabled><?= e($cName) ?></option>
+                        <?php endif; ?>
+                        <?php foreach ($PRODUCT_CATEGORIES as $pc): ?>
+                          <option value="<?= e($pc) ?>" <?= $pc === $cName ? 'selected' : '' ?>><?= e($pc) ?></option>
+                        <?php endforeach; ?>
+                      </select>
+                    </form>
+                    <span>Stock: <?= $p['stock'] >= 999 ? '∞' : $p['stock'] ?></span>
                   </div>
                 </div>
                 <div class="fw-bold" style="color:var(--maroon-mid);font-size:1rem;white-space:nowrap">
@@ -706,12 +811,24 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
             <?php endforeach; ?>
           </div>
+          </div>
+          <?php endforeach; ?>
+          </div>
           <?php endif; ?>
         </div>
       </div>
     </div>
 
     <script>
+    document.querySelectorAll('.cat-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('.cat-pill').forEach(p => p.classList.toggle('active', p === pill));
+        const cat = pill.dataset.cat;
+        document.querySelectorAll('.product-cat-group').forEach(g => {
+          g.classList.toggle('d-none', cat !== '__all' && g.dataset.cat !== cat);
+        });
+      });
+    });
     document.querySelectorAll('.gallery-toggle-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelector(btn.dataset.target).classList.toggle('d-none');
