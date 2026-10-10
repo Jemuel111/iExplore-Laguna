@@ -208,7 +208,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
-        header('Location: ' . APP_URL . '/pages/shop-dashboard.php#orders'); exit;
+        // Return to the same filter/page the owner was on
+        parse_str((string) input('ret', 'post', ''), $ret_raw);
+        $ret = [];
+        foreach (['ostatus', 'oq', 'op'] as $k) {
+            if (isset($ret_raw[$k]) && is_string($ret_raw[$k]) && $ret_raw[$k] !== '') { $ret[$k] = $ret_raw[$k]; }
+        }
+        header('Location: ' . APP_URL . '/pages/shop-dashboard.php' . ($ret ? '?' . http_build_query($ret) : '') . '#orders'); exit;
     }
 
     // ── Update shop info ──────────────────────────────────────
@@ -258,15 +264,49 @@ $product_photos_raw = db_fetch_all(
 $product_photos = [];
 foreach ($product_photos_raw as $pp) { $product_photos[$pp['product_id']][] = $pp; }
 
+// Orders list: filtered, searched and paged on the server so it stays fast as orders pile up.
+$ORDER_STATUSES = ['pending', 'confirmed', 'preparing', 'ready', 'picked_up', 'cancelled'];
+$ord_status = (string) input('ostatus', 'get', '');
+if (!in_array($ord_status, $ORDER_STATUSES, true)) { $ord_status = ''; }
+$ord_q      = trim((string) input('oq', 'get', ''));
+$ord_page   = max(1, (int) input('op', 'get', 1));
+$ord_per    = 10;
+
+$ord_where  = ['o.shop_id = ?'];
+$ord_params = [$sid];
+if ($ord_status !== '') { $ord_where[] = 'o.status = ?'; $ord_params[] = $ord_status; }
+if ($ord_q !== '') {
+    $like = '%' . addcslashes($ord_q, '%_\\') . '%';
+    $ord_where[] = "(o.order_number LIKE ? OR u.name LIKE ? OR o.pickup_code LIKE ?
+                     OR EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.product_name LIKE ?))";
+    array_push($ord_params, $like, $like, $like, $like);
+}
+$ord_where_sql = implode(' AND ', $ord_where);
+
+$orders_total = (int) (db_fetch_one(
+    "SELECT COUNT(*) AS n FROM orders o JOIN users u ON o.tourist_id = u.id WHERE {$ord_where_sql}", $ord_params
+)['n'] ?? 0);
+$ord_pages = max(1, (int) ceil($orders_total / $ord_per));
+$ord_page  = min($ord_page, $ord_pages);
+$ord_off   = ($ord_page - 1) * $ord_per;
+
 $orders = db_fetch_all(
     "SELECT o.*, u.name AS tourist_name, u.phone AS tourist_phone
-     FROM orders o
-     JOIN users u ON o.tourist_id = u.id
-     WHERE o.shop_id = ?
+     FROM orders o JOIN users u ON o.tourist_id = u.id
+     WHERE {$ord_where_sql}
      ORDER BY o.created_at DESC
-     LIMIT 50",
-    [$sid]
+     LIMIT {$ord_per} OFFSET {$ord_off}",
+    $ord_params
 );
+// Items for just this page's orders, in one query
+$items_by_order = [];
+if ($orders) {
+    $oids = array_column($orders, 'id');
+    $ph   = implode(',', array_fill(0, count($oids), '?'));
+    foreach (db_fetch_all("SELECT * FROM order_items WHERE order_id IN ({$ph})", $oids) as $it) {
+        $items_by_order[$it['order_id']][] = $it;
+    }
+}
 
 // Stats
 $today_orders  = db_fetch_one("SELECT COUNT(*) n FROM orders WHERE shop_id=? AND DATE(created_at)=CURDATE()", [$sid])['n'] ?? 0;
@@ -299,16 +339,16 @@ $periods = [
     'month' => ['This month', $rev['month_rev'] ?? 0, $rev['month_cnt'] ?? 0, 'Last month', $rev['month_prev'] ?? 0],
 ];
 
-// Daily revenue for the last 14 days (the bars under the headline figure).
+// Daily revenue for the last 7 days (the bars under the headline figure).
 $db_today  = db_fetch_one("SELECT CURDATE() AS d")['d'] ?? date('Y-m-d');
 $daily_raw = db_fetch_all(
     "SELECT DATE(ts) AS d, SUM(total_amount) AS amt FROM {$ts_sub}
-     WHERE DATE(ts) >= DATE_SUB(CURDATE(), INTERVAL 13 DAY) GROUP BY DATE(ts)",
+     WHERE DATE(ts) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) GROUP BY DATE(ts)",
     [$sid]
 );
 $daily_map = array_column($daily_raw, 'amt', 'd');
 $daily = [];
-for ($i = 13; $i >= 0; $i--) {
+for ($i = 6; $i >= 0; $i--) {
     $d = date('Y-m-d', strtotime("{$db_today} -{$i} day"));
     $daily[] = ['d' => $d, 'amt' => (float) ($daily_map[$d] ?? 0)];
 }
@@ -334,7 +374,19 @@ $inprog = array_column(db_fetch_all(
 
 $chip_labels = ['pending' => 'Pending', 'confirmed' => 'Confirmed', 'preparing' => 'Preparing',
                 'ready' => 'Ready', 'picked_up' => 'Picked up', 'cancelled' => 'Cancelled'];
-$status_counts = array_count_values(array_column($orders, 'status'));
+// Chip counts cover all of the shop's orders, whatever filter is active.
+$status_counts = array_column(db_fetch_all(
+    "SELECT status, COUNT(*) AS n FROM orders WHERE shop_id = ? GROUP BY status", [$sid]
+), 'n', 'status');
+$orders_all = array_sum($status_counts);
+
+/** Link to the orders list with some filters changed (always lands on the Orders tab). */
+function sd_orders_url(array $over = []): string {
+    global $ord_status, $ord_q, $ord_page;
+    $q = array_merge(['ostatus' => $ord_status, 'oq' => $ord_q, 'op' => $ord_page], $over);
+    $q = array_filter($q, fn($v) => $v !== '' && $v !== null && $v !== 1);
+    return APP_URL . '/pages/shop-dashboard.php' . ($q ? '?' . http_build_query($q) : '') . '#orders';
+}
 
 /** One-button form that moves an order to a new status. */
 function sd_order_btn(int $oid, string $status, string $label, string $cls = 'sd-btn'): string {
@@ -342,6 +394,7 @@ function sd_order_btn(int $oid, string $status, string $label, string $cls = 'sd
          . '<input type="hidden" name="action" value="update_order">'
          . '<input type="hidden" name="order_id" value="' . $oid . '">'
          . '<input type="hidden" name="status" value="' . e($status) . '">'
+         . '<input type="hidden" name="ret" value="' . e((string) ($_SERVER['QUERY_STRING'] ?? '')) . '">'
          . '<button class="' . e($cls) . '">' . e($label) . '</button></form>';
 }
 
@@ -402,13 +455,14 @@ require_once __DIR__ . '/../includes/header.php';
 .sd .sd-peso{color:var(--maroon-mid);margin-right:.15em}
 .sd .sd-note{margin:.55rem 0 0;color:var(--text-muted);font-size:.93rem}
 .sd .sd-cap{margin:1.6rem 0 .5rem;font-size:.82rem;color:var(--text-muted)}
-.sd .sd-bars{display:flex;gap:5px;height:104px;border-bottom:1px solid var(--border)}
+.sd .sd-bars{display:flex;gap:10px;height:104px;border-bottom:1px solid var(--border)}
 .sd .sd-bar-col{flex:1;display:flex;flex-direction:column;min-width:0}
 .sd .sd-bar-wrap{flex:1;display:flex;align-items:flex-end;justify-content:center;min-height:0}
-.sd .sd-bar{width:100%;max-width:24px;min-height:2px;background:var(--sand-dark);opacity:.6;border-radius:3px 3px 0 0}
+.sd .sd-bar{width:100%;max-width:44px;min-height:2px;background:var(--sand-dark);opacity:.6;border-radius:3px 3px 0 0}
 .sd .sd-bar-col.is-today .sd-bar{background:var(--maroon-mid);opacity:1}
-.sd .sd-days{display:flex;gap:5px;margin-top:.3rem}
-.sd .sd-days span{flex:1;text-align:center;font-size:.72rem;color:var(--text-muted)}
+.sd .sd-days{display:flex;gap:10px;margin-top:.4rem}
+.sd .sd-days span{flex:1;text-align:center;font-size:.8rem;line-height:1.3;color:var(--text-muted)}
+.sd .sd-days span em{display:block;font-style:normal;font-size:.68rem;opacity:.8}
 .sd .sd-days span.is-today{color:var(--maroon-dark);font-weight:600}
 .sd .sd-empty-bars{margin:0;padding:2.2rem 0 1rem;color:var(--text-muted);font-size:.9rem;border-bottom:1px solid var(--border)}
 
@@ -448,13 +502,20 @@ require_once __DIR__ . '/../includes/header.php';
 .sd .sd-filters{display:flex;flex-wrap:wrap;gap:1rem 1.5rem;align-items:center;justify-content:space-between;margin-bottom:.4rem}
 .sd .sd-chips{display:flex;flex-wrap:wrap;gap:.4rem}
 .sd .sd-chip{background:#fff;border:1px solid var(--border);border-radius:50px;padding:.25rem .85rem;font-size:.83rem;font-weight:600;color:var(--charcoal);cursor:pointer}
-.sd .sd-chip:hover{border-color:var(--maroon-mid)}
-.sd .sd-chip[aria-pressed="true"]{background:var(--maroon-pale);border-color:var(--maroon-mid);color:var(--maroon-dark)}
+.sd a.sd-chip{text-decoration:none}
+.sd .sd-chip:hover{border-color:var(--maroon-mid);color:var(--charcoal)}
+.sd .sd-chip[aria-current="true"]{background:var(--maroon-pale);border-color:var(--maroon-mid);color:var(--maroon-dark)}
 .sd .sd-chip span{font-weight:500;color:var(--text-muted);margin-left:.25rem}
 .sd .sd-search{position:relative;min-width:240px}
 .sd .sd-search i{position:absolute;left:.8rem;top:50%;transform:translateY(-50%);color:var(--text-muted)}
 .sd .sd-search input{width:100%;padding:.45rem .9rem .45rem 2.2rem;border:1px solid var(--border);border-radius:50px;background:#fff;font-size:.9rem}
 .sd .sd-countline{margin:.7rem 0 1rem;color:var(--text-muted);font-size:.85rem}
+.sd .sd-pager{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:.35rem;margin:1.6rem 0 .5rem}
+.sd .sd-pager a,.sd .sd-pager span{min-width:2.3rem;padding:.35rem .8rem;text-align:center;border:1px solid var(--border);border-radius:50px;background:#fff;color:var(--charcoal);font-size:.88rem;font-weight:600;text-decoration:none}
+.sd .sd-pager a:hover{border-color:var(--maroon-mid);color:var(--maroon-dark)}
+.sd .sd-pager a[aria-current="page"]{background:var(--maroon-mid);border-color:var(--maroon-mid);color:#fff}
+.sd .sd-pager .is-off{color:#b9b2a7;background:transparent}
+.sd .sd-pager .gap{border:0;background:none;min-width:0;padding:.35rem .2rem;color:var(--text-muted)}
 
 /* Pickup slips */
 .sd .slip{display:flex;background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:.9rem}
@@ -541,7 +602,7 @@ require_once __DIR__ . '/../includes/header.php';
       </div>
       <?php $first = false; endforeach; ?>
 
-      <p class="sd-cap">Daily revenue, last 14 days</p>
+      <p class="sd-cap">Daily revenue, last 7 days</p>
       <?php if ($daily_max > 0): ?>
         <div class="sd-bars">
           <?php foreach ($daily as $day): $isToday = $day['d'] === $db_today; ?>
@@ -553,11 +614,11 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
         <div class="sd-days" aria-hidden="true">
           <?php foreach ($daily as $day): ?>
-            <span class="<?= $day['d'] === $db_today ? 'is-today' : '' ?>"><?= substr(date('D', strtotime($day['d'])), 0, 1) ?></span>
+            <span class="<?= $day['d'] === $db_today ? 'is-today' : '' ?>"><?= $day['d'] === $db_today ? 'Today' : date('D', strtotime($day['d'])) ?><em><?= date('M j', strtotime($day['d'])) ?></em></span>
           <?php endforeach; ?>
         </div>
       <?php else: ?>
-        <p class="sd-empty-bars">Nothing picked up in the last 14 days. Revenue shows up here once you mark an order as picked up.</p>
+        <p class="sd-empty-bars">Nothing picked up in the last 7 days. Revenue shows up here once you mark an order as picked up.</p>
       <?php endif; ?>
     </section>
 
@@ -624,35 +685,43 @@ require_once __DIR__ . '/../includes/header.php';
 
     <!-- ── ORDERS TAB ──────────────────────────────────────── -->
     <div class="tab-pane fade show active" id="orders">
-      <?php if (empty($orders)): ?>
+      <?php if ($orders_all === 0): ?>
         <div class="py-5 text-center">
           <h5 class="mb-1">No orders yet</h5>
           <p class="text-muted mb-0">When a tourist orders from your shop, the order slip appears here with its pickup code.</p>
         </div>
       <?php else: ?>
         <div class="sd-filters">
-          <div class="sd-chips" id="orders-chips">
-            <button type="button" class="sd-chip" data-status="all" aria-pressed="true">All<span><?= count($orders) ?></span></button>
+          <div class="sd-chips">
+            <a class="sd-chip" href="<?= e(sd_orders_url(['ostatus' => '', 'op' => 1])) ?>" <?= $ord_status === '' ? 'aria-current="true"' : '' ?>>All<span><?= (int) $orders_all ?></span></a>
             <?php foreach ($chip_labels as $stKey => $stLabel): if (empty($status_counts[$stKey])) continue; ?>
-              <button type="button" class="sd-chip" data-status="<?= $stKey ?>" aria-pressed="false"><?= $stLabel ?><span><?= $status_counts[$stKey] ?></span></button>
+              <a class="sd-chip" href="<?= e(sd_orders_url(['ostatus' => $stKey, 'op' => 1])) ?>" <?= $ord_status === $stKey ? 'aria-current="true"' : '' ?>><?= $stLabel ?><span><?= (int) $status_counts[$stKey] ?></span></a>
             <?php endforeach; ?>
           </div>
-          <label class="sd-search">
+          <form class="sd-search" method="get" action="<?= APP_URL ?>/pages/shop-dashboard.php#orders">
             <i class="bi bi-search"></i>
-            <input type="search" id="orders-search" placeholder="Find an order, customer or item" aria-label="Search orders">
-          </label>
+            <input type="search" name="oq" value="<?= e($ord_q) ?>" placeholder="Find an order, customer or item" aria-label="Search orders">
+            <?php if ($ord_status !== ''): ?><input type="hidden" name="ostatus" value="<?= e($ord_status) ?>"><?php endif; ?>
+          </form>
         </div>
-        <p class="sd-countline" id="orders-count"></p>
+
+        <p class="sd-countline">
+          <?php if ($orders_total === 0): ?>
+            No orders match<?= $ord_q !== '' ? ' "' . e($ord_q) . '"' : '' ?>.
+            <a href="<?= e(sd_orders_url(['ostatus' => '', 'oq' => '', 'op' => 1])) ?>">Clear filters</a>
+          <?php else: ?>
+            Showing <?= $ord_off + 1 ?> to <?= $ord_off + count($orders) ?> of <?= $orders_total ?> <?= $orders_total === 1 ? 'order' : 'orders' ?>
+            <?php if ($ord_q !== ''): ?>matching "<?= e($ord_q) ?>". <a href="<?= e(sd_orders_url(['oq' => '', 'op' => 1])) ?>">Clear search</a><?php endif; ?>
+          <?php endif; ?>
+        </p>
 
         <div id="orders-list-body">
           <?php foreach ($orders as $ord):
             $st    = order_status_meta($ord['status']);
-            $items = db_fetch_all("SELECT * FROM order_items WHERE order_id = ?", [$ord['id']]);
-            $itemNames = implode(' ', array_column($items, 'product_name'));
-            $blob  = strtolower($ord['order_number'].' '.$ord['tourist_name'].' '.$ord['pickup_code'].' '.$ord['status'].' '.$itemNames);
+            $items = $items_by_order[$ord['id']] ?? [];
             $oid   = (int) $ord['id'];
           ?>
-          <article class="slip order-row" data-status="<?= e($ord['status']) ?>" data-search="<?= e($blob) ?>">
+          <article class="slip order-row" data-status="<?= e($ord['status']) ?>">
             <div class="slip-stub">
               <span class="slip-code"><?= e($ord['pickup_code'] ?: '—') ?></span>
               <small>pickup code</small>
@@ -702,45 +771,24 @@ require_once __DIR__ . '/../includes/header.php';
           <?php endforeach; ?>
         </div>
 
-        <div class="text-center mt-3">
-          <button type="button" id="orders-show-more" class="sd-btn-quiet">Show more orders</button>
-          <p id="orders-no-results" class="text-muted py-3 mb-0" hidden>No orders match. Try a different status or search.</p>
-        </div>
-
-        <script>
-        (function () {
-          const PAGE = 10;
-          const rows   = Array.from(document.querySelectorAll('#orders-list-body .order-row'));
-          const chips  = Array.from(document.querySelectorAll('#orders-chips .sd-chip'));
-          const search = document.getElementById('orders-search');
-          const more   = document.getElementById('orders-show-more');
-          const none   = document.getElementById('orders-no-results');
-          const count  = document.getElementById('orders-count');
-          let status = 'all', query = '', shown = PAGE;
-
-          function apply() {
-            const matches = rows.filter(r =>
-              (status === 'all' || r.dataset.status === status) &&
-              (!query || r.dataset.search.includes(query)));
-            const filtering = status !== 'all' || query !== '';
-            const limit = filtering ? matches.length : Math.min(shown, matches.length);
-            rows.forEach(r => { r.hidden = true; });
-            matches.slice(0, limit).forEach(r => { r.hidden = false; });
-            more.hidden = filtering || shown >= matches.length;
-            none.hidden = matches.length > 0;
-            count.textContent = 'Showing ' + limit + ' of ' + matches.length +
-              (!filtering && rows.length >= 50 ? ' (your latest 50 orders)' : '');
-          }
-          chips.forEach(chip => chip.addEventListener('click', () => {
-            status = chip.dataset.status;
-            chips.forEach(c => c.setAttribute('aria-pressed', c === chip ? 'true' : 'false'));
-            apply();
-          }));
-          search.addEventListener('input', () => { query = search.value.trim().toLowerCase(); apply(); });
-          more.addEventListener('click', () => { shown += PAGE; apply(); });
-          apply();
-        })();
-        </script>
+        <?php if ($ord_pages > 1):
+          // window of page numbers around the current page, with first/last and gaps
+          $nums = array_unique(array_merge([1, $ord_pages], range(max(1, $ord_page - 1), min($ord_pages, $ord_page + 1))));
+          sort($nums);
+        ?>
+        <nav class="sd-pager" aria-label="Orders pages">
+          <?php if ($ord_page > 1): ?>
+            <a href="<?= e(sd_orders_url(['op' => $ord_page - 1])) ?>">Previous</a>
+          <?php else: ?><span class="is-off">Previous</span><?php endif; ?>
+          <?php $prev = 0; foreach ($nums as $n):
+            if ($n - $prev > 1): ?><span class="gap">…</span><?php endif; ?>
+            <a href="<?= e(sd_orders_url(['op' => $n])) ?>" <?= $n === $ord_page ? 'aria-current="page"' : '' ?>><?= $n ?></a>
+          <?php $prev = $n; endforeach; ?>
+          <?php if ($ord_page < $ord_pages): ?>
+            <a href="<?= e(sd_orders_url(['op' => $ord_page + 1])) ?>">Next</a>
+          <?php else: ?><span class="is-off">Next</span><?php endif; ?>
+        </nav>
+        <?php endif; ?>
       <?php endif; ?>
     </div>
 
