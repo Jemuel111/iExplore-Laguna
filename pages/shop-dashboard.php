@@ -271,28 +271,79 @@ $orders = db_fetch_all(
 // Stats
 $today_orders  = db_fetch_one("SELECT COUNT(*) n FROM orders WHERE shop_id=? AND DATE(created_at)=CURDATE()", [$sid])['n'] ?? 0;
 $pending_count = db_fetch_one("SELECT COUNT(*) n FROM orders WHERE shop_id=? AND status='pending'", [$sid])['n'] ?? 0;
-// Revenue = completed (picked-up) orders only, bucketed by the day they were picked up.
+// ── Revenue ledger ───────────────────────────────────────────
+// Revenue = completed (picked-up) orders only, dated by the day they were picked up.
+$ts_sub = "(SELECT total_amount, COALESCE(picked_up_at, updated_at) AS ts
+              FROM orders WHERE shop_id = ? AND status = 'picked_up') t";
 $rev = db_fetch_one(
     "SELECT
-        COALESCE(SUM(CASE WHEN DATE(ts) = CURDATE() THEN total_amount END), 0)                               AS day_rev,
-        SUM(DATE(ts) = CURDATE())                                                                            AS day_cnt,
-        COALESCE(SUM(CASE WHEN YEARWEEK(ts, 1) = YEARWEEK(CURDATE(), 1) THEN total_amount END), 0)           AS week_rev,
-        SUM(YEARWEEK(ts, 1) = YEARWEEK(CURDATE(), 1))                                                        AS week_cnt,
-        COALESCE(SUM(CASE WHEN YEAR(ts) = YEAR(CURDATE()) AND MONTH(ts) = MONTH(CURDATE())
-                          THEN total_amount END), 0)                                                         AS month_rev,
-        SUM(YEAR(ts) = YEAR(CURDATE()) AND MONTH(ts) = MONTH(CURDATE()))                                    AS month_cnt,
-        COALESCE(SUM(total_amount), 0)                                                                       AS all_rev,
-        COUNT(*)                                                                                             AS all_cnt
-     FROM (SELECT total_amount, COALESCE(picked_up_at, updated_at) AS ts
-             FROM orders WHERE shop_id = ? AND status = 'picked_up') t",
+        COALESCE(SUM(CASE WHEN DATE(ts) = CURDATE() THEN total_amount END), 0)                          AS day_rev,
+        COALESCE(SUM(DATE(ts) = CURDATE()), 0)                                                          AS day_cnt,
+        COALESCE(SUM(CASE WHEN DATE(ts) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) THEN total_amount END), 0) AS day_prev,
+        COALESCE(SUM(CASE WHEN YEARWEEK(ts, 1) = YEARWEEK(CURDATE(), 1) THEN total_amount END), 0)      AS week_rev,
+        COALESCE(SUM(YEARWEEK(ts, 1) = YEARWEEK(CURDATE(), 1)), 0)                                      AS week_cnt,
+        COALESCE(SUM(CASE WHEN YEARWEEK(ts, 1) = YEARWEEK(DATE_SUB(CURDATE(), INTERVAL 7 DAY), 1)
+                          THEN total_amount END), 0)                                                    AS week_prev,
+        COALESCE(SUM(CASE WHEN DATE_FORMAT(ts, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')
+                          THEN total_amount END), 0)                                                    AS month_rev,
+        COALESCE(SUM(DATE_FORMAT(ts, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')), 0)                    AS month_cnt,
+        COALESCE(SUM(CASE WHEN DATE_FORMAT(ts, '%Y-%m') = DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m')
+                          THEN total_amount END), 0)                                                    AS month_prev
+     FROM {$ts_sub}",
     [$sid]
 ) ?: [];
-$revenue_cards = [
-    ['bi-sun',            'Today',      $rev['day_rev']   ?? 0, $rev['day_cnt']   ?? 0, date('M j')],
-    ['bi-calendar-week',  'This Week',  $rev['week_rev']  ?? 0, $rev['week_cnt']  ?? 0, 'Mon – Sun'],
-    ['bi-calendar-month', 'This Month', $rev['month_rev'] ?? 0, $rev['month_cnt'] ?? 0, date('F Y')],
-    ['bi-cash-stack',     'All Time',   $rev['all_rev']   ?? 0, $rev['all_cnt']   ?? 0, 'Since opening'],
+// key => [label, amount, completed orders, label of previous period, previous amount]
+$periods = [
+    'day'   => ['Today',      $rev['day_rev']   ?? 0, $rev['day_cnt']   ?? 0, 'Yesterday',  $rev['day_prev']   ?? 0],
+    'week'  => ['This week',  $rev['week_rev']  ?? 0, $rev['week_cnt']  ?? 0, 'Last week',  $rev['week_prev']  ?? 0],
+    'month' => ['This month', $rev['month_rev'] ?? 0, $rev['month_cnt'] ?? 0, 'Last month', $rev['month_prev'] ?? 0],
 ];
+
+// Daily revenue for the last 14 days (the bars under the headline figure).
+$db_today  = db_fetch_one("SELECT CURDATE() AS d")['d'] ?? date('Y-m-d');
+$daily_raw = db_fetch_all(
+    "SELECT DATE(ts) AS d, SUM(total_amount) AS amt FROM {$ts_sub}
+     WHERE DATE(ts) >= DATE_SUB(CURDATE(), INTERVAL 13 DAY) GROUP BY DATE(ts)",
+    [$sid]
+);
+$daily_map = array_column($daily_raw, 'amt', 'd');
+$daily = [];
+for ($i = 13; $i >= 0; $i--) {
+    $d = date('Y-m-d', strtotime("{$db_today} -{$i} day"));
+    $daily[] = ['d' => $d, 'amt' => (float) ($daily_map[$d] ?? 0)];
+}
+$daily_max = max(array_column($daily, 'amt'));
+
+// Orders that need the owner: oldest pending first, plus a count of what is in progress.
+$queue = db_fetch_all(
+    "SELECT o.id, o.pickup_code, o.total_amount, u.name AS tourist_name
+       FROM orders o JOIN users u ON o.tourist_id = u.id
+      WHERE o.shop_id = ? AND o.status = 'pending'
+      ORDER BY o.created_at ASC LIMIT 4",
+    [$sid]
+);
+foreach ($queue as &$q_) {
+    $its = db_fetch_all("SELECT product_name, quantity FROM order_items WHERE order_id = ?", [$q_['id']]);
+    $q_['summary'] = implode(', ', array_map(fn($i) => $i['quantity'] . ' × ' . $i['product_name'], $its));
+}
+unset($q_);
+$inprog = array_column(db_fetch_all(
+    "SELECT status, COUNT(*) AS n FROM orders
+      WHERE shop_id = ? AND status IN ('confirmed','preparing','ready') GROUP BY status", [$sid]
+), 'n', 'status');
+
+$chip_labels = ['pending' => 'Pending', 'confirmed' => 'Confirmed', 'preparing' => 'Preparing',
+                'ready' => 'Ready', 'picked_up' => 'Picked up', 'cancelled' => 'Cancelled'];
+$status_counts = array_count_values(array_column($orders, 'status'));
+
+/** One-button form that moves an order to a new status. */
+function sd_order_btn(int $oid, string $status, string $label, string $cls = 'sd-btn'): string {
+    return '<form method="POST" class="m-0">' . csrf_field()
+         . '<input type="hidden" name="action" value="update_order">'
+         . '<input type="hidden" name="order_id" value="' . $oid . '">'
+         . '<input type="hidden" name="status" value="' . e($status) . '">'
+         . '<button class="' . e($cls) . '">' . e($label) . '</button></form>';
+}
 
 // Group products by category: preset categories first (in order), then any
 // older free-text categories, then anything uncategorised.
@@ -330,290 +381,364 @@ require_once __DIR__ . '/../includes/header.php';
   <?php endforeach; unset($_SESSION['flash']); ?>
 <?php endif; ?>
 
-<!-- Page header -->
-<section class="py-3" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
-  <div class="container">
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-      <div class="d-flex align-items-center gap-3">
-        <div style="width:48px;height:48px;background:rgba(255,255,255,.2);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.6rem"><i class="bi bi-shop"></i></div>
-        <div>
-          <h1 class="mb-0 fs-4" style="font-family:'Playfair Display',serif"><?= e($shop['name']) ?></h1>
-          <p class="mb-0 small opacity-75">
-            <i class="bi bi-geo-alt me-1"></i>Shop Dashboard
-            <?php if (!$shop['is_verified']): ?>
-              <span class="badge ms-2" style="background:rgba(255,255,255,.2);font-size:.7rem"><i class="bi bi-hourglass-split me-1"></i>Pending verification</span>
-            <?php else: ?>
-              <span class="badge ms-2" style="background:rgba(255,255,255,.2);font-size:.7rem"><i class="bi bi-check-circle-fill me-1"></i>Verified</span>
-            <?php endif; ?>
-          </p>
-        </div>
-      </div>
-      <?php if ($pending_count > 0): ?>
-        <a href="#orders" class="btn btn-sm"
-           style="background:#fff;color:var(--maroon-mid);font-weight:700;border-radius:var(--radius-pill)">
-          <i class="bi bi-bell-fill me-1"></i><?= $pending_count ?> New Order<?= $pending_count > 1 ? 's' : '' ?>
-        </a>
+<style>
+/* Shop dashboard — uses the site's tokens (app.css), scoped to .sd */
+.sd .sd-head{padding:.5rem 0 1.75rem}
+.sd .sd-title{font-size:clamp(1.9rem,4.2vw,2.6rem);margin:0;color:var(--charcoal)}
+.sd .sd-sub{margin:.3rem 0 0;color:var(--text-muted);font-size:.92rem}
+.sd .sd-sub i{color:var(--maroon-mid)}
+.sd .sd-top{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:2.25rem;margin-bottom:2.75rem;align-items:start}
+@media (max-width:991.98px){.sd .sd-top{grid-template-columns:1fr;gap:2rem}}
+
+/* Revenue ledger */
+.sd .sd-ledger{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:1.4rem 1.75rem 1.5rem}
+.sd .sd-periods{display:flex;gap:1.5rem;border-bottom:1px solid var(--border);margin-bottom:1.4rem}
+.sd .sd-periods button{background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:.2rem 0 .65rem;
+  font:inherit;font-weight:600;color:var(--text-muted);cursor:pointer}
+.sd .sd-periods button:hover{color:var(--maroon-dark)}
+.sd .sd-periods button[aria-selected="true"]{color:var(--maroon-dark);border-bottom-color:var(--maroon-mid)}
+.sd .sd-figure{font-family:'Playfair Display',Georgia,serif;font-weight:700;font-size:clamp(2.5rem,6vw,3.5rem);
+  line-height:1.05;color:var(--charcoal);font-variant-numeric:lining-nums}
+.sd .sd-peso{color:var(--maroon-mid);margin-right:.15em}
+.sd .sd-note{margin:.55rem 0 0;color:var(--text-muted);font-size:.93rem}
+.sd .sd-cap{margin:1.6rem 0 .5rem;font-size:.82rem;color:var(--text-muted)}
+.sd .sd-bars{display:flex;gap:5px;height:104px;border-bottom:1px solid var(--border)}
+.sd .sd-bar-col{flex:1;display:flex;flex-direction:column;min-width:0}
+.sd .sd-bar-wrap{flex:1;display:flex;align-items:flex-end;justify-content:center;min-height:0}
+.sd .sd-bar{width:100%;max-width:24px;min-height:2px;background:var(--sand-dark);opacity:.6;border-radius:3px 3px 0 0}
+.sd .sd-bar-col.is-today .sd-bar{background:var(--maroon-mid);opacity:1}
+.sd .sd-days{display:flex;gap:5px;margin-top:.3rem}
+.sd .sd-days span{flex:1;text-align:center;font-size:.72rem;color:var(--text-muted)}
+.sd .sd-days span.is-today{color:var(--maroon-dark);font-weight:600}
+.sd .sd-empty-bars{margin:0;padding:2.2rem 0 1rem;color:var(--text-muted);font-size:.9rem;border-bottom:1px solid var(--border)}
+
+/* Waiting on you */
+.sd .sd-h{font-size:1.3rem;margin:0 0 .15rem;color:var(--charcoal)}
+.sd .sd-q-lede{margin:0 0 .5rem;color:var(--text-muted);font-size:.9rem}
+.sd .sd-q-item{padding:.95rem 0;border-top:1px solid var(--border)}
+.sd .sd-q-row{display:flex;justify-content:space-between;align-items:baseline;gap:1rem}
+.sd .sd-q-code{font-weight:600;letter-spacing:.08em;color:var(--maroon-dark);font-variant-numeric:tabular-nums}
+.sd .sd-q-name{font-weight:600;margin-left:.6rem}
+.sd .sd-q-total{font-family:'Playfair Display',Georgia,serif;font-weight:700;font-size:1.1rem}
+.sd .sd-q-items{margin:.15rem 0 .65rem;color:var(--text-muted);font-size:.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sd .sd-q-actions{display:flex;gap:.5rem}
+.sd .sd-q-foot{padding-top:.85rem;border-top:1px solid var(--border);color:var(--text-muted);font-size:.88rem}
+.sd .sd-q-foot p{margin:0 0 .25rem}
+.sd .sd-q-empty{padding:1.1rem 0;border-top:1px solid var(--border);color:var(--text-muted);font-size:.93rem}
+
+/* Buttons */
+.sd .sd-btn,.sd .sd-btn-sand,.sd .sd-btn-quiet{border:1px solid transparent;border-radius:50px;padding:.38rem 1.05rem;font-size:.85rem;font-weight:600;line-height:1.4;cursor:pointer;transition:background var(--transition),color var(--transition)}
+.sd .sd-btn{background:var(--maroon-mid);color:#fff}
+.sd .sd-btn:hover{background:var(--maroon-dark)}
+.sd .sd-btn-sand{background:var(--sand-dark);color:var(--charcoal)}
+.sd .sd-btn-sand:hover{background:#dcb558}
+.sd .sd-btn-quiet{background:transparent;color:var(--text-muted);border-color:var(--border)}
+.sd .sd-btn-quiet:hover{color:var(--maroon-dark);border-color:var(--maroon-mid)}
+.sd button:focus-visible,.sd .nav-link:focus-visible,.sd input:focus-visible{outline:2px solid var(--maroon-dark);outline-offset:2px}
+
+/* Tabs */
+.sd .nav-tabs{border-bottom:1px solid var(--border);gap:1.9rem;margin-bottom:1.75rem}
+.sd .nav-tabs .nav-link{border:0;border-bottom:2px solid transparent;border-radius:0;background:none;margin-bottom:-1px;padding:.55rem 0;font-weight:600;color:var(--text-muted)}
+.sd .nav-tabs .nav-link:hover{color:var(--maroon-dark);border-bottom-color:transparent}
+.sd .nav-tabs .nav-link.active{color:var(--maroon-dark);background:none;border-bottom-color:var(--maroon-mid)}
+.sd .sd-tabn{margin-left:.35rem;font-weight:500;color:var(--text-muted)}
+.sd .sd-tabn.is-alert{background:var(--maroon-mid);color:#fff;border-radius:50px;padding:.05rem .5rem;font-size:.75rem;font-weight:600}
+
+/* Order filters */
+.sd .sd-filters{display:flex;flex-wrap:wrap;gap:1rem 1.5rem;align-items:center;justify-content:space-between;margin-bottom:.4rem}
+.sd .sd-chips{display:flex;flex-wrap:wrap;gap:.4rem}
+.sd .sd-chip{background:#fff;border:1px solid var(--border);border-radius:50px;padding:.25rem .85rem;font-size:.83rem;font-weight:600;color:var(--charcoal);cursor:pointer}
+.sd .sd-chip:hover{border-color:var(--maroon-mid)}
+.sd .sd-chip[aria-pressed="true"]{background:var(--maroon-pale);border-color:var(--maroon-mid);color:var(--maroon-dark)}
+.sd .sd-chip span{font-weight:500;color:var(--text-muted);margin-left:.25rem}
+.sd .sd-search{position:relative;min-width:240px}
+.sd .sd-search i{position:absolute;left:.8rem;top:50%;transform:translateY(-50%);color:var(--text-muted)}
+.sd .sd-search input{width:100%;padding:.45rem .9rem .45rem 2.2rem;border:1px solid var(--border);border-radius:50px;background:#fff;font-size:.9rem}
+.sd .sd-countline{margin:.7rem 0 1rem;color:var(--text-muted);font-size:.85rem}
+
+/* Pickup slips */
+.sd .slip{display:flex;background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:.9rem}
+.sd .slip[hidden]{display:none}
+.sd .slip-stub{position:relative;flex:0 0 138px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.2rem;
+  padding:1rem .75rem;background:var(--sand);border-right:2px dashed #d8cfc2}
+.sd .slip-stub::before,.sd .slip-stub::after{content:"";position:absolute;right:-9px;width:16px;height:16px;border-radius:50%;
+  background:var(--cream);border:1px solid var(--border)}
+.sd .slip-stub::before{top:-9px}
+.sd .slip-stub::after{bottom:-9px}
+.sd .slip-code{font-weight:700;font-size:1.2rem;letter-spacing:.09em;color:var(--maroon-dark);font-variant-numeric:tabular-nums}
+.sd .slip-stub small{font-size:.72rem;color:var(--text-muted)}
+.sd .slip[data-status="pending"] .slip-stub{background:var(--maroon-mid);border-right-color:rgba(255,255,255,.55)}
+.sd .slip[data-status="pending"] .slip-code,.sd .slip[data-status="pending"] .slip-stub small{color:#fff}
+.sd .slip[data-status="ready"] .slip-stub{background:var(--sand-dark)}
+.sd .slip[data-status="ready"] .slip-code{color:var(--charcoal)}
+.sd .slip[data-status="picked_up"],.sd .slip[data-status="cancelled"]{opacity:.72}
+.sd .slip[data-status="cancelled"] .slip-code{text-decoration:line-through}
+.sd .slip-main{flex:1;min-width:0;padding:1rem 1.3rem 1.05rem}
+.sd .slip-top{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start}
+.sd .slip-name{font-weight:600;font-size:1.02rem}
+.sd .slip-meta{font-size:.84rem;color:var(--text-muted);line-height:1.5}
+.sd .slip-status{font-size:.84rem;font-weight:600;white-space:nowrap}
+.sd .slip-items{list-style:none;margin:.8rem 0 0;padding:0}
+.sd .slip-items li{display:flex;align-items:baseline;gap:.5rem;font-size:.92rem;line-height:1.7}
+.sd .slip-items .lead{flex:1;border-bottom:1px dotted #c9bfb0;min-width:1rem;transform:translateY(-.2em)}
+.sd .slip-items .amt{font-variant-numeric:tabular-nums}
+.sd .slip-note{margin:.45rem 0 0;font-size:.86rem;color:var(--text-muted);font-style:italic}
+.sd .slip-foot{display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;flex-wrap:wrap;margin-top:.95rem}
+.sd .slip-total{font-family:'Playfair Display',Georgia,serif;font-weight:700;font-size:1.5rem;line-height:1.1}
+.sd .slip-when{display:block;font-family:'DM Sans',system-ui,sans-serif;font-weight:400;font-size:.78rem;color:var(--text-muted);margin-top:.2rem}
+.sd .slip-actions{display:flex;gap:.5rem;flex-wrap:wrap}
+@media (max-width:575.98px){
+  .sd .slip{flex-direction:column}
+  .sd .slip-stub{flex:none;flex-direction:row;gap:.6rem;border-right:0;border-bottom:2px dashed #d8cfc2;padding:.7rem 1rem}
+  .sd .slip[data-status="pending"] .slip-stub{border-bottom-color:rgba(255,255,255,.55)}
+  .sd .slip-stub::before,.sd .slip-stub::after{right:auto;top:auto;bottom:-9px}
+  .sd .slip-stub::before{left:-9px}
+  .sd .slip-stub::after{right:-9px}
+  .sd .sd-search{min-width:100%}
+}
+
+/* Products */
+.sd .sd-plist{background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.sd .sd-prow{border-bottom:1px solid var(--border)}
+.sd .sd-prow:last-child{border-bottom:0}
+.sd .cat-pill{background:#fff;border:1px solid var(--border);color:var(--charcoal);font-weight:600}
+.sd .cat-pill:hover{border-color:var(--maroon-mid)}
+.sd .cat-pill.active{background:var(--maroon-pale);border-color:var(--maroon-mid);color:var(--maroon-dark)}
+.sd .sd-cat-h{font-size:1.15rem;margin:0 0 .6rem;color:var(--charcoal)}
+.sd .sd-cat-h span{font-family:'DM Sans',system-ui,sans-serif;font-size:.85rem;font-weight:400;color:var(--text-muted);margin-left:.4rem}
+</style>
+
+<div class="container py-4 sd">
+
+  <header class="sd-head">
+    <h1 class="sd-title"><?= e($shop['name']) ?></h1>
+    <p class="sd-sub">
+      <?php if ($shop['is_verified']): ?>
+        <i class="bi bi-patch-check-fill me-1"></i>Verified shop. Tourists can find you and place orders.
+      <?php else: ?>
+        <i class="bi bi-hourglass-split me-1"></i>Waiting for admin verification. Tourists can't see your shop yet.
       <?php endif; ?>
-    </div>
-  </div>
-</section>
+    </p>
+  </header>
 
-<div class="container py-4">
+  <div class="sd-top">
 
-  <!-- Stats row -->
-  <div class="stat-strip mb-4" style="border-radius:var(--radius)">
-    <div class="row g-0 text-center">
-    <?php
-    $stats = [
-      ['bi-box-seam',        "Today's Orders",   $today_orders],
-      ['bi-hourglass-split', 'Pending Orders',   $pending_count],
-      ['bi-bag',             'Products Listed',  $total_products],
-    ];
-    foreach ($stats as [$ico,$lbl,$val]): ?>
-    <div class="col-4">
-      <div class="stat-item">
-        <div class="stat-item-icon"><i class="bi <?= $ico ?>"></i></div>
-        <div class="stat-num" style="font-size:1.5rem"><?= $val ?></div>
-        <div class="stat-lbl"><?= $lbl ?></div>
+    <!-- Revenue ledger -->
+    <section class="sd-ledger" aria-label="Revenue">
+      <div class="sd-periods" role="tablist">
+        <?php $first = true; foreach ($periods as $key => $per): ?>
+          <button type="button" role="tab" data-period="<?= $key ?>" aria-selected="<?= $first ? 'true' : 'false' ?>"><?= $per[0] ?></button>
+        <?php $first = false; endforeach; ?>
       </div>
-    </div>
-    <?php endforeach; ?>
-    </div>
-  </div>
 
-  <!-- Revenue: day / week / month -->
-  <div class="row g-3 mb-4">
-    <?php foreach ($revenue_cards as [$rIco, $rLbl, $rAmt, $rCnt, $rSub]): ?>
-    <div class="col-6 col-lg-3">
-      <div class="h-100 p-3" style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius)">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-          <span class="small fw-semibold text-muted text-uppercase" style="letter-spacing:.04em"><?= $rLbl ?> revenue</span>
-          <i class="bi <?= $rIco ?>" style="color:var(--maroon-mid)"></i>
+      <?php $first = true; foreach ($periods as $key => [$pLabel, $pAmt, $pCnt, $prevLabel, $prevAmt]): ?>
+      <div class="sd-period" data-period="<?= $key ?>" <?= $first ? '' : 'hidden' ?>>
+        <div class="sd-figure"><span class="sd-peso">₱</span><?= number_format((float) $pAmt, 2) ?></div>
+        <p class="sd-note">
+          <?= (int) $pCnt ?> <?= (int) $pCnt === 1 ? 'order' : 'orders' ?> picked up.
+          <?= $prevLabel ?>: ₱<?= number_format((float) $prevAmt, 2) ?>.
+        </p>
+      </div>
+      <?php $first = false; endforeach; ?>
+
+      <p class="sd-cap">Daily revenue, last 14 days</p>
+      <?php if ($daily_max > 0): ?>
+        <div class="sd-bars">
+          <?php foreach ($daily as $day): $isToday = $day['d'] === $db_today; ?>
+            <div class="sd-bar-col <?= $isToday ? 'is-today' : '' ?>"
+                 title="<?= e(date('D, M j', strtotime($day['d']))) ?>: ₱<?= number_format($day['amt'], 2) ?>">
+              <div class="sd-bar-wrap"><div class="sd-bar" style="height:<?= max(2, round($day['amt'] / $daily_max * 100)) ?>%"></div></div>
+            </div>
+          <?php endforeach; ?>
         </div>
-        <div class="fw-bold" style="font-size:1.45rem;color:var(--maroon-dark)">₱<?= number_format((float)$rAmt, 2) ?></div>
-        <div class="small text-muted"><?= (int)$rCnt ?> completed order<?= (int)$rCnt === 1 ? '' : 's' ?> · <?= e($rSub) ?></div>
+        <div class="sd-days" aria-hidden="true">
+          <?php foreach ($daily as $day): ?>
+            <span class="<?= $day['d'] === $db_today ? 'is-today' : '' ?>"><?= substr(date('D', strtotime($day['d'])), 0, 1) ?></span>
+          <?php endforeach; ?>
+        </div>
+      <?php else: ?>
+        <p class="sd-empty-bars">Nothing picked up in the last 14 days. Revenue shows up here once you mark an order as picked up.</p>
+      <?php endif; ?>
+    </section>
+
+    <!-- Waiting on you -->
+    <section aria-label="Orders waiting for you">
+      <h2 class="sd-h">Waiting on you</h2>
+      <?php if ($queue): ?>
+        <p class="sd-q-lede"><?= (int) $pending_count ?> new <?= (int) $pending_count === 1 ? 'order needs' : 'orders need' ?> an answer.</p>
+        <?php foreach ($queue as $q): ?>
+          <div class="sd-q-item">
+            <div class="sd-q-row">
+              <div><span class="sd-q-code"><?= e($q['pickup_code'] ?: '—') ?></span><span class="sd-q-name"><?= e($q['tourist_name']) ?></span></div>
+              <span class="sd-q-total">₱<?= number_format((float) $q['total_amount'], 2) ?></span>
+            </div>
+            <div class="sd-q-items"><?= e($q['summary']) ?></div>
+            <div class="sd-q-actions">
+              <?= sd_order_btn((int) $q['id'], 'confirmed', 'Accept') ?>
+              <?= sd_order_btn((int) $q['id'], 'cancelled', 'Decline', 'sd-btn-quiet') ?>
+            </div>
+          </div>
+        <?php endforeach; ?>
+        <?php if ($pending_count > count($queue)): ?>
+          <div class="sd-q-foot"><p><?= (int) $pending_count - count($queue) ?> more in the Orders tab.</p></div>
+        <?php endif; ?>
+      <?php else: ?>
+        <div class="sd-q-empty">Nothing waiting. New orders from tourists appear here as soon as they're placed.</div>
+      <?php endif; ?>
+
+      <?php
+        $prog = [];
+        if (!empty($inprog['confirmed'])) $prog[] = $inprog['confirmed'] . ' accepted';
+        if (!empty($inprog['preparing'])) $prog[] = $inprog['preparing'] . ' being prepared';
+        if (!empty($inprog['ready']))     $prog[] = $inprog['ready'] . ' ready for pickup';
+      ?>
+      <div class="sd-q-foot">
+        <?php if ($prog): ?><p>In progress: <?= implode(', ', $prog) ?>.</p><?php endif; ?>
+        <p><?= (int) $today_orders ?> <?= (int) $today_orders === 1 ? 'order' : 'orders' ?> placed today.</p>
       </div>
-    </div>
-    <?php endforeach; ?>
+    </section>
   </div>
 
-
-  <!-- Nav tabs -->
-  <ul class="nav nav-tabs mb-4" style="border-bottom:2px solid var(--border)">
+  <ul class="nav nav-tabs" role="tablist">
     <li class="nav-item">
-      <a class="nav-link active" data-bs-toggle="tab" href="#orders" style="font-weight:600">
-        <i class="bi bi-receipt me-1"></i>Orders
-        <?php if ($pending_count): ?>
-          <span class="badge rounded-pill ms-1" style="background:var(--maroon-mid);font-size:.7rem"><?= $pending_count ?></span>
-        <?php endif; ?>
-      </a>
+      <a class="nav-link active" data-bs-toggle="tab" href="#orders">Orders<?php if ($pending_count): ?><span class="sd-tabn is-alert"><?= (int) $pending_count ?></span><?php endif; ?></a>
     </li>
     <li class="nav-item">
-      <a class="nav-link" data-bs-toggle="tab" href="#products" style="font-weight:600">
-        <i class="bi bi-grid me-1"></i>Products
-      </a>
+      <a class="nav-link" data-bs-toggle="tab" href="#products">Products<span class="sd-tabn"><?= (int) $total_products ?></span></a>
     </li>
     <li class="nav-item">
-      <a class="nav-link" data-bs-toggle="tab" href="#settings" style="font-weight:600">
-        <i class="bi bi-gear me-1"></i>Shop Settings
-      </a>
+      <a class="nav-link" data-bs-toggle="tab" href="#settings">Shop settings</a>
     </li>
   </ul>
+
+  <script>
+  document.querySelectorAll('.sd-periods button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.sd-periods button').forEach(b => b.setAttribute('aria-selected', b === btn ? 'true' : 'false'));
+      document.querySelectorAll('.sd-period').forEach(p => { p.hidden = p.dataset.period !== btn.dataset.period; });
+    });
+  });
+  </script>
 
   <div class="tab-content">
 
     <!-- ── ORDERS TAB ──────────────────────────────────────── -->
     <div class="tab-pane fade show active" id="orders">
       <?php if (empty($orders)): ?>
-        <div class="text-center py-5">
-          <i class="bi bi-receipt fs-1 text-muted d-block mb-3"></i>
-          <h5>No orders yet</h5>
-          <p class="text-muted">Orders will appear here once tourists place them.</p>
+        <div class="py-5 text-center">
+          <h5 class="mb-1">No orders yet</h5>
+          <p class="text-muted mb-0">When a tourist orders from your shop, the order slip appears here with its pickup code.</p>
         </div>
       <?php else: ?>
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-          <div class="input-group" style="max-width:340px">
-            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-            <input type="text" id="orders-search" class="form-control"
-                   placeholder="Search by order #, customer, item, or status…">
+        <div class="sd-filters">
+          <div class="sd-chips" id="orders-chips">
+            <button type="button" class="sd-chip" data-status="all" aria-pressed="true">All<span><?= count($orders) ?></span></button>
+            <?php foreach ($chip_labels as $stKey => $stLabel): if (empty($status_counts[$stKey])) continue; ?>
+              <button type="button" class="sd-chip" data-status="<?= $stKey ?>" aria-pressed="false"><?= $stLabel ?><span><?= $status_counts[$stKey] ?></span></button>
+            <?php endforeach; ?>
           </div>
-          <span class="badge border text-body" style="background:#fff;border-color:var(--border)!important">
-            <span id="orders-visible-count"><?= count($orders) ?></span> / <?= count($orders) ?> shown
-          </span>
+          <label class="sd-search">
+            <i class="bi bi-search"></i>
+            <input type="search" id="orders-search" placeholder="Find an order, customer or item" aria-label="Search orders">
+          </label>
         </div>
-        <div class="d-flex flex-column gap-3" id="orders-list-body">
+        <p class="sd-countline" id="orders-count"></p>
+
+        <div id="orders-list-body">
           <?php foreach ($orders as $ord):
-            $st = order_status_meta($ord['status']);
-            $bg = $st['bg']; $fg = $st['fg'];
-            // Get items
-            $items = db_fetch_all(
-                "SELECT * FROM order_items WHERE order_id = ?",
-                [$ord['id']]
-            );
+            $st    = order_status_meta($ord['status']);
+            $items = db_fetch_all("SELECT * FROM order_items WHERE order_id = ?", [$ord['id']]);
             $itemNames = implode(' ', array_column($items, 'product_name'));
-            $orderSearchBlob = strtolower($ord['order_number'].' '.$ord['tourist_name'].' '.$ord['status'].' '.$itemNames);
+            $blob  = strtolower($ord['order_number'].' '.$ord['tourist_name'].' '.$ord['pickup_code'].' '.$ord['status'].' '.$itemNames);
+            $oid   = (int) $ord['id'];
           ?>
-          <div class="p-0 rounded overflow-hidden order-row" data-search="<?= e($orderSearchBlob) ?>"
-               style="border:1.5px solid var(--border);background:#fff">
-            <!-- Order header -->
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 p-3"
-                 style="background:var(--cream);border-bottom:1px solid var(--border)">
-              <div>
-                <span class="fw-bold" style="font-family:'Playfair Display',serif"><?= e($ord['order_number']) ?></span>
-                <span class="ms-2" style="background:<?= $bg ?>;color:<?= $fg ?>;padding:.2rem .7rem;border-radius:20px;font-size:.75rem;font-weight:700">
-                  <i class="bi <?= $st['icon'] ?> me-1"></i><?= ucfirst($ord['status']) ?>
-                </span>
-              </div>
-              <div class="text-muted small">
-                <i class="bi bi-clock me-1"></i><?= date('M d, Y g:i A', strtotime($ord['created_at'])) ?>
-              </div>
+          <article class="slip order-row" data-status="<?= e($ord['status']) ?>" data-search="<?= e($blob) ?>">
+            <div class="slip-stub">
+              <span class="slip-code"><?= e($ord['pickup_code'] ?: '—') ?></span>
+              <small>pickup code</small>
             </div>
-
-            <div class="p-3">
-              <div class="row g-3">
-                <!-- Tourist info -->
-                <div class="col-sm-4">
-                  <div class="small text-muted mb-1 fw-600">Customer</div>
-                  <div class="fw-bold"><?= e($ord['tourist_name']) ?></div>
-                  <?php if ($ord['tourist_phone']): ?>
-                  <div class="small text-muted"><i class="bi bi-telephone me-1"></i><?= e($ord['tourist_phone']) ?></div>
-                  <?php endif; ?>
-                  <?php if ($ord['pickup_date']): ?>
-                  <div class="small text-muted mt-1">
-                    <i class="bi bi-calendar me-1"></i>Pickup: <?= date('M d', strtotime($ord['pickup_date'])) ?>
-                    <?= $ord['pickup_time'] ? ' at '.date('g:i A', strtotime($ord['pickup_time'])) : '' ?>
+            <div class="slip-main">
+              <div class="slip-top">
+                <div>
+                  <div class="slip-name"><?= e($ord['tourist_name']) ?></div>
+                  <div class="slip-meta">
+                    <?php if ($ord['tourist_phone']): ?><?= e($ord['tourist_phone']) ?><br><?php endif; ?>
+                    <?php if ($ord['pickup_date']): ?>
+                      Pickup <?= date('D, M j', strtotime($ord['pickup_date'])) ?><?= $ord['pickup_time'] ? ' at '.date('g:i A', strtotime($ord['pickup_time'])) : '' ?>
+                    <?php endif; ?>
                   </div>
-                  <?php endif; ?>
-                  <?php if ($ord['pickup_code']): ?>
-                  <div class="mt-1">
-                    <span style="background:var(--maroon-pale);color:var(--maroon-dark);padding:.25rem .75rem;border-radius:8px;font-family:monospace;font-weight:700;font-size:.95rem;letter-spacing:.1em">
-                      <?= e($ord['pickup_code']) ?>
-                    </span>
-                  </div>
-                  <?php endif; ?>
                 </div>
+                <span class="slip-status" style="color:<?= $st['fg'] ?>"><i class="bi <?= $st['icon'] ?> me-1"></i><?= e($chip_labels[$ord['status']] ?? ucfirst($ord['status'])) ?></span>
+              </div>
 
-                <!-- Items -->
-                <div class="col-sm-4">
-                  <div class="small text-muted mb-1 fw-600">Items</div>
-                  <?php foreach ($items as $item): ?>
-                  <div class="small d-flex justify-content-between">
-                    <span><?= e($item['product_name']) ?> × <?= $item['quantity'] ?></span>
-                    <span class="fw-600">₱<?= number_format($item['subtotal'], 2) ?></span>
-                  </div>
-                  <?php endforeach; ?>
-                  <?php if ($ord['special_notes']): ?>
-                  <div class="small text-muted mt-1 fst-italic"><i class="bi bi-chat-left-text me-1"></i><?= e($ord['special_notes']) ?></div>
-                  <?php endif; ?>
+              <ul class="slip-items">
+                <?php foreach ($items as $item): ?>
+                  <li><span><?= e($item['product_name']) ?> × <?= (int) $item['quantity'] ?></span><span class="lead"></span><span class="amt">₱<?= number_format($item['subtotal'], 2) ?></span></li>
+                <?php endforeach; ?>
+              </ul>
+              <?php if ($ord['special_notes']): ?>
+                <p class="slip-note">Note from customer: <?= e($ord['special_notes']) ?></p>
+              <?php endif; ?>
+
+              <div class="slip-foot">
+                <div class="slip-total">₱<?= number_format($ord['total_amount'], 2) ?>
+                  <span class="slip-when">Order <?= e($ord['order_number']) ?>, placed <?= date('M j, g:i A', strtotime($ord['created_at'])) ?></span>
                 </div>
-
-                <!-- Total + Actions -->
-                <div class="col-sm-4 d-flex flex-column align-items-end justify-content-between">
-                  <div class="text-end">
-                    <div class="small text-muted">Total</div>
-                    <div class="fw-bold fs-5" style="color:var(--maroon-dark)">₱<?= number_format($ord['total_amount'],2) ?></div>
-                  </div>
-
-                  <!-- Status update buttons -->
+                <div class="slip-actions">
                   <?php if ($ord['status'] === 'pending'): ?>
-                  <div class="d-flex gap-2 mt-2">
-                    <form method="POST"><?= csrf_field() ?>
-                      <input type="hidden" name="action"   value="update_order">
-                      <input type="hidden" name="order_id" value="<?= $ord['id'] ?>">
-                      <input type="hidden" name="status"   value="confirmed">
-                      <button class="btn btn-sm" style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-pill)">
-                        <i class="bi bi-check me-1"></i>Accept
-                      </button>
-                    </form>
-                    <form method="POST"><?= csrf_field() ?>
-                      <input type="hidden" name="action"   value="update_order">
-                      <input type="hidden" name="order_id" value="<?= $ord['id'] ?>">
-                      <input type="hidden" name="status"   value="cancelled">
-                      <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill)">
-                        Decline
-                      </button>
-                    </form>
-                  </div>
+                    <?= sd_order_btn($oid, 'confirmed', 'Accept') ?>
+                    <?= sd_order_btn($oid, 'cancelled', 'Decline', 'sd-btn-quiet') ?>
                   <?php elseif ($ord['status'] === 'confirmed'): ?>
-                  <form method="POST" class="mt-2"><?= csrf_field() ?>
-                    <input type="hidden" name="action"   value="update_order">
-                    <input type="hidden" name="order_id" value="<?= $ord['id'] ?>">
-                    <input type="hidden" name="status"   value="preparing">
-                    <button class="btn btn-sm" style="background:var(--sand-dark);color:var(--maroon-dark);font-weight:600;border-radius:var(--radius-pill)">
-                      <i class="bi bi-fire me-1"></i>Start Preparing
-                    </button>
-                  </form>
+                    <?= sd_order_btn($oid, 'preparing', 'Start preparing', 'sd-btn-sand') ?>
                   <?php elseif ($ord['status'] === 'preparing'): ?>
-                  <form method="POST" class="mt-2"><?= csrf_field() ?>
-                    <input type="hidden" name="action"   value="update_order">
-                    <input type="hidden" name="order_id" value="<?= $ord['id'] ?>">
-                    <input type="hidden" name="status"   value="ready">
-                    <button class="btn btn-sm" style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-pill)">
-                      <i class="bi bi-box-seam me-1"></i>Mark Ready
-                    </button>
-                  </form>
+                    <?= sd_order_btn($oid, 'ready', 'Mark ready') ?>
                   <?php elseif ($ord['status'] === 'ready'): ?>
-                  <form method="POST" class="mt-2"><?= csrf_field() ?>
-                    <input type="hidden" name="action"   value="update_order">
-                    <input type="hidden" name="order_id" value="<?= $ord['id'] ?>">
-                    <input type="hidden" name="status"   value="picked_up">
-                    <button class="btn btn-sm" style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-pill)">
-                      <i class="bi bi-check2-circle me-1"></i>Mark Picked Up
-                    </button>
-                  </form>
+                    <?= sd_order_btn($oid, 'picked_up', 'Mark picked up') ?>
                   <?php endif; ?>
                 </div>
               </div>
             </div>
-          </div>
+          </article>
           <?php endforeach; ?>
         </div>
+
         <div class="text-center mt-3">
-          <button type="button" id="orders-show-more" class="btn btn-outline-secondary btn-sm">
-            Show more <i class="bi bi-chevron-down ms-1"></i>
-          </button>
-          <div id="orders-no-results" class="text-muted small py-3 d-none">
-            <i class="bi bi-search me-1"></i>No orders match "<span id="orders-no-results-query"></span>".
-          </div>
+          <button type="button" id="orders-show-more" class="sd-btn-quiet">Show more orders</button>
+          <p id="orders-no-results" class="text-muted py-3 mb-0" hidden>No orders match. Try a different status or search.</p>
         </div>
+
         <script>
         (function () {
-          const PAGE_SIZE = 10;
-          const rows = Array.from(document.querySelectorAll('#orders-list-body .order-row'));
-          const searchInput = document.getElementById('orders-search');
-          const showMoreBtn = document.getElementById('orders-show-more');
-          const visibleCountEl = document.getElementById('orders-visible-count');
-          const noResultsEl = document.getElementById('orders-no-results');
-          const noResultsQueryEl = document.getElementById('orders-no-results-query');
-          let shownCount = PAGE_SIZE;
+          const PAGE = 10;
+          const rows   = Array.from(document.querySelectorAll('#orders-list-body .order-row'));
+          const chips  = Array.from(document.querySelectorAll('#orders-chips .sd-chip'));
+          const search = document.getElementById('orders-search');
+          const more   = document.getElementById('orders-show-more');
+          const none   = document.getElementById('orders-no-results');
+          const count  = document.getElementById('orders-count');
+          let status = 'all', query = '', shown = PAGE;
 
-          function renderPaged() {
-            rows.forEach((row, i) => { row.style.display = i < shownCount ? '' : 'none'; });
-            visibleCountEl.textContent = Math.min(shownCount, rows.length);
-            showMoreBtn.classList.toggle('d-none', shownCount >= rows.length);
-            noResultsEl.classList.add('d-none');
+          function apply() {
+            const matches = rows.filter(r =>
+              (status === 'all' || r.dataset.status === status) &&
+              (!query || r.dataset.search.includes(query)));
+            const filtering = status !== 'all' || query !== '';
+            const limit = filtering ? matches.length : Math.min(shown, matches.length);
+            rows.forEach(r => { r.hidden = true; });
+            matches.slice(0, limit).forEach(r => { r.hidden = false; });
+            more.hidden = filtering || shown >= matches.length;
+            none.hidden = matches.length > 0;
+            count.textContent = 'Showing ' + limit + ' of ' + matches.length +
+              (!filtering && rows.length >= 50 ? ' (your latest 50 orders)' : '');
           }
-          function renderSearch(query) {
-            let matches = 0;
-            rows.forEach(row => {
-              const isMatch = row.dataset.search.includes(query);
-              row.style.display = isMatch ? '' : 'none';
-              if (isMatch) matches++;
-            });
-            visibleCountEl.textContent = matches;
-            showMoreBtn.classList.add('d-none');
-            noResultsEl.classList.toggle('d-none', matches > 0);
-            noResultsQueryEl.textContent = query;
-          }
-          showMoreBtn.addEventListener('click', () => {
-            shownCount = Math.min(shownCount + PAGE_SIZE, rows.length);
-            renderPaged();
-          });
-          searchInput.addEventListener('input', () => {
-            const query = searchInput.value.trim().toLowerCase();
-            if (query) renderSearch(query); else { shownCount = PAGE_SIZE; renderPaged(); }
-          });
-          renderPaged();
+          chips.forEach(chip => chip.addEventListener('click', () => {
+            status = chip.dataset.status;
+            chips.forEach(c => c.setAttribute('aria-pressed', c === chip ? 'true' : 'false'));
+            apply();
+          }));
+          search.addEventListener('input', () => { query = search.value.trim().toLowerCase(); apply(); });
+          more.addEventListener('click', () => { shown += PAGE; apply(); });
+          apply();
         })();
         </script>
       <?php endif; ?>
@@ -627,7 +752,7 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="col-lg-4">
           <div class="form-panel">
             <h6 class="fw-bold mb-3" style="color:var(--maroon-dark);font-family:'Playfair Display',serif">
-              <i class="bi bi-plus-circle me-2" style="color:var(--maroon-mid)"></i>Add New Product
+              Add a product
             </h6>
             <form method="POST" enctype="multipart/form-data"><?= csrf_field() ?>
               <input type="hidden" name="action" value="add_product">
@@ -663,7 +788,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <div class="form-text">Use 999 for unlimited stock.</div>
               </div>
               <button type="submit" class="btn btn-primary-app w-100">
-                <i class="bi bi-plus-lg me-2"></i>Add Product
+                Add product
               </button>
             </form>
           </div>
@@ -673,9 +798,8 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="col-lg-8">
           <?php if (empty($products)): ?>
           <div class="text-center py-5">
-            <i class="bi bi-box-seam fs-1 text-muted d-block mb-3"></i>
-            <h5>No products yet</h5>
-            <p class="text-muted">Add your first product using the form.</p>
+            <h5 class="mb-1">Your shop has no products yet</h5>
+            <p class="text-muted mb-0">Add your first product with the form. It shows up for tourists right away.</p>
           </div>
           <?php else: ?>
           <!-- Category filter -->
@@ -687,21 +811,14 @@ require_once __DIR__ . '/../includes/header.php';
                       style="border-radius:var(--radius-pill);font-size:.78rem"><?= e($cName) ?> (<?= count($cList) ?>)</button>
             <?php endforeach; ?>
           </div>
-          <style>
-            .cat-pill{background:#fff;border:1.5px solid var(--border);color:var(--maroon-dark);font-weight:600}
-            .cat-pill.active{background:var(--maroon-mid);border-color:var(--maroon-mid);color:#fff}
-          </style>
 
           <div>
           <?php foreach ($product_groups as $cName => $cList): ?>
           <div class="product-cat-group mb-4" data-cat="<?= e($cName) ?>">
-            <h6 class="fw-bold mb-2" style="color:var(--maroon-dark);font-family:'Playfair Display',serif">
-              <?= e($cName) ?> <span class="text-muted fw-normal small">· <?= count($cList) ?></span>
-            </h6>
-          <div class="d-flex flex-column gap-2">
+            <h3 class="sd-cat-h"><?= e($cName) ?><span><?= count($cList) ?></span></h3>
+          <div class="sd-plist">
             <?php foreach ($cList as $p): $pPhotos = $product_photos[$p['id']] ?? []; ?>
-            <div style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;
-                        opacity:<?= $p['is_available'] ? '1' : '.55' ?>">
+            <div class="sd-prow" style="opacity:<?= $p['is_available'] ? '1' : '.55' ?>">
               <div class="d-flex align-items-center gap-3 p-3">
                 <?php if (!empty($p['image_url'])): ?>
                   <img src="<?= e($p['image_url']) ?>" alt="<?= e($p['name']) ?>"
@@ -730,7 +847,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <span>Stock: <?= $p['stock'] >= 999 ? '∞' : $p['stock'] ?></span>
                   </div>
                 </div>
-                <div class="fw-bold" style="color:var(--maroon-mid);font-size:1rem;white-space:nowrap">
+                <div style="font-family:'Playfair Display',serif;font-weight:700;color:var(--charcoal);font-size:1.05rem;white-space:nowrap">
                   ₱<?= number_format($p['price'],2) ?>
                 </div>
                 <div class="d-flex gap-2 flex-shrink-0">
