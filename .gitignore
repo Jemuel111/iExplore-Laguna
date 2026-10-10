@@ -12,3 +12,5 @@ Thumbs.db
 
 # Composer, if added later
 
+   /uploads/*
+   !/uploads/.htaccess
