@@ -1029,6 +1029,69 @@ function get_budget_level_ranges(): array {
  *                            the existing photo"). Calls json_error() /
  *                            dies with a message on validation failure.
  */
+/**
+ * Shrink and re-compress an uploaded photo in place. Phone photos are often
+ * 3-12 megapixels; cards and galleries never need more than ~1600px, so
+ * serving the original wastes bandwidth and makes pages feel slow.
+ * Keeps the same file type. Returns true if the file was rewritten, and
+ * quietly leaves the original untouched if GD is missing or anything fails.
+ */
+function optimize_uploaded_image(string $path, string $mime, int $maxSide = 1600): bool {
+    if (!function_exists('imagecreatetruecolor')) return false;
+    $info = @getimagesize($path);
+    if (!$info) return false;
+    [$w, $h] = $info;
+    $bytes = (int) @filesize($path);
+    // Already small? Leave it alone.
+    if ($w <= $maxSide && $h <= $maxSide && $bytes <= 400 * 1024) return false;
+    // Decoding costs roughly 5 bytes per pixel; skip absurd sizes instead of risking the memory limit.
+    if ($w * $h > 40000000) return false;
+
+    switch ($mime) {
+        case 'image/jpeg': $src = @imagecreatefromjpeg($path); break;
+        case 'image/png':  $src = @imagecreatefrompng($path);  break;
+        case 'image/webp': $src = function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($path) : false; break;
+        default: return false;
+    }
+    if (!$src) return false;
+
+    // Phones store rotation in EXIF data, which re-encoding drops, so apply it now.
+    if ($mime === 'image/jpeg' && function_exists('exif_read_data')) {
+        $exif  = @exif_read_data($path);
+        $angle = [3 => 180, 6 => -90, 8 => 90][$exif['Orientation'] ?? 1] ?? 0;
+        if ($angle) {
+            $rot = @imagerotate($src, $angle, 0);
+            if ($rot) { imagedestroy($src); $src = $rot; }
+        }
+    }
+
+    $sw = imagesx($src);
+    $sh = imagesy($src);
+    $scale = min(1, $maxSide / max($sw, $sh));
+    $nw = max(1, (int) round($sw * $scale));
+    $nh = max(1, (int) round($sh * $scale));
+
+    $dst = imagecreatetruecolor($nw, $nh);
+    if ($mime !== 'image/jpeg') { // keep transparency for PNG / WEBP
+        imagealphablending($dst, false);
+        imagesavealpha($dst, true);
+        imagefilledrectangle($dst, 0, 0, $nw, $nh, imagecolorallocatealpha($dst, 0, 0, 0, 127));
+    }
+    imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $sw, $sh);
+    imagedestroy($src);
+
+    $tmp = $path . '.tmp';
+    if     ($mime === 'image/jpeg') { $ok = imagejpeg($dst, $tmp, 82); }
+    elseif ($mime === 'image/png')  { $ok = imagepng($dst, $tmp, 7); }
+    else                            { $ok = function_exists('imagewebp') && imagewebp($dst, $tmp, 80); }
+    imagedestroy($dst);
+
+    if (!$ok || !is_file($tmp)) { @unlink($tmp); return false; }
+    // Keep the new file only if it helped (smaller, or at least resized).
+    if ($scale === 1 && filesize($tmp) >= $bytes) { @unlink($tmp); return false; }
+    return @rename($tmp, $path);
+}
+
 function handle_image_upload(string $fieldName, string $subfolder): ?string {
     if (empty($_FILES[$fieldName]) || $_FILES[$fieldName]['error'] === UPLOAD_ERR_NO_FILE) {
         return null; // no file chosen — not an error, just nothing to do
@@ -1077,6 +1140,9 @@ function handle_image_upload(string $fieldName, string $subfolder): ?string {
     if (!move_uploaded_file($file['tmp_name'], $destPath)) {
         throw new RuntimeException('Could not save the uploaded file. Please try again.');
     }
+
+    // Shrink big phone photos so pages stay fast (no-op for small images).
+    optimize_uploaded_image($destPath, $mime);
 
     // Root-relative, NOT a full URL with the domain baked in. A path like
     // "/uploads/spots/xyz.jpg" resolves correctly against whatever host is

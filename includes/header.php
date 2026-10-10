@@ -99,12 +99,28 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <!-- Bootstrap Icons -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<?php
+  // Only the pages that draw a map need Leaflet (about 150 KB). Everything else skips it.
+  if (!function_exists('page_needs_leaflet')) {
+      function page_needs_leaflet(): bool {
+          return in_array(basename($_SERVER['SCRIPT_NAME'] ?? ''), [
+              'explore.php', 'hotel.php', 'hotels.php', 'package.php', 'planner.php',
+              'shop.php', 'shops.php', 'spot-detail.php', 'spots.php',
+          ], true);
+      }
+  }
+  $__css_file = __DIR__ . '/../assets/css/app.css';
+  $__css_ver  = is_file($__css_file) ? filemtime($__css_file) : 1;
+?>
+<?php if (page_needs_leaflet()): ?>
   <!-- Leaflet CSS — must load before any map renders -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<?php endif; ?>
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- App CSS -->
-  <link rel="stylesheet" href="<?= APP_URL ?>/assets/css/app.css">
+  <link rel="stylesheet" href="<?= APP_URL ?>/assets/css/app.css?v=<?= $__css_ver ?>">
 </head>
 <body style="<?= $__theme_css ?>">
 

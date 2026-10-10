@@ -22,15 +22,21 @@ ServerSignature Off
 
 # ── Enable Gzip compression ───────────────────────────────
 <IfModule mod_deflate.c>
-  AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json
+  AddOutputFilterByType DEFLATE text/html text/plain text/css text/javascript application/javascript application/json image/svg+xml
 </IfModule>
 
 # ── Cache static assets ───────────────────────────────────
 <IfModule mod_expires.c>
   ExpiresActive On
-  ExpiresByType text/css               "access plus 1 week"
-  ExpiresByType application/javascript "access plus 1 week"
+  # CSS/JS links carry a ?v=<file time> stamp, so a long cache is safe: edits show up immediately.
+  ExpiresByType text/css               "access plus 1 month"
+  ExpiresByType text/javascript        "access plus 1 month"
+  ExpiresByType application/javascript "access plus 1 month"
   ExpiresByType image/jpeg             "access plus 1 month"
   ExpiresByType image/png              "access plus 1 month"
   ExpiresByType image/webp             "access plus 1 month"
+  ExpiresByType image/gif              "access plus 1 month"
+  ExpiresByType image/svg+xml          "access plus 1 month"
+  ExpiresByType image/x-icon           "access plus 1 month"
+  ExpiresByType image/vnd.microsoft.icon "access plus 1 month"
 </IfModule>

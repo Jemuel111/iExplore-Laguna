@@ -121,10 +121,13 @@
 
 <!-- Bootstrap JS bundle -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<!-- Leaflet JS -->
+<?php if (!function_exists('page_needs_leaflet') || page_needs_leaflet()): ?>
+<!-- Leaflet JS (map pages only) -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<?php endif; ?>
 <!-- App JS -->
-<script src="<?= APP_URL ?>/assets/js/app.js"></script>
+<?php $__js_file = __DIR__ . '/../assets/js/app.js'; ?>
+<script src="<?= APP_URL ?>/assets/js/app.js?v=<?= is_file($__js_file) ? filemtime($__js_file) : 1 ?>"></script>
 
 </body>
 </html>
