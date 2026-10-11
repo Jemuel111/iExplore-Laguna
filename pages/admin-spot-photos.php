@@ -289,7 +289,8 @@ require_once __DIR__ . '/../includes/header.php';
 
     document.querySelectorAll('.picker-row').forEach(row => {
       const match = !q || row.dataset.name.includes(q) || row.dataset.city.includes(q);
-      row.style.display = match ? '' : 'none';
+      // d-none, not style.display: the rows use Bootstrap's d-flex, whose !important beats an inline display
+      row.classList.toggle('d-none', !match);
       if (match) anyVisible = true;
     });
 
@@ -297,10 +298,10 @@ require_once __DIR__ . '/../includes/header.php';
       let el = header.nextElementSibling;
       let hasVisibleRow = false;
       while (el && !el.hasAttribute('data-city-header')) {
-        if (el.classList.contains('picker-row') && el.style.display !== 'none') hasVisibleRow = true;
+        if (el.classList.contains('picker-row') && !el.classList.contains('d-none')) hasVisibleRow = true;
         el = el.nextElementSibling;
       }
-      header.style.display = hasVisibleRow ? '' : 'none';
+      header.classList.toggle('d-none', !hasVisibleRow);
     });
 
     if (noResults) noResults.classList.toggle('d-none', anyVisible);
