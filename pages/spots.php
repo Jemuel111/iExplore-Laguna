@@ -13,6 +13,7 @@ $filter_cat  = input('category', 'get', '');
 $filter_free = input('free', 'get', '');
 $filter_sort = input('sort', 'get', 'rating');
 $view_mode   = input('view', 'get', 'grid'); // grid | list
+$filter_q    = mb_substr(trim((string) input('q', 'get', '')), 0, 80); // search text
 
 // Pagination
 $per_page    = 12;
@@ -33,6 +34,11 @@ if ($filter_cat) {
 }
 if ($filter_free === '1') {
     $where[] = 's.entrance_fee = 0';
+}
+if ($filter_q !== '') {
+    $like = '%' . addcslashes($filter_q, '%_\\') . '%';
+    $where[] = '(s.name LIKE ? OR s.description LIKE ? OR s.category LIKE ? OR c.name LIKE ?)';
+    array_push($params, $like, $like, $like, $like);
 }
 
 $where_sql = implode(' AND ', $where);
@@ -93,7 +99,7 @@ $cities = db_fetch_all("SELECT id, name, slug FROM cities ORDER BY name");
 
 // Build base query string (no page param) for pagination links
 $base_qs = http_build_query(array_filter([
-    'city' => $filter_city, 'category' => $filter_cat,
+    'q' => $filter_q, 'city' => $filter_city, 'category' => $filter_cat,
     'free' => $filter_free, 'sort' => $filter_sort !== 'rating' ? $filter_sort : '',
     'view' => $view_mode !== 'grid' ? $view_mode : '',
 ]));
@@ -121,10 +127,10 @@ $base_qs = http_build_query(array_filter([
 
       <!-- Category pills -->
       <div class="d-flex gap-1 flex-wrap flex-grow-1">
-        <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'free'=>$filter_free,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>"
+        <a href="?<?= http_build_query(array_filter(['q'=>$filter_q,'city'=>$filter_city,'free'=>$filter_free,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>"
            class="filter-pill <?= !$filter_cat ? 'active' : '' ?>">All</a>
         <?php foreach (spot_categories() as $val => $meta): ?>
-        <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'category'=>$val,'free'=>$filter_free,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>"
+        <a href="?<?= http_build_query(array_filter(['q'=>$filter_q,'city'=>$filter_city,'category'=>$val,'free'=>$filter_free,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>"
            class="filter-pill <?= $filter_cat === $val ? 'active' : '' ?>">
           <i class="bi <?= $meta['icon'] ?> me-1"></i><?= $meta['label'] ?>
         </a>
@@ -142,15 +148,15 @@ $base_qs = http_build_query(array_filter([
 
         <!-- View toggle -->
         <div class="btn-group btn-group-sm" role="group">
-          <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'category'=>$filter_cat,'free'=>$filter_free,'sort'=>$filter_sort!=='rating'?$filter_sort:''])) ?>"
+          <a href="?<?= http_build_query(array_filter(['q'=>$filter_q,'city'=>$filter_city,'category'=>$filter_cat,'free'=>$filter_free,'sort'=>$filter_sort!=='rating'?$filter_sort:''])) ?>"
              class="btn btn-outline-secondary <?= $view_mode==='grid'?'active':'' ?>" title="Grid view">
             <i class="bi bi-grid-3x3-gap"></i>
           </a>
-          <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'category'=>$filter_cat,'free'=>$filter_free,'sort'=>$filter_sort!=='rating'?$filter_sort:'','view'=>'list'])) ?>"
+          <a href="?<?= http_build_query(array_filter(['q'=>$filter_q,'city'=>$filter_city,'category'=>$filter_cat,'free'=>$filter_free,'sort'=>$filter_sort!=='rating'?$filter_sort:'','view'=>'list'])) ?>"
              class="btn btn-outline-secondary <?= $view_mode==='list'?'active':'' ?>" title="List view">
             <i class="bi bi-list-ul"></i>
           </a>
-          <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'category'=>$filter_cat,'free'=>$filter_free,'sort'=>$filter_sort!=='rating'?$filter_sort:'','view'=>'map'])) ?>"
+          <a href="?<?= http_build_query(array_filter(['q'=>$filter_q,'city'=>$filter_city,'category'=>$filter_cat,'free'=>$filter_free,'sort'=>$filter_sort!=='rating'?$filter_sort:'','view'=>'map'])) ?>"
              class="btn btn-outline-secondary <?= $view_mode==='map'?'active':'' ?>" title="Map view">
             <i class="bi bi-pin-map"></i>
           </a>
@@ -173,6 +179,13 @@ $base_qs = http_build_query(array_filter([
 
       <form method="GET" action="">
         <input type="hidden" name="view" value="<?= e($view_mode) ?>">
+
+        <!-- Search -->
+        <div class="mb-3">
+          <label class="form-label" for="spot-search">Search</label>
+          <input type="search" class="form-control form-control-sm" id="spot-search" name="q"
+                 value="<?= e($filter_q) ?>" maxlength="80" placeholder="Name, place or keyword">
+        </div>
 
         <!-- City filter -->
         <div class="mb-3">
@@ -267,29 +280,34 @@ $base_qs = http_build_query(array_filter([
     <?php elseif (empty($spots)): ?>
       <div class="text-center py-5">
         <i class="bi bi-geo-alt fs-1 text-muted d-block mb-3"></i>
-        <h5 class="fw-bold">No spots found</h5>
-        <p class="text-muted">Try adjusting your filters.</p>
+        <h5 class="fw-bold">No spots found<?= $filter_q !== '' ? ' for "' . e($filter_q) . '"' : '' ?></h5>
+        <p class="text-muted">Try a different word, or adjust your filters.</p>
         <a href="spots.php" class="btn btn-primary-app">View All Spots</a>
       </div>
     <?php else: ?>
 
     <!-- Active filter pills -->
-    <?php if ($filter_city || $filter_cat || $filter_free): ?>
+    <?php if ($filter_city || $filter_cat || $filter_free || $filter_q !== ''): ?>
     <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
       <span class="text-muted small">Active:</span>
+      <?php if ($filter_q !== ''): ?>
+        <span class="badge rounded-pill" style="background:var(--maroon-pale);color:var(--maroon-dark);padding:.35rem .85rem">
+          <i class="bi bi-search me-1"></i>"<?= e($filter_q) ?>" <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'category'=>$filter_cat,'free'=>$filter_free,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>" class="text-decoration-none ms-1" style="color:var(--maroon-dark)" aria-label="Clear search">&times;</a>
+        </span>
+      <?php endif; ?>
       <?php if ($filter_city): ?>
         <span class="badge rounded-pill" style="background:var(--maroon-pale);color:var(--maroon-dark);padding:.35rem .85rem">
-          <i class="bi bi-geo-alt-fill me-1"></i><?= e($filter_city) ?> <a href="?<?= http_build_query(array_filter(['category'=>$filter_cat,'free'=>$filter_free,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>" class="text-decoration-none ms-1" style="color:var(--maroon-dark)">×</a>
+          <i class="bi bi-geo-alt-fill me-1"></i><?= e($filter_city) ?> <a href="?<?= http_build_query(array_filter(['q'=>$filter_q,'category'=>$filter_cat,'free'=>$filter_free,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>" class="text-decoration-none ms-1" style="color:var(--maroon-dark)">×</a>
         </span>
       <?php endif; ?>
       <?php if ($filter_cat): ?>
         <span class="badge rounded-pill" style="background:var(--maroon-pale);color:var(--maroon-dark);padding:.35rem .85rem">
-          <i class="bi <?= spot_category_icon($filter_cat) ?> me-1"></i><?= e(spot_category_label($filter_cat)) ?> <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'free'=>$filter_free,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>" class="text-decoration-none ms-1" style="color:var(--maroon-dark)">×</a>
+          <i class="bi <?= spot_category_icon($filter_cat) ?> me-1"></i><?= e(spot_category_label($filter_cat)) ?> <a href="?<?= http_build_query(array_filter(['q'=>$filter_q,'city'=>$filter_city,'free'=>$filter_free,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>" class="text-decoration-none ms-1" style="color:var(--maroon-dark)">×</a>
         </span>
       <?php endif; ?>
       <?php if ($filter_free): ?>
         <span class="badge rounded-pill" style="background:var(--maroon-pale);color:var(--maroon-dark);padding:.35rem .85rem">
-          <i class="bi bi-check-circle-fill me-1"></i>Free Entry <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'category'=>$filter_cat,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>" class="text-decoration-none ms-1" style="color:var(--maroon-dark)">×</a>
+          <i class="bi bi-check-circle-fill me-1"></i>Free Entry <a href="?<?= http_build_query(array_filter(['q'=>$filter_q,'city'=>$filter_city,'category'=>$filter_cat,'view'=>$view_mode!=='grid'?$view_mode:''])) ?>" class="text-decoration-none ms-1" style="color:var(--maroon-dark)">×</a>
         </span>
       <?php endif; ?>
     </div>

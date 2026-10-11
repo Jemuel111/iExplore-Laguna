@@ -13,6 +13,7 @@ $filter_city   = input('city',      'get', '');
 $filter_stars  = (int) input('stars',     'get', 0);
 $filter_budget = (int) input('max_price', 'get', 0);
 $filter_sort   = input('sort',      'get', 'stars');
+$filter_q      = mb_substr(trim((string) input('q', 'get', '')), 0, 80); // search text
 $view_mode     = input('view',      'get', 'grid');
 
 // Amenities come in as a checkbox array (amenities[]=X&amenities[]=Y),
@@ -40,6 +41,11 @@ if ($filter_budget) {
     $where[]  = 'h.price_min <= ?';
     $params[] = $filter_budget;
 }
+if ($filter_q !== '') {
+    $like = '%' . addcslashes($filter_q, '%_\\') . '%';
+    $where[] = '(h.name LIKE ? OR h.address LIKE ? OR h.description LIKE ? OR c.name LIKE ?)';
+    array_push($params, $like, $like, $like, $like);
+}
 if (!empty($filter_amenities)) {
     $placeholders = implode(',', array_fill(0, count($filter_amenities), '?'));
     $where[]  = "(SELECT COUNT(DISTINCT label) FROM hotel_amenities WHERE hotel_id = h.id AND label IN ($placeholders)) = ?";
@@ -49,13 +55,6 @@ if (!empty($filter_amenities)) {
 
 $where_sql = implode(' AND ', $where);
 
-// Guest rating = live average of approved reviews (hotels.star_rating stays the
-// official star class and is not overwritten). Computed on the fly, so it can't go stale.
-ensure_hotel_reviews_table();
-$guest_join = "LEFT JOIN (SELECT hotel_id, AVG(rating) AS avg_rating, COUNT(*) AS review_count
-                           FROM hotel_reviews WHERE is_approved = 1 GROUP BY hotel_id) gr
-                 ON gr.hotel_id = h.id";
-
 if ($filter_sort === 'price_asc') {
     $order_sql = 'h.price_min ASC';
 } elseif ($filter_sort === 'price_desc') {
@@ -63,9 +62,7 @@ if ($filter_sort === 'price_asc') {
 } elseif ($filter_sort === 'name') {
     $order_sql = 'h.name ASC';
 } else {
-    // "Top Rated": guest reviews weighted against the star class (counts as 3 votes),
-    // so one lone review can't outrank an established hotel.
-    $order_sql = '((COALESCE(gr.avg_rating * gr.review_count, 0) + h.star_rating * 3) / (COALESCE(gr.review_count, 0) + 3)) DESC, h.price_min ASC';
+    $order_sql = 'h.star_rating DESC, h.price_min ASC';
 }
 
 // Total count
@@ -79,11 +76,9 @@ $page = min($page, $total_pages);
 $offset = ($page - 1) * $per_page;
 
 $hotels = db_fetch_all(
-    "SELECT h.*, c.name AS city_name, c.slug AS city_slug,
-            gr.avg_rating, COALESCE(gr.review_count, 0) AS review_count
+    "SELECT h.*, c.name AS city_name, c.slug AS city_slug
      FROM hotels h
      JOIN cities c ON h.city_id = c.id
-     {$guest_join}
      WHERE {$where_sql}
      ORDER BY {$order_sql}
      LIMIT {$per_page} OFFSET {$offset}",
@@ -94,11 +89,9 @@ $hotels = db_fetch_all(
 $map_hotels = [];
 if ($view_mode === 'map') {
     $map_hotels = db_fetch_all(
-        "SELECT h.id, h.name, h.star_rating, h.price_min, h.latitude, h.longitude, c.name AS city_name,
-                gr.avg_rating, COALESCE(gr.review_count, 0) AS review_count
+        "SELECT h.id, h.name, h.star_rating, h.price_min, h.latitude, h.longitude, c.name AS city_name
          FROM hotels h
          JOIN cities c ON h.city_id = c.id
-         {$guest_join}
          WHERE {$where_sql} AND h.latitude IS NOT NULL AND h.longitude IS NOT NULL
          ORDER BY {$order_sql}",
         $params
@@ -147,7 +140,7 @@ if (!empty($hotels)) {
 }
 
 $base_qs = http_build_query(array_filter([
-    'city' => $filter_city, 'stars' => $filter_stars ?: '',
+    'q' => $filter_q, 'city' => $filter_city, 'stars' => $filter_stars ?: '',
     'max_price' => $filter_budget ?: '',
     'sort' => $filter_sort !== 'stars' ? $filter_sort : '',
     'view' => $view_mode !== 'grid' ? $view_mode : '',
@@ -178,10 +171,10 @@ $base_qs = http_build_query(array_filter([
 
       <!-- Star quick filters -->
       <div class="d-flex gap-1 flex-grow-1 flex-wrap">
-        <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'max_price'=>$filter_budget?:'','view'=>$view_mode!=='grid'?$view_mode:'','amenities'=>$filter_amenities])) ?>"
+        <a href="?<?= http_build_query(array_filter(['q'=>$filter_q,'city'=>$filter_city,'max_price'=>$filter_budget?:'','view'=>$view_mode!=='grid'?$view_mode:'','amenities'=>$filter_amenities])) ?>"
            class="filter-pill <?= !$filter_stars ? 'active' : '' ?>">All Stars</a>
         <?php for ($s = 5; $s >= 1; $s--): ?>
-        <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'stars'=>$s,'max_price'=>$filter_budget?:'','view'=>$view_mode!=='grid'?$view_mode:'','amenities'=>$filter_amenities])) ?>"
+        <a href="?<?= http_build_query(array_filter(['q'=>$filter_q,'city'=>$filter_city,'stars'=>$s,'max_price'=>$filter_budget?:'','view'=>$view_mode!=='grid'?$view_mode:'','amenities'=>$filter_amenities])) ?>"
            class="filter-pill <?= $filter_stars===$s ? 'active' : '' ?>">
           <?= str_repeat('★',$s) ?>
         </a>
@@ -196,15 +189,15 @@ $base_qs = http_build_query(array_filter([
           <option value="name"       <?= $filter_sort==='name'?'selected':'' ?>>Name: A–Z</option>
         </select>
         <div class="btn-group btn-group-sm" role="group">
-          <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'stars'=>$filter_stars?:'','max_price'=>$filter_budget?:'','sort'=>$filter_sort!=='stars'?$filter_sort:'','amenities'=>$filter_amenities])) ?>"
+          <a href="?<?= http_build_query(array_filter(['q'=>$filter_q,'city'=>$filter_city,'stars'=>$filter_stars?:'','max_price'=>$filter_budget?:'','sort'=>$filter_sort!=='stars'?$filter_sort:'','amenities'=>$filter_amenities])) ?>"
              class="btn btn-outline-secondary <?= $view_mode==='grid'?'active':'' ?>" title="Grid view">
             <i class="bi bi-grid-3x3-gap"></i>
           </a>
-          <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'stars'=>$filter_stars?:'','max_price'=>$filter_budget?:'','sort'=>$filter_sort!=='stars'?$filter_sort:'','view'=>'list','amenities'=>$filter_amenities])) ?>"
+          <a href="?<?= http_build_query(array_filter(['q'=>$filter_q,'city'=>$filter_city,'stars'=>$filter_stars?:'','max_price'=>$filter_budget?:'','sort'=>$filter_sort!=='stars'?$filter_sort:'','view'=>'list','amenities'=>$filter_amenities])) ?>"
              class="btn btn-outline-secondary <?= $view_mode==='list'?'active':'' ?>" title="List view">
             <i class="bi bi-list-ul"></i>
           </a>
-          <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'stars'=>$filter_stars?:'','max_price'=>$filter_budget?:'','sort'=>$filter_sort!=='stars'?$filter_sort:'','view'=>'map','amenities'=>$filter_amenities])) ?>"
+          <a href="?<?= http_build_query(array_filter(['q'=>$filter_q,'city'=>$filter_city,'stars'=>$filter_stars?:'','max_price'=>$filter_budget?:'','sort'=>$filter_sort!=='stars'?$filter_sort:'','view'=>'map','amenities'=>$filter_amenities])) ?>"
              class="btn btn-outline-secondary <?= $view_mode==='map'?'active':'' ?>" title="Map view">
             <i class="bi bi-pin-map"></i>
           </a>
@@ -226,6 +219,11 @@ $base_qs = http_build_query(array_filter([
       </h6>
       <form method="GET">
         <input type="hidden" name="view" value="<?= e($view_mode) ?>">
+        <div class="mb-3">
+          <label class="form-label" for="hotel-search">Search</label>
+          <input type="search" class="form-control form-control-sm" id="hotel-search" name="q"
+                 value="<?= e($filter_q) ?>" maxlength="80" placeholder="Hotel name, place or keyword">
+        </div>
         <div class="mb-3">
           <label class="form-label">City</label>
           <select class="form-select form-select-sm" name="city">
@@ -308,6 +306,16 @@ $base_qs = http_build_query(array_filter([
 
   <!-- Hotels content -->
   <div class="col-lg-9">
+
+    <?php if ($filter_q !== ''): ?>
+    <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+      <span class="text-muted small">Search:</span>
+      <span class="badge rounded-pill" style="background:var(--maroon-pale);color:var(--maroon-dark);padding:.35rem .85rem">
+        <i class="bi bi-search me-1"></i>"<?= e($filter_q) ?>"
+        <a href="?<?= http_build_query(array_filter(['city'=>$filter_city,'stars'=>$filter_stars?:'','max_price'=>$filter_budget?:'','sort'=>$filter_sort!=='stars'?$filter_sort:'','view'=>$view_mode!=='grid'?$view_mode:'','amenities'=>$filter_amenities])) ?>" class="text-decoration-none ms-1" style="color:var(--maroon-dark)" aria-label="Clear search">&times;</a>
+      </span>
+    </div>
+    <?php endif; ?>
     <?php if ($view_mode === 'map'): ?>
 
       <?php if (empty($map_hotels)): ?>
@@ -326,8 +334,8 @@ $base_qs = http_build_query(array_filter([
     <?php elseif (empty($hotels)): ?>
       <div class="text-center py-5">
         <i class="bi bi-building fs-1 text-muted d-block mb-3"></i>
-        <h5>No hotels found</h5>
-        <p class="text-muted">Try adjusting your filters.</p>
+        <h5>No hotels found<?= $filter_q !== '' ? ' for "' . e($filter_q) . '"' : '' ?></h5>
+        <p class="text-muted">Try a different word, or adjust your filters.</p>
         <a href="hotels.php" class="btn btn-primary-app">View All Hotels</a>
       </div>
     <?php else: ?>
@@ -354,11 +362,6 @@ $base_qs = http_build_query(array_filter([
             <div class="mb-1" style="color:var(--sand-dark);font-size:.85rem">
               <?= str_repeat('★', $hotel['star_rating']) . str_repeat('☆', 5 - $hotel['star_rating']) ?>
               <small class="text-muted ms-1"><?= $hotel['star_rating'] ?>-star</small>
-              <?php if (!empty($hotel['review_count'])): ?>
-                <span class="ms-2 small fw-semibold" style="color:var(--charcoal)"><i class="bi bi-star-fill" style="color:var(--sand-dark)"></i> <?= number_format((float)$hotel['avg_rating'], 1) ?> <span class="text-muted fw-normal">(<?= (int)$hotel['review_count'] ?>)</span></span>
-              <?php else: ?>
-                <span class="ms-2 small text-muted">No reviews yet</span>
-              <?php endif; ?>
             </div>
             <a href="hotel.php?id=<?= $hotel['id'] ?>" class="text-decoration-none" style="color:inherit">
               <h5 class="card-title-app mb-1" style="font-size:.98rem"><?= e($hotel['name']) ?></h5>
@@ -423,11 +426,6 @@ $base_qs = http_build_query(array_filter([
             <div>
               <div class="mb-0" style="color:var(--sand-dark);font-size:.8rem">
                 <?= str_repeat('★',$hotel['star_rating']) . str_repeat('☆',5-$hotel['star_rating']) ?>
-                <?php if (!empty($hotel['review_count'])): ?>
-                <span class="ms-2 small fw-semibold" style="color:var(--charcoal)"><i class="bi bi-star-fill" style="color:var(--sand-dark)"></i> <?= number_format((float)$hotel['avg_rating'], 1) ?> <span class="text-muted fw-normal">(<?= (int)$hotel['review_count'] ?>)</span></span>
-              <?php else: ?>
-                <span class="ms-2 small text-muted">No reviews yet</span>
-              <?php endif; ?>
               </div>
               <h6 class="mb-0 fw-bold" style="font-family:'Playfair Display',serif;font-size:.95rem">
                 <?= e($hotel['name']) ?>
@@ -538,16 +536,13 @@ document.addEventListener('DOMContentLoaded', function() {
   hotelPins.forEach(h => {
     hotelBounds.push([h.latitude, h.longitude]);
     const stars = '★'.repeat(h.star_rating || 0);
-    const guest = Number(h.review_count) > 0
-      ? `<br><span style="font-size:.85rem">★ ${Number(h.avg_rating).toFixed(1)} <span style="color:#666">(${h.review_count} review${Number(h.review_count) === 1 ? '' : 's'})</span></span>`
-      : '';
     const price = h.price_min ? '₱' + Number(h.price_min).toLocaleString() + '+/night' : 'Price varies';
     L.marker([h.latitude, h.longitude], { icon: hotelPinIcon })
       .addTo(hotelsMap)
       .bindPopup(`
         <div style="min-width:160px">
           <strong>${h.name}</strong><br>
-          <span style="color:#e9c46a">${stars}</span>${guest}<br>
+          <span style="color:#e9c46a">${stars}</span><br>
           <span style="font-size:.85rem;color:#666">${h.city_name} · ${price}</span><br>
           <a href="<?= APP_URL ?>/pages/hotel.php?id=${h.id}"
              style="display:inline-block;margin-top:.4rem;padding:.25rem .7rem;background:var(--maroon-mid);color:#fff;
