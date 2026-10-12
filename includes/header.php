@@ -39,7 +39,7 @@ if ($user && ($user['role'] ?? '') === 'admin') {
 // real access control on its own, since someone could still type the URL
 // directly — this is the actual enforcement.
 if ($user && ($user['role'] ?? '') === 'shop_owner') {
-    $__owner_allowed = ['shop-dashboard.php', 'logout.php'];
+    $__owner_allowed = ['shop-dashboard.php', 'register-shop.php', 'logout.php'];
     $__current_page  = basename($_SERVER['SCRIPT_NAME'] ?? '');
     if (!in_array($__current_page, $__owner_allowed, true)) {
         header('Location: ' . APP_URL . '/pages/shop-dashboard.php');
@@ -47,7 +47,7 @@ if ($user && ($user['role'] ?? '') === 'shop_owner') {
     }
 }
 if ($user && ($user['role'] ?? '') === 'hotel_owner') {
-    $__owner_allowed = ['hotel-dashboard.php', 'logout.php'];
+    $__owner_allowed = ['hotel-dashboard.php', 'register-hotel.php', 'logout.php'];
     $__current_page  = basename($_SERVER['SCRIPT_NAME'] ?? '');
     if (!in_array($__current_page, $__owner_allowed, true)) {
         header('Location: ' . APP_URL . '/pages/hotel-dashboard.php');
