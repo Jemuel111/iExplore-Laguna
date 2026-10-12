@@ -10,7 +10,8 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Composer, if added later
-
-   /uploads/*
-   !/uploads/.htaccess
+# User-uploaded images live on the server, not in git
+/uploads/*
+!/uploads/.htaccess
+!/uploads/*/
+!/uploads/*/.gitkeep
