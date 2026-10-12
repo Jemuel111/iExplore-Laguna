@@ -74,14 +74,14 @@ $budgetRanges = get_budget_level_ranges();
         <div class="col-4">
           <label class="form-label">Level</label>
           <select class="form-select" id="b-level">
-            <option value="budget">₱<?= number_format($budgetRanges['budget']['min']) ?>–<?= number_format($budgetRanges['budget']['max']) ?></option>
-            <option value="midrange" selected>₱<?= number_format($budgetRanges['midrange']['min']) ?>–<?= number_format($budgetRanges['midrange']['max']) ?></option>
-            <option value="upscale">₱<?= number_format($budgetRanges['upscale']['min']) ?>–<?= number_format($budgetRanges['upscale']['max']) ?></option>
+            <option value="budget">Budget · ₱<?= number_format($budgetRanges['budget']['min']) ?>–<?= number_format($budgetRanges['budget']['max']) ?></option>
+            <option value="midrange" selected>Mid-range · ₱<?= number_format($budgetRanges['midrange']['min']) ?>–<?= number_format($budgetRanges['midrange']['max']) ?></option>
+            <option value="upscale">Upscale · ₱<?= number_format($budgetRanges['upscale']['min']) ?>–<?= number_format($budgetRanges['upscale']['max']) ?></option>
           </select>
         </div>
       </div>
       <p class="text-muted small mt-1 mb-3" style="margin-top:-.5rem">
-        <i class="bi bi-info-circle me-1"></i>Ranges are food + hotel cost per person, per day.
+        <i class="bi bi-info-circle me-1"></i>Ranges are typical food + one hotel room cost per day (a room is shared by 2 people).
       </p>
 
       <!-- Entrance fees toggle -->
@@ -138,6 +138,7 @@ $budgetRanges = get_budget_level_ranges();
           Cost Breakdown
         </h6>
         <div id="res-breakdown"></div>
+        <div id="res-estimated" class="small text-muted mt-2"></div>
       </div>
 
       <!-- Per-person per-day card -->
@@ -220,8 +221,8 @@ async function calculateBudget() {
 
   // Breakdown rows
   const rows = [
-    ['bi-bus-front',   'Transport (round trip)', b.transport * persons],
-    ['bi-house-door',  `Accommodation (${Math.max(0,days-1)} night${days>2?'s':''})`, b.accommodation * persons * Math.max(0,days-1)],
+    ['bi-bus-front',   b.transport_type==='private_car' ? `Transport (private car × ${b.vehicles}, round trip)` : 'Transport (round trip)', b.transport * persons],
+    ['bi-house-door',  `Accommodation (${b.rooms} room${b.rooms>1?'s':''} × ${Math.max(0,days-1)} night${days>2?'s':''})`, b.accommodation * persons * Math.max(0,days-1)],
     ['bi-cup-hot',     `Food (${days} day${days>1?'s':''})`, b.food * persons * days],
     ['bi-arrows-move', `Local Transport (${days} day${days>1?'s':''})`, b.local * persons * days],
     ['bi-ticket',      'Entrance Fees', feesTotal],
@@ -240,6 +241,13 @@ async function calculateBudget() {
       <span style="color:var(--maroon-mid);font-size:1.1rem">${formatPeso(grand)}</span>
     </div>
   `;
+
+  // Warn when some figures are fallback guesses rather than local data
+  const est = (b.estimated || []);
+  const noteEl = document.getElementById('res-estimated');
+  if (noteEl) {
+    noteEl.textContent = est.length ? 'Note: some figures (' + est.join(', ') + ') are general estimates for this area.' : '';
+  }
 
   // Tips based on level
   const allTips = {
