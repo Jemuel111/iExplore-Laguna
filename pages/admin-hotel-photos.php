@@ -11,9 +11,8 @@ $page_title  = 'Manage Hotel Content';
 $active_page = 'admin-hotel-photos';
 
 
-if (!is_logged_in()) { header('Location: ' . APP_URL . '/pages/login.php'); exit; }
-$u = current_user();
-if (($u['role'] ?? '') !== 'admin') { header('Location: ' . APP_URL); exit; }
+$u = require_admin_area();   // super admin or city admin
+$scope = admin_scope();      // null = all cities, int = this city only, 0 = no access
 
 // Make sure the gallery tables exist — this app ships without a bundled
 // SQL schema file, so create them on first use if they aren't there yet.
@@ -31,6 +30,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'uplo
 
     if (!$targetHotelId) {
         $_SESSION['flash']['danger'] = 'Please select a hotel first.';
+        header('Location: ' . APP_URL . '/pages/admin-hotel-photos.php'); exit;
+    }
+    if (!admin_owns_hotel($targetHotelId)) {
+        $_SESSION['flash']['danger'] = 'You can only manage hotels in your own city.';
         header('Location: ' . APP_URL . '/pages/admin-hotel-photos.php'); exit;
     }
 
@@ -82,6 +85,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'uplo
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'set_main') {
     $photoId = (int) input('photo_id', 'post', 0);
     $hid     = (int) input('hotel_id', 'post', 0);
+    if (!admin_owns_hotel($hid)) {
+        $_SESSION['flash']['danger'] = 'You can only manage hotels in your own city.';
+        header('Location: ' . APP_URL . '/pages/admin-hotel-photos.php'); exit;
+    }
     // Demote any existing main photo for this hotel, then promote the chosen one
     db_execute("UPDATE hotel_photos SET photo_type='gallery' WHERE hotel_id=? AND photo_type='main'", [$hid]);
     db_execute("UPDATE hotel_photos SET photo_type='main' WHERE id=? AND hotel_id=?", [$photoId, $hid]);
@@ -92,6 +99,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'set_
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'delete_photo') {
     $photoId = (int) input('photo_id', 'post', 0);
     $hid     = (int) input('hotel_id', 'post', 0);
+    if (!admin_owns_hotel($hid)) {
+        $_SESSION['flash']['danger'] = 'You can only manage hotels in your own city.';
+        header('Location: ' . APP_URL . '/pages/admin-hotel-photos.php'); exit;
+    }
     db_execute("DELETE FROM hotel_photos WHERE id=? AND hotel_id=?", [$photoId, $hid]);
     $_SESSION['flash']['success'] = 'Photo removed.';
     header('Location: ' . APP_URL . '/pages/admin-hotel-photos.php?hotel_id=' . $hid); exit;
@@ -125,6 +136,10 @@ function hotel_amenity_presets(): array {
 // ── POST: add an amenity ─────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'add_amenity') {
     $hid    = (int) input('hotel_id', 'post', 0);
+    if (!admin_owns_hotel($hid)) {
+        $_SESSION['flash']['danger'] = 'You can only manage hotels in your own city.';
+        header('Location: ' . APP_URL . '/pages/admin-hotel-photos.php'); exit;
+    }
     $preset = input('preset', 'post', '');
 
     if ($preset === 'custom') {
@@ -150,6 +165,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'add_
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'delete_amenity') {
     $amenityId = (int) input('amenity_id', 'post', 0);
     $hid       = (int) input('hotel_id', 'post', 0);
+    if (!admin_owns_hotel($hid)) {
+        $_SESSION['flash']['danger'] = 'You can only manage hotels in your own city.';
+        header('Location: ' . APP_URL . '/pages/admin-hotel-photos.php'); exit;
+    }
     db_execute("DELETE FROM hotel_amenities WHERE id=? AND hotel_id=?", [$amenityId, $hid]);
     $_SESSION['flash']['success'] = 'Amenity removed.';
     header('Location: ' . APP_URL . '/pages/admin-hotel-photos.php?hotel_id=' . $hid); exit;
@@ -160,13 +179,18 @@ $hotels = db_fetch_all(
     "SELECT h.id, h.name, c.name AS city_name,
             (SELECT COUNT(*) FROM hotel_photos p WHERE p.hotel_id = h.id) AS photo_count
      FROM hotels h
-     JOIN cities c ON h.city_id = c.id
-     ORDER BY c.name, h.name"
+     JOIN cities c ON h.city_id = c.id" . ($scope !== null ? " WHERE h.city_id = ?" : "") . "
+     ORDER BY c.name, h.name",
+    $scope !== null ? [(int) $scope] : []
 );
 
 $selected_hotel  = null;
 $hotel_photos    = [];
 $hotel_amenities = [];
+if ($hotel_id && !admin_owns_hotel($hotel_id)) {
+    $_SESSION['flash']['danger'] = 'That hotel is not in your city.';
+    $hotel_id = 0;
+}
 if ($hotel_id) {
     $selected_hotel = db_fetch_one(
         "SELECT h.*, c.name AS city_name FROM hotels h JOIN cities c ON h.city_id=c.id WHERE h.id=?",

@@ -12,9 +12,8 @@ $page_title  = 'Manage Spots';
 $active_page = 'admin-spots';
 
 
-if (!is_logged_in()) { header('Location: ' . APP_URL . '/pages/login.php'); exit; }
-$u = current_user();
-if (($u['role'] ?? '') !== 'admin') { header('Location: ' . APP_URL); exit; }
+$u = require_admin_area();   // super admin or city admin
+$scope = admin_scope();      // null = all cities, int = this city only, 0 = no access
 
 // Category metadata now comes from the shared spot_categories() helper
 // in helpers.php instead of a locally duplicated emoji array.
@@ -27,6 +26,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'save
     $spotId      = (int) input('spot_id', 'post', 0);
     $name        = trim(input('name', 'post', ''));
     $cityId      = (int) input('city_id', 'post', 0);
+    // A city admin can only ever save into their own city, whatever the form says.
+    if ($scope !== null) $cityId = (int) $scope;
     $category    = input('category', 'post', 'nature');
     $description = trim(input('description', 'post', ''));
     $entranceFee = (float) input('entrance_fee', 'post', 0);
@@ -59,6 +60,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'save
         if ($city) { $lat = $lat === '' ? $city['latitude'] : $lat; $lng = $lng === '' ? $city['longitude'] : $lng; }
     }
     if ($lat === '' || $lng === '') $errors[] = 'Could not determine coordinates — please enter latitude/longitude manually.';
+
+    // Make sure the admin is allowed to touch this spot and city at all.
+    if ($cityId && !admin_can_access_city($cityId)) $errors[] = 'You can only manage spots in your own city.';
+    if ($spotId && !admin_owns_spot($spotId))       $errors[] = 'You can only edit spots in your own city.';
+
+    // Catch pins that are nowhere near the chosen city (e.g. a Calamba spot pinned in Liliw).
+    if (!$errors && is_numeric($lat) && is_numeric($lng)) {
+        $coordErr = spot_coords_error((float) $lat, (float) $lng, $cityId);
+        if ($coordErr) $errors[] = $coordErr;
+    } elseif (!$errors) {
+        $errors[] = 'Latitude and longitude must be numbers.';
+    }
 
     if (empty($errors)) {
         $slug = slugify($name);
@@ -93,6 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'save
                  $spotId]
             );
 
+            log_admin_activity('update_spot', 'spot', $spotId, $cityId, $name);
             $_SESSION['flash']['success'] = "\"{$name}\" updated.";
 
             // If this save just closed the spot, tell the admin how many
@@ -125,6 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'save
                  $isClosed ? date('Y-m-d H:i:s') : null]
             );
             $newId = db_last_id();
+            log_admin_activity('create_spot', 'spot', (int) $newId, $cityId, $name);
             $_SESSION['flash']['success'] = "\"{$name}\" created!";
             header('Location: ' . APP_URL . '/pages/admin-spots.php?id=' . $newId); exit;
         }
@@ -134,13 +149,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'save
 // ── POST: toggle active/inactive ────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'toggle_spot') {
     $sid = (int) input('spot_id', 'post', 0);
+    if (!admin_owns_spot($sid)) {
+        $_SESSION['flash']['danger'] = 'You can only manage spots in your own city.';
+        header('Location: ' . APP_URL . '/pages/admin-spots.php'); exit;
+    }
     db_execute("UPDATE tourist_spots SET is_active = NOT is_active WHERE id = ?", [$sid]);
+    $__sp = db_fetch_one("SELECT city_id, name, is_active FROM tourist_spots WHERE id = ?", [$sid]);
+    log_admin_activity($__sp && $__sp['is_active'] ? 'activate_spot' : 'deactivate_spot', 'spot', $sid, $__sp ? (int) $__sp['city_id'] : null, $__sp['name'] ?? '');
     header('Location: ' . APP_URL . '/pages/admin-spots.php'); exit;
 }
 
 // ── POST: delete a spot ─────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'delete_spot') {
     $sid = (int) input('spot_id', 'post', 0);
+    if (!admin_owns_spot($sid)) {
+        $_SESSION['flash']['danger'] = 'You can only manage spots in your own city.';
+        header('Location: ' . APP_URL . '/pages/admin-spots.php'); exit;
+    }
+    $__sp = db_fetch_one("SELECT city_id, name FROM tourist_spots WHERE id = ?", [$sid]);
+    log_admin_activity('delete_spot', 'spot', $sid, $__sp ? (int) $__sp['city_id'] : null, $__sp['name'] ?? '');
     db_execute("DELETE FROM spot_photos WHERE spot_id = ?", [$sid]);
     db_execute("DELETE FROM spot_reviews WHERE spot_id = ?", [$sid]);
     db_execute("DELETE FROM spot_amenities WHERE spot_id = ?", [$sid]);
@@ -150,16 +177,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'dele
 }
 
 // ── Data ──────────────────────────────────────────────────────
-$cities = db_fetch_all("SELECT id, name, latitude, longitude FROM cities ORDER BY name");
+if ($scope === null) {
+    $cities = db_fetch_all("SELECT id, name, latitude, longitude FROM cities ORDER BY name");
+} else {
+    $cities = db_fetch_all("SELECT id, name, latitude, longitude FROM cities WHERE id = ? ORDER BY name", [$scope]);
+}
 
 $editing_spot = null;
 if ($edit_id) {
-    $editing_spot = db_fetch_one("SELECT * FROM tourist_spots WHERE id = ?", [$edit_id]);
+    if (admin_owns_spot($edit_id)) {
+        $editing_spot = db_fetch_one("SELECT * FROM tourist_spots WHERE id = ?", [$edit_id]);
+    } else {
+        $_SESSION['flash']['danger'] = 'That spot is not in your city.';
+    }
 }
 
 $search = trim(input('q', 'get', ''));
 $spots_where  = ['1=1'];
 $spots_params = [];
+if ($scope !== null) {            // city admins only ever see their own city
+    $spots_where[]  = 's.city_id = ?';
+    $spots_params[] = (int) $scope;
+}
 if ($search !== '') {
     $spots_where[]  = 's.name LIKE ?';
     $spots_params[] = '%' . $search . '%';
@@ -233,7 +272,7 @@ require_once __DIR__ . '/../includes/header.php';
             <select class="form-select" name="city_id" required>
               <option value="">Select…</option>
               <?php foreach ($cities as $c): ?>
-              <option value="<?= $c['id'] ?>" <?= ($editing_spot['city_id'] ?? null)==$c['id']?'selected':'' ?>><?= e($c['name']) ?></option>
+              <option value="<?= $c['id'] ?>" <?= ($editing_spot['city_id'] ?? $scope ?? null)==$c['id']?'selected':'' ?>><?= e($c['name']) ?></option>
               <?php endforeach; ?>
             </select>
           </div>

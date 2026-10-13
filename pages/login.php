@@ -14,6 +14,7 @@ if (is_logged_in()) {
     if ($__role === 'shop_owner')  { header('Location: ' . APP_URL . '/pages/shop-dashboard.php');  exit; }
     if ($__role === 'hotel_owner') { header('Location: ' . APP_URL . '/pages/hotel-dashboard.php'); exit; }
     if ($__role === 'admin')       { header('Location: ' . APP_URL . '/pages/admin-dashboard.php'); exit; }
+    if ($__role === 'city_admin')  { header('Location: ' . APP_URL . '/pages/city-dashboard.php'); exit; }
     header('Location: ' . APP_URL); exit;
 }
 
@@ -51,6 +52,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             if ($role === 'admin') {
                 header('Location: ' . APP_URL . '/pages/admin-dashboard.php'); exit;
+            }
+            if ($role === 'city_admin') {
+                header('Location: ' . APP_URL . '/pages/city-dashboard.php'); exit;
             }
             $_SESSION['flash']['success'] = 'Welcome back, ' . $user['name'] . '!';
             header('Location: ' . APP_URL); exit;

@@ -36,7 +36,7 @@
         </div>
       </div>
 
-      <?php if (!(is_logged_in() && (current_user()['role'] ?? '') === 'admin')): ?>
+      <?php if (!(is_logged_in() && in_array((current_user()['role'] ?? ''), ['admin', 'city_admin'], true))): ?>
       <!-- Quick links -->
       <div class="col-6 col-sm-4 col-lg-2 offset-lg-1">
         <h6 class="footer-heading mb-3">Explore</h6>
@@ -64,12 +64,12 @@
       <?php endif; ?>
 
       <!-- Account -->
-      <div class="col-6 col-sm-4 col-lg-2 <?= (is_logged_in() && (current_user()['role'] ?? '') === 'admin') ? 'offset-lg-1' : '' ?>">
+      <div class="col-6 col-sm-4 col-lg-2 <?= (is_logged_in() && in_array((current_user()['role'] ?? ''), ['admin', 'city_admin'], true)) ? 'offset-lg-1' : '' ?>">
         <h6 class="footer-heading mb-3">Account</h6>
         <ul class="list-unstyled footer-links">
           <?php if (is_logged_in()):
             $__u = current_user(); ?>
-            <?php if ($__u['role'] !== 'admin'): ?>
+            <?php if (!in_array($__u['role'], ['admin', 'city_admin'], true)): ?>
             <li><a href="<?= APP_URL ?>/pages/itineraries.php"><i class="bi bi-journal-bookmark me-2 opacity-50"></i>My Itineraries</a></li>
             <li><a href="<?= APP_URL ?>/pages/my-orders.php"><i class="bi bi-bag-check me-2 opacity-50"></i>My Orders</a></li>
             <li><a href="<?= APP_URL ?>/pages/my-bookings.php"><i class="bi bi-calendar-check me-2 opacity-50"></i>My Bookings</a></li>
@@ -79,6 +79,10 @@
             <?php endif; ?>
             <?php if ($__u['role'] === 'hotel_owner'): ?>
             <li><a href="<?= APP_URL ?>/pages/hotel-dashboard.php"><i class="bi bi-building me-2 opacity-50"></i>My Hotel</a></li>
+            <?php endif; ?>
+            <?php if ($__u['role'] === 'city_admin'): ?>
+            <li><a href="<?= APP_URL ?>/pages/city-dashboard.php"><i class="bi bi-buildings me-2 opacity-50"></i>City Dashboard</a></li>
+            <li><a href="<?= APP_URL ?>/pages/admin-spots.php"><i class="bi bi-geo-alt me-2 opacity-50"></i>Manage Spots</a></li>
             <?php endif; ?>
             <?php if ($__u['role'] === 'admin'): ?>
             <li><a href="<?= APP_URL ?>/pages/admin-dashboard.php"><i class="bi bi-shield-check me-2 opacity-50"></i>Admin Dashboard</a></li>

@@ -1206,3 +1206,180 @@ function censor_profanity(?string $text): array {
 
     return ['text' => $text, 'was_censored' => $wasCensored];
 }
+
+
+// ============================================================
+// CITY ADMINS — one administrator per city
+//
+// Roles:
+//   admin       = super admin, unrestricted
+//   city_admin  = restricted to the single city stored in users.city_id
+//
+// IMPORTANT: every page or action that touches city data must check
+// access on the SERVER with the helpers below. Hiding links in the
+// menu is not security, because anyone can type a URL or change an id.
+// ============================================================
+
+function is_super_admin(): bool {
+    $u = current_user();
+    return $u && ($u['role'] ?? '') === 'admin';
+}
+
+function is_city_admin(): bool {
+    $u = current_user();
+    return $u && ($u['role'] ?? '') === 'city_admin';
+}
+
+function is_any_admin(): bool {
+    return is_super_admin() || is_city_admin();
+}
+
+/**
+ * The city a city admin may manage, read fresh from the database on
+ * every request (so reassigning or deactivating an account takes effect
+ * immediately, even while they are logged in). Returns null if the
+ * current user is not a city admin, or has no active city.
+ */
+function city_admin_city_id(): ?int {
+    static $cache = [];
+    $u = current_user();
+    if (!$u || ($u['role'] ?? '') !== 'city_admin') return null;
+    $uid = (int) $u['id'];
+    if (!array_key_exists($uid, $cache)) {
+        $row = db_fetch_one(
+            "SELECT city_id FROM users WHERE id = ? AND role = 'city_admin' AND is_active = 1",
+            [$uid]
+        );
+        $cache[$uid] = ($row && $row['city_id']) ? (int) $row['city_id'] : 0;
+    }
+    return $cache[$uid] ?: null;
+}
+
+/**
+ * How far this admin's access reaches:
+ *   null = every city (super admin)
+ *   int  = only that city id (city admin)
+ *   0    = nothing (not an admin, or a city admin with no active city)
+ */
+function admin_scope(): ?int {
+    if (is_super_admin()) return null;
+    if (is_city_admin())  return city_admin_city_id() ?? 0;
+    return 0;
+}
+
+function admin_can_access_city(int $cityId): bool {
+    if ($cityId <= 0) return false;
+    $scope = admin_scope();
+    return $scope === null ? true : ($scope > 0 && $scope === $cityId);
+}
+
+function admin_owns_spot(int $spotId): bool {
+    $r = db_fetch_one("SELECT city_id FROM tourist_spots WHERE id = ?", [$spotId]);
+    return $r ? admin_can_access_city((int) $r['city_id']) : false;
+}
+
+function admin_owns_hotel(int $hotelId): bool {
+    $r = db_fetch_one("SELECT city_id FROM hotels WHERE id = ?", [$hotelId]);
+    return $r ? admin_can_access_city((int) $r['city_id']) : false;
+}
+
+function admin_owns_shop(int $shopId): bool {
+    $r = db_fetch_one("SELECT city_id FROM shops WHERE id = ?", [$shopId]);
+    return $r ? admin_can_access_city((int) $r['city_id']) : false;
+}
+
+/**
+ * Gate for admin pages. Lets super admins and city admins in; everyone
+ * else is sent home. Pass true for pages only the super admin may use.
+ * Returns the current user array.
+ */
+function require_admin_area(bool $superOnly = false): array {
+    if (!is_logged_in()) {
+        header('Location: ' . APP_URL . '/pages/login.php');
+        exit;
+    }
+    $u    = current_user();
+    $role = $u['role'] ?? '';
+    if ($role === 'admin') return $u;
+    if ($role === 'city_admin' && !$superOnly) return $u;
+    header('Location: ' . APP_URL);
+    exit;
+}
+
+/**
+ * Stop a request that targets a city the admin does not manage.
+ * Sets a flash message and redirects.
+ */
+function require_city_access(int $cityId, string $redirectTo): void {
+    if (admin_can_access_city($cityId)) return;
+    $_SESSION['flash']['danger'] = 'You can only manage items in your own city.';
+    header('Location: ' . $redirectTo);
+    exit;
+}
+
+/** Straight-line distance between two coordinates, in kilometres. */
+function distance_km(float $lat1, float $lng1, float $lat2, float $lng2): float {
+    $r = 6371.0;
+    $dLat = deg2rad($lat2 - $lat1);
+    $dLng = deg2rad($lng2 - $lng1);
+    $a = sin($dLat / 2) ** 2
+       + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+    return $r * 2 * atan2(sqrt($a), sqrt(1 - $a));
+}
+
+/**
+ * Check that a spot's coordinates make sense for its city.
+ * Returns an error message, or null when the coordinates are fine.
+ * This catches the "spot saved under Calamba but pinned in Liliw" mistake.
+ */
+function spot_coords_error(float $lat, float $lng, int $cityId, float $maxKm = 25.0): ?string {
+    if ($lat < 13.5 || $lat > 14.8 || $lng < 120.8 || $lng > 122.2) {
+        return 'These coordinates are outside Laguna. Please check the latitude and longitude.';
+    }
+    $city = db_fetch_one("SELECT name, latitude, longitude FROM cities WHERE id = ?", [$cityId]);
+    if (!$city || $city['latitude'] === null || $city['longitude'] === null) return null;
+    $km = distance_km($lat, $lng, (float) $city['latitude'], (float) $city['longitude']);
+    if ($km > $maxKm) {
+        return sprintf(
+            'These coordinates are about %d km from %s. Please check that the pin is inside %s.',
+            round($km), $city['name'], $city['name']
+        );
+    }
+    return null;
+}
+
+/** Audit trail so the super admin can see who changed what. */
+function ensure_admin_activity_table(): void {
+    static $done = false;
+    if ($done) return;
+    db()->exec(
+        "CREATE TABLE IF NOT EXISTS admin_activity_log (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            user_id INT UNSIGNED NOT NULL,
+            city_id INT UNSIGNED NULL,
+            action VARCHAR(60) NOT NULL,
+            entity VARCHAR(40) NOT NULL,
+            entity_id INT UNSIGNED NULL,
+            details VARCHAR(255) NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_city (city_id, created_at),
+            KEY idx_user (user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+    $done = true;
+}
+
+function log_admin_activity(string $action, string $entity, ?int $entityId, ?int $cityId, string $details = ''): void {
+    try {
+        ensure_admin_activity_table();
+        $u = current_user();
+        if (!$u) return;
+        db_execute(
+            "INSERT INTO admin_activity_log (user_id, city_id, action, entity, entity_id, details)
+             VALUES (?, ?, ?, ?, ?, ?)",
+            [(int) $u['id'], $cityId, $action, $entity, $entityId, mb_substr($details, 0, 255)]
+        );
+    } catch (Throwable $e) {
+        // Logging must never break the admin's actual action.
+    }
+}

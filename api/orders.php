@@ -20,7 +20,7 @@ if (!is_logged_in()) {
 }
 
 $u    = current_user();
-if (($u['role'] ?? '') === 'admin') {
+if (in_array(($u['role'] ?? ''), ['admin', 'city_admin'], true)) {
     http_response_code(403);
     echo json_encode(['success'=>false,'message'=>'Admin accounts cannot place orders']);
     exit;

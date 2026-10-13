@@ -11,9 +11,8 @@ $page_title  = 'Manage Spot Photos';
 $active_page = 'admin-spot-photos';
 
 
-if (!is_logged_in()) { header('Location: ' . APP_URL . '/pages/login.php'); exit; }
-$u = current_user();
-if (($u['role'] ?? '') !== 'admin') { header('Location: ' . APP_URL); exit; }
+$u = require_admin_area();   // super admin or city admin
+$scope = admin_scope();      // null = all cities, int = this city only, 0 = no access
 
 $spot_id = (int) input('spot_id', 'get', 0);
 
@@ -26,6 +25,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'uplo
 
     if (!$targetSpotId) {
         $_SESSION['flash']['danger'] = 'Please select a spot first.';
+        header('Location: ' . APP_URL . '/pages/admin-spot-photos.php'); exit;
+    }
+    if (!admin_owns_spot($targetSpotId)) {
+        $_SESSION['flash']['danger'] = 'You can only manage photos for spots in your own city.';
         header('Location: ' . APP_URL . '/pages/admin-spot-photos.php'); exit;
     }
 
@@ -62,6 +65,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'uplo
     }
 
     if ($uploaded > 0) {
+        $__sp = db_fetch_one("SELECT city_id, name FROM tourist_spots WHERE id = ?", [$targetSpotId]);
+        log_admin_activity('upload_spot_photos', 'spot', $targetSpotId, $__sp ? (int) $__sp['city_id'] : null, "{$uploaded} photo(s) · " . ($__sp['name'] ?? ''));
         $_SESSION['flash']['success'] = "Uploaded {$uploaded} photo" . ($uploaded!=1?'s':'') . "!";
     }
     if (!empty($failed)) {
@@ -77,6 +82,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'uplo
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'set_main') {
     $photoId = (int) input('photo_id', 'post', 0);
     $sid     = (int) input('spot_id', 'post', 0);
+    if (!admin_owns_spot($sid)) {
+        $_SESSION['flash']['danger'] = 'You can only manage photos for spots in your own city.';
+        header('Location: ' . APP_URL . '/pages/admin-spot-photos.php'); exit;
+    }
     // Demote any existing main photo for this spot, then promote the chosen one
     db_execute("UPDATE spot_photos SET photo_type='gallery' WHERE spot_id=? AND photo_type='main'", [$sid]);
     db_execute("UPDATE spot_photos SET photo_type='main' WHERE id=? AND spot_id=?", [$photoId, $sid]);
@@ -87,6 +96,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'set_
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'delete_photo') {
     $photoId = (int) input('photo_id', 'post', 0);
     $sid     = (int) input('spot_id', 'post', 0);
+    if (!admin_owns_spot($sid)) {
+        $_SESSION['flash']['danger'] = 'You can only manage photos for spots in your own city.';
+        header('Location: ' . APP_URL . '/pages/admin-spot-photos.php'); exit;
+    }
+    $__sp = db_fetch_one("SELECT city_id, name FROM tourist_spots WHERE id = ?", [$sid]);
+    log_admin_activity('delete_spot_photo', 'spot', $sid, $__sp ? (int) $__sp['city_id'] : null, $__sp['name'] ?? '');
     db_execute("DELETE FROM spot_photos WHERE id=? AND spot_id=?", [$photoId, $sid]);
     $_SESSION['flash']['success'] = 'Photo removed.';
     header('Location: ' . APP_URL . '/pages/admin-spot-photos.php?spot_id=' . $sid); exit;
@@ -97,12 +112,17 @@ $spots = db_fetch_all(
     "SELECT s.id, s.name, c.name AS city_name,
             (SELECT COUNT(*) FROM spot_photos p WHERE p.spot_id = s.id) AS photo_count
      FROM tourist_spots s
-     JOIN cities c ON s.city_id = c.id
-     ORDER BY c.name, s.name"
+     JOIN cities c ON s.city_id = c.id" . ($scope !== null ? " WHERE s.city_id = ?" : "") . "
+     ORDER BY c.name, s.name",
+    $scope !== null ? [(int) $scope] : []
 );
 
 $selected_spot = null;
 $spot_photos   = [];
+if ($spot_id && !admin_owns_spot($spot_id)) {
+    $_SESSION['flash']['danger'] = 'That spot is not in your city.';
+    $spot_id = 0;
+}
 if ($spot_id) {
     $selected_spot = db_fetch_one(
         "SELECT s.*, c.name AS city_name FROM tourist_spots s JOIN cities c ON s.city_id=c.id WHERE s.id=?",

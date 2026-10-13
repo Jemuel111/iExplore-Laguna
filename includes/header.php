@@ -26,10 +26,22 @@ $__theme_css = sprintf(
 // Admins are restricted to the admin area — bounce them off every
 // tourist-facing page (browsing, planner, ordering, booking, etc.)
 if ($user && ($user['role'] ?? '') === 'admin') {
-    $__admin_allowed = ['admin-dashboard.php', 'admin-packages.php', 'admin-spot-photos.php', 'admin-spots.php', 'admin-hotel-photos.php', 'admin-analytics.php', 'logout.php'];
+    $__admin_allowed = ['admin-dashboard.php', 'admin-packages.php', 'admin-spot-photos.php', 'admin-spots.php', 'admin-hotel-photos.php', 'admin-analytics.php', 'admin-city-admins.php', 'logout.php'];
     $__current_page  = basename($_SERVER['SCRIPT_NAME'] ?? '');
     if (!in_array($__current_page, $__admin_allowed, true)) {
         header('Location: ' . APP_URL . '/pages/admin-dashboard.php');
+        exit;
+    }
+}
+
+// City admins: locked to the pages for managing their own city.
+// (The pages themselves ALSO check the city on the server — this is
+// only the "keep them out of tourist pages" layer.)
+if ($user && ($user['role'] ?? '') === 'city_admin') {
+    $__city_allowed = ['city-dashboard.php', 'admin-spots.php', 'admin-spot-photos.php', 'admin-hotel-photos.php', 'logout.php'];
+    $__current_page = basename($_SERVER['SCRIPT_NAME'] ?? '');
+    if (!in_array($__current_page, $__city_allowed, true)) {
+        header('Location: ' . APP_URL . '/pages/city-dashboard.php');
         exit;
     }
 }
@@ -178,6 +190,33 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
             <i class="bi bi-bar-chart-line me-1"></i>Analytics
           </a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link <?= $active_page === 'admin-city-admins' ? 'active' : '' ?>" href="<?= APP_URL ?>/pages/admin-city-admins.php">
+            <i class="bi bi-people me-1"></i>City Admins
+          </a>
+        </li>
+
+        <?php elseif ($user && ($user['role'] ?? '') === 'city_admin'): ?>
+        <li class="nav-item">
+          <a class="nav-link <?= $active_page === 'city-dashboard' ? 'active' : '' ?>" href="<?= APP_URL ?>/pages/city-dashboard.php">
+            <i class="bi bi-buildings me-1"></i>City Dashboard
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link <?= $active_page === 'admin-spots' ? 'active' : '' ?>" href="<?= APP_URL ?>/pages/admin-spots.php">
+            <i class="bi bi-geo-alt me-1"></i>Manage Spots
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link <?= $active_page === 'admin-spot-photos' ? 'active' : '' ?>" href="<?= APP_URL ?>/pages/admin-spot-photos.php">
+            <i class="bi bi-images me-1"></i>Spot Photos
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link <?= $active_page === 'admin-hotel-photos' ? 'active' : '' ?>" href="<?= APP_URL ?>/pages/admin-hotel-photos.php">
+            <i class="bi bi-images me-1"></i>Hotel Photos
+          </a>
+        </li>
 
         <?php elseif ($user && ($user['role'] ?? '') === 'shop_owner'): ?>
         <!-- Shop owners run a business here, not browse as tourists — same
@@ -288,6 +327,8 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
                 <span class="badge ms-1" style="background:var(--maroon-dark);font-size:.65rem">Hotel</span>
               <?php elseif ($__role === 'admin'): ?>
                 <span class="badge ms-1" style="background:var(--maroon-dark);font-size:.65rem">Admin</span>
+              <?php elseif ($__role === 'city_admin'): ?>
+                <span class="badge ms-1" style="background:var(--maroon-dark);font-size:.65rem">City Admin</span>
               <?php endif; ?>
             </a>
             <ul class="dropdown-menu dropdown-menu-end shadow">
@@ -330,6 +371,19 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
                   <i class="bi bi-images me-2"></i>Manage Hotel Photos</a></li>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-analytics.php">
                   <i class="bi bi-bar-chart-line me-2"></i>Analytics</a></li>
+
+              <?php elseif ($__role === 'city_admin'): ?>
+                <li><a class="dropdown-item fw-bold" href="<?= APP_URL ?>/pages/city-dashboard.php">
+                  <i class="bi bi-buildings me-2" style="color:var(--maroon-dark)"></i>City Dashboard</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/city-dashboard.php#approvals">
+                  <i class="bi bi-patch-check me-2"></i>Approve Hotels &amp; Shops</a></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-spots.php">
+                  <i class="bi bi-geo-alt me-2"></i>Manage Spots</a></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-spot-photos.php">
+                  <i class="bi bi-images me-2"></i>Manage Spot Photos</a></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-hotel-photos.php">
+                  <i class="bi bi-images me-2"></i>Manage Hotel Photos</a></li>
 
               <?php else: ?>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/itineraries.php">
