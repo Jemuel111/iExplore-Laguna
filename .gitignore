@@ -11,7 +11,6 @@ Thumbs.db
 .idea/
 
 # User-uploaded images live on the server, not in git
-/uploads/*
-!/uploads/.htaccess
-!/uploads/*/
+# User-uploaded images live on the server, not in git
+/uploads/*/*
 !/uploads/*/.gitkeep
