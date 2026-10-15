@@ -1332,18 +1332,36 @@ function distance_km(float $lat1, float $lng1, float $lat2, float $lng2): float 
  * Returns an error message, or null when the coordinates are fine.
  * This catches the "spot saved under Calamba but pinned in Liliw" mistake.
  */
-function spot_coords_error(float $lat, float $lng, int $cityId, float $maxKm = 25.0): ?string {
+function spot_coords_error(float $lat, float $lng, int $cityId, bool $strict = false, float $maxKm = 25.0): ?string {
     if ($lat < 13.5 || $lat > 14.8 || $lng < 120.8 || $lng > 122.2) {
         return 'These coordinates are outside Laguna. Please check the latitude and longitude.';
     }
     $city = db_fetch_one("SELECT name, latitude, longitude FROM cities WHERE id = ?", [$cityId]);
     if (!$city || $city['latitude'] === null || $city['longitude'] === null) return null;
     $km = distance_km($lat, $lng, (float) $city['latitude'], (float) $city['longitude']);
+
+    // Hard rule (everyone): far too far from the city to be inside it.
     if ($km > $maxKm) {
         return sprintf(
             'These coordinates are about %d km from %s. Please check that the pin is inside %s.',
             round($km), $city['name'], $city['name']
         );
+    }
+
+    // Soft rule (city admins): the pin sits well away from this city's center AND
+    // is much closer to another city's center, so it most likely belongs there.
+    if ($strict && $km >= 10.0) {
+        $others = db_fetch_all("SELECT name, latitude, longitude FROM cities WHERE id <> ?", [$cityId]);
+        foreach ($others as $o) {
+            if ($o['latitude'] === null || $o['longitude'] === null) continue;
+            $d = distance_km($lat, $lng, (float) $o['latitude'], (float) $o['longitude']);
+            if ($d <= $km - 6.0) {
+                return sprintf(
+                    'These coordinates look like they are in %s, not %s. Please check the pin.',
+                    $o['name'], $city['name']
+                );
+            }
+        }
     }
     return null;
 }

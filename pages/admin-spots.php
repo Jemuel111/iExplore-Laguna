@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && input('action','post','') === 'save
 
     // Catch pins that are nowhere near the chosen city (e.g. a Calamba spot pinned in Liliw).
     if (!$errors && is_numeric($lat) && is_numeric($lng)) {
-        $coordErr = spot_coords_error((float) $lat, (float) $lng, $cityId);
+        $coordErr = spot_coords_error((float) $lat, (float) $lng, $cityId, $scope !== null);
         if ($coordErr) $errors[] = $coordErr;
     } elseif (!$errors) {
         $errors[] = 'Latitude and longitude must be numbers.';

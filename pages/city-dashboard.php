@@ -18,14 +18,21 @@ if (is_super_admin()) { header('Location: ' . APP_URL . '/pages/admin-dashboard.
 
 $cityId = (int) admin_scope();   // 0 = no active city assigned
 
-// ── No city assigned (or account deactivated): explain, don't loop ──
+// ── No city / deactivated account: explain clearly, don't loop ──
 if ($cityId <= 0) {
+    $acct        = db_fetch_one("SELECT is_active FROM users WHERE id = ?", [(int) $u['id']]);
+    $deactivated = $acct && !$acct['is_active'];
     require_once __DIR__ . '/../includes/header.php';
     ?>
     <div class="container py-5 text-center" style="max-width:560px">
-      <i class="bi bi-exclamation-triangle fs-1 text-muted d-block mb-3"></i>
-      <h4>No city assigned</h4>
-      <p class="text-muted">Your account is not linked to an active city yet. Please contact the iExplore Laguna administrator to have a city assigned to you.</p>
+      <i class="bi bi-<?= $deactivated ? 'lock' : 'exclamation-triangle' ?> fs-1 text-muted d-block mb-3"></i>
+      <?php if ($deactivated): ?>
+        <h4>This account has been deactivated</h4>
+        <p class="text-muted">You can no longer manage your city's spots, hotels or shops. If you think this is a mistake, please contact the iExplore Laguna administrator.</p>
+      <?php else: ?>
+        <h4>No city assigned</h4>
+        <p class="text-muted">Your account is not linked to a city yet. Please contact the iExplore Laguna administrator to have a city assigned to you.</p>
+      <?php endif; ?>
       <a href="<?= APP_URL ?>/pages/logout.php" class="btn btn-outline-secondary">Log out</a>
     </div>
     <?php
@@ -33,8 +40,8 @@ if ($cityId <= 0) {
     exit;
 }
 
-$city = db_fetch_one("SELECT id, name FROM cities WHERE id = ?", [$cityId]);
-if (!$city) { $city = ['id' => $cityId, 'name' => 'Your city']; }
+$city = db_fetch_one("SELECT id, name, description, latitude, longitude FROM cities WHERE id = ?", [$cityId]);
+if (!$city) { $city = ['id' => $cityId, 'name' => 'Your city', 'description' => '', 'latitude' => null, 'longitude' => null]; }
 $cityName = (string) $city['name'];
 
 $back = APP_URL . '/pages/city-dashboard.php';
@@ -143,14 +150,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // ── Data for this city only ───────────────────────────────────
 ensure_admin_activity_table();
 
-$spotStats = db_fetch_one(
-    "SELECT COUNT(*) AS total, COALESCE(SUM(is_active = 1), 0) AS active
-     FROM tourist_spots WHERE city_id = ?", [$cityId]
-) ?: ['total' => 0, 'active' => 0];
+$today = new DateTimeImmutable('today');
 
-$views30 = (int) (db_fetch_one(
+// Every spot in this city, with what the table and the to-do list need.
+$spots = db_fetch_all(
+    "SELECT s.id, s.name, s.category, s.description, s.operating_hours,
+            s.latitude, s.longitude, s.is_active, s.is_closed, s.closed_until, s.image_url,
+            (SELECT url FROM spot_photos WHERE spot_id = s.id AND photo_type = 'main'
+              ORDER BY sort_order, id LIMIT 1) AS main_photo_url,
+            (SELECT COUNT(*) FROM spot_photos WHERE spot_id = s.id) AS photo_count,
+            (SELECT COUNT(*) FROM spot_views v
+              WHERE v.spot_id = s.id AND v.viewed_at >= (CURDATE() - INTERVAL 29 DAY)) AS views30
+     FROM tourist_spots s
+     WHERE s.city_id = ?
+     ORDER BY views30 DESC, s.name", [$cityId]);
+
+$spotTotal  = count($spots);
+$spotActive = count(array_filter($spots, fn($x) => (int) $x['is_active'] === 1));
+$maxViews   = max(1, ...array_map(fn($x) => (int) $x['views30'], $spots ?: [['views30' => 0]]));
+
+// Views per day for the last 30 days (gaps filled with 0) + the 30 days before.
+$dailyRows = db_fetch_all(
+    "SELECT DATE(v.viewed_at) AS d, COUNT(*) AS n
+     FROM spot_views v JOIN tourist_spots s ON s.id = v.spot_id
+     WHERE s.city_id = ? AND v.viewed_at >= (CURDATE() - INTERVAL 29 DAY)
+     GROUP BY DATE(v.viewed_at)", [$cityId]);
+$byDay = [];
+foreach ($dailyRows as $r) { $byDay[(string) $r['d']] = (int) $r['n']; }
+$series = [];
+for ($i = 29; $i >= 0; $i--) {
+    $series[] = $byDay[$today->modify("-{$i} day")->format('Y-m-d')] ?? 0;
+}
+$views30 = array_sum($series);
+$viewsPrev30 = (int) (db_fetch_one(
     "SELECT COUNT(*) AS n FROM spot_views v JOIN tourist_spots s ON s.id = v.spot_id
-     WHERE s.city_id = ? AND v.viewed_at >= (NOW() - INTERVAL 30 DAY)", [$cityId])['n'] ?? 0);
+     WHERE s.city_id = ? AND v.viewed_at >= (CURDATE() - INTERVAL 59 DAY)
+       AND v.viewed_at <  (CURDATE() - INTERVAL 29 DAY)", [$cityId])['n'] ?? 0);
 
 $checkins30 = (int) (db_fetch_one(
     "SELECT COUNT(*) AS n FROM spot_checkins c JOIN tourist_spots s ON s.id = c.spot_id
@@ -168,15 +203,6 @@ $bookings30 = (int) (db_fetch_one(
 $orders30 = (int) (db_fetch_one(
     "SELECT COUNT(*) AS n FROM orders o JOIN shops s ON s.id = o.shop_id
      WHERE s.city_id = ? AND o.created_at >= (NOW() - INTERVAL 30 DAY)", [$cityId])['n'] ?? 0);
-
-$topSpots = db_fetch_all(
-    "SELECT s.id, s.name, COUNT(v.id) AS views
-     FROM tourist_spots s
-     LEFT JOIN spot_views v ON v.spot_id = s.id AND v.viewed_at >= (NOW() - INTERVAL 30 DAY)
-     WHERE s.city_id = ?
-     GROUP BY s.id, s.name
-     ORDER BY views DESC, s.name
-     LIMIT 5", [$cityId]);
 
 $pending_shops = db_fetch_all(
     "SELECT s.*, u.name AS owner_name, u.email AS owner_email, u.phone AS owner_phone
@@ -206,12 +232,154 @@ $activity = db_fetch_all(
     "SELECT l.action, l.entity, l.details, l.created_at, u.name AS user_name
      FROM admin_activity_log l LEFT JOIN users u ON u.id = l.user_id
      WHERE l.city_id = ?
-     ORDER BY l.id DESC LIMIT 10", [$cityId]);
+     ORDER BY l.id DESC LIMIT 12", [$cityId]);
 
 $pendingTotal = count($pending_shops) + count($pending_hotels);
 
+// ── To-do list, built from the city's real data ───────────────
+$hasCenter = $city['latitude'] !== null && $city['longitude'] !== null;
+$todo = [];
+if ($pendingTotal) {
+    $todo[] = ['urgent' => true, 'href' => '#approvals', 'cta' => 'Review',
+               'text' => '<strong>' . $pendingTotal . '</strong> hotel or shop registration' . ($pendingTotal === 1 ? ' is' : 's are') . ' waiting for your approval'];
+}
+foreach ($spots as $sp) {
+    $nm    = '<strong>' . e((string) $sp['name']) . '</strong>';
+    $edit  = APP_URL . '/pages/admin-spots.php?id=' . (int) $sp['id'];
+    $photo = APP_URL . '/pages/admin-spot-photos.php?spot_id=' . (int) $sp['id'];
+
+    if ((int) $sp['photo_count'] === 0 && empty($sp['image_url'])) {
+        $todo[] = ['urgent' => false, 'href' => $photo, 'cta' => 'Add photos', 'text' => "$nm has no photo yet"];
+    }
+    if ($hasCenter
+        && abs((float) $sp['latitude']  - (float) $city['latitude'])  < 0.0003
+        && abs((float) $sp['longitude'] - (float) $city['longitude']) < 0.0003) {
+        $todo[] = ['urgent' => false, 'href' => $edit, 'cta' => 'Fix the pin',
+                   'text' => "$nm is still pinned at the center of " . e($cityName) . " — trip routes will start from the wrong place"];
+    }
+    if (trim((string) $sp['description']) === '') {
+        $todo[] = ['urgent' => false, 'href' => $edit, 'cta' => 'Write it', 'text' => "$nm has no description"];
+    } elseif (trim((string) $sp['operating_hours']) === '') {
+        $todo[] = ['urgent' => false, 'href' => $edit, 'cta' => 'Add hours', 'text' => "$nm has no opening hours"];
+    }
+    if ((int) $sp['is_closed'] === 1 && !empty($sp['closed_until']) && $sp['closed_until'] < $today->format('Y-m-d')) {
+        $todo[] = ['urgent' => false, 'href' => $edit, 'cta' => 'Update',
+                   'text' => "$nm is marked closed, but its reopening date has passed"];
+    }
+}
+$todoShown = array_slice($todo, 0, 6);
+$todoMore  = count($todo) - count($todoShown);
+
+// ── Sparkline geometry (viewBox 300 × 70) ─────────────────────
+$sparkMax = max(1, max($series));
+$pts = [];
+foreach ($series as $i => $v) {
+    $x = round($i * (300 / 29), 1);
+    $y = round(62 - ($v / $sparkMax) * 52, 1);
+    $pts[] = [$x, $y];
+}
+$line = 'M' . implode(' L', array_map(fn($p) => $p[0] . ' ' . $p[1], $pts));
+$area = $line . ' L300 70 L0 70 Z';
+$last = end($pts);
+
+$delta = $views30 - $viewsPrev30;
+if ($viewsPrev30 === 0 && $views30 === 0)      $deltaText = 'No views yet in the last 60 days';
+elseif ($viewsPrev30 === 0)                       $deltaText = 'No views in the 30 days before';
+elseif ($delta === 0)                             $deltaText = 'Same as the 30 days before';
+elseif ($delta > 0)                               $deltaText = '↑ ' . $delta . ' more than the 30 days before';
+else                                              $deltaText = '↓ ' . abs($delta) . ' fewer than the 30 days before';
+
+$blurb = trim((string) ($city['description'] ?? ''));
+if ($blurb !== '' && mb_strlen($blurb) > 170) { $blurb = rtrim(mb_substr($blurb, 0, 167)) . '…'; }
+
+$categoryLabel = fn(string $c) => ucwords(str_replace('_', ' ', $c));
+
 require_once __DIR__ . '/../includes/header.php';
 ?>
+<style>
+  .cd-mast{position:relative;color:#fff;background:var(--maroon-dark);overflow:hidden;border-bottom:3px solid var(--sand-dark)}
+  /* a quiet woven-mat (banig) texture that fades in from the right */
+  .cd-mast::before{content:"";position:absolute;inset:0;pointer-events:none;
+    background:
+      repeating-linear-gradient(45deg, rgba(255,255,255,.07) 0 9px, transparent 9px 18px),
+      repeating-linear-gradient(-45deg, rgba(0,0,0,.10) 0 9px, transparent 9px 18px);
+    -webkit-mask-image:linear-gradient(90deg,transparent 25%,#000 85%);
+            mask-image:linear-gradient(90deg,transparent 25%,#000 85%)}
+  .cd-mast .container{position:relative;padding-top:2rem;padding-bottom:1.75rem}
+  .cd-eyebrow{font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--sand-dark);font-weight:600}
+  .cd-city{font-family:'Playfair Display',serif;font-size:clamp(2.1rem,4.5vw,3.2rem);line-height:1.05;margin:.35rem 0 .6rem}
+  .cd-blurb{max-width:58ch;font-size:.95rem;line-height:1.55;color:rgba(255,255,255,.82);margin:0}
+  .cd-date{font-size:.8rem;color:rgba(255,255,255,.7)}
+  .cd-btn{display:inline-flex;align-items:center;gap:.4rem;font-size:.85rem;font-weight:600;padding:.5rem 1.05rem;border-radius:var(--radius-pill);text-decoration:none;border:1.5px solid rgba(255,255,255,.55);color:#fff;transition:var(--transition)}
+  .cd-btn:hover{background:rgba(255,255,255,.14);color:#fff}
+  .cd-btn.is-primary{background:var(--sand-dark);border-color:var(--sand-dark);color:var(--maroon-dark)}
+  .cd-btn.is-primary:hover{background:#f0d27f;color:var(--maroon-dark)}
+
+  .cd-label{font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted);font-weight:600}
+  .cd-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm)}
+  .cd-h{font-family:'Playfair Display',serif;font-size:1.15rem;color:var(--maroon-dark);margin:0}
+
+  .cd-pulse{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:1.25rem}
+  .cd-big{font-family:'Playfair Display',serif;font-size:3.1rem;line-height:1;color:var(--maroon-dark)}
+  .cd-delta{font-size:.82rem;color:var(--text-muted)}
+  .cd-spark{width:100%;height:70px;display:block;margin-top:.9rem}
+  .cd-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .cd-stat{padding:1.15rem 1.25rem;border-right:1px solid var(--border);border-bottom:1px solid var(--border)}
+  .cd-stat:nth-child(3n){border-right:0}
+  .cd-stat:nth-last-child(-n+3){border-bottom:0}
+  .cd-stat b{display:block;font-family:'Playfair Display',serif;font-size:1.7rem;line-height:1.1;color:var(--charcoal);font-weight:600}
+  .cd-stat span{font-size:.78rem;color:var(--text-muted)}
+
+  .cd-todo{border-left:4px solid var(--sand-dark)}
+  .cd-todo.has-urgent{border-left-color:var(--maroon-mid)}
+  .cd-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 0;border-bottom:1px solid var(--border);font-size:.9rem}
+  .cd-row:last-child{border-bottom:0}
+  .cd-row a.cd-cta{flex-shrink:0;font-size:.8rem;font-weight:600;color:var(--maroon-mid);text-decoration:none;white-space:nowrap}
+  .cd-row a.cd-cta:hover{color:var(--maroon-dark);text-decoration:underline}
+  .cd-dot{width:8px;height:8px;border-radius:50%;background:var(--sand-dark);flex-shrink:0;margin-right:.7rem}
+  .cd-dot.is-urgent{background:var(--maroon-mid)}
+
+  .cd-spots-head,.cd-spot{display:grid;grid-template-columns:minmax(0,2.6fr) 1fr 1.3fr .6fr .8fr auto;gap:.9rem;align-items:center}
+  .cd-spots-head{padding:.6rem 1rem;border-bottom:1px solid var(--border);background:var(--cream)}
+  .cd-spot{padding:.65rem 1rem;border-bottom:1px solid var(--border);font-size:.88rem}
+  .cd-spot:last-child{border-bottom:0}
+  .cd-thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;background:var(--maroon-pale);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--maroon-mid)}
+  .cd-spot a.cd-name{font-weight:600;color:var(--charcoal);text-decoration:none}
+  .cd-spot a.cd-name:hover{color:var(--maroon-mid)}
+  .cd-bar{height:5px;border-radius:3px;background:var(--maroon-pale);margin-top:4px;overflow:hidden}
+  .cd-bar i{display:block;height:100%;background:var(--maroon-mid);border-radius:3px}
+  .cd-pill{display:inline-block;font-size:.7rem;font-weight:600;padding:.18rem .6rem;border-radius:var(--radius-pill)}
+  .cd-pill.live{background:#e3f3e8;color:#1f6b3a}
+  .cd-pill.hidden{background:#eceae6;color:#6b6b6b}
+  .cd-pill.closed{background:#fdf0d5;color:#8a5a00}
+  .cd-mini{font-size:.78rem;font-weight:600;color:var(--maroon-mid);text-decoration:none;margin-left:.6rem}
+  .cd-mini:hover{text-decoration:underline;color:var(--maroon-dark)}
+
+  details.cd-fold{border:1px solid var(--border);border-radius:var(--radius-sm);background:#fff;margin-bottom:.75rem}
+  details.cd-fold>summary{cursor:pointer;list-style:none;padding:.8rem 1rem;font-weight:600;font-size:.92rem;display:flex;justify-content:space-between;align-items:center}
+  details.cd-fold>summary::-webkit-details-marker{display:none}
+  details.cd-fold>summary::after{content:"+";font-size:1.2rem;color:var(--maroon-mid)}
+  details.cd-fold[open]>summary::after{content:"–"}
+  details.cd-fold .cd-fold-body{padding:0 1rem .5rem}
+
+  .cd-time{position:relative;margin:0;padding:0 0 0 1.1rem;list-style:none}
+  .cd-time::before{content:"";position:absolute;left:3px;top:6px;bottom:6px;width:1px;background:var(--border)}
+  .cd-time li{position:relative;padding-bottom:.9rem;font-size:.84rem}
+  .cd-time li::before{content:"";position:absolute;left:-1.1rem;top:.38rem;width:7px;height:7px;border-radius:50%;background:var(--maroon-mid)}
+  .cd-time small{display:block;color:var(--text-muted)}
+
+  @media (max-width:991px){.cd-pulse{grid-template-columns:1fr}}
+  @media (max-width:767px){
+    .cd-spots-head{display:none}
+    .cd-spot{grid-template-columns:minmax(0,1fr) auto}
+    .cd-hide-sm{display:none!important}
+    .cd-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .cd-stat:nth-child(3n){border-right:1px solid var(--border)}
+    .cd-stat:nth-child(2n){border-right:0}
+    .cd-stat:nth-last-child(-n+3){border-bottom:1px solid var(--border)}
+    .cd-stat:nth-last-child(-n+2){border-bottom:0}
+  }
+</style>
 
 <?php if (!empty($_SESSION['flash'])): ?>
   <?php foreach ($_SESSION['flash'] as $type => $msg): ?>
@@ -223,252 +391,276 @@ require_once __DIR__ . '/../includes/header.php';
   <?php endforeach; unset($_SESSION['flash']); ?>
 <?php endif; ?>
 
-<section class="py-3" style="background:linear-gradient(135deg,var(--maroon-dark),var(--maroon-mid));color:#fff">
-  <div class="container d-flex align-items-center justify-content-between flex-wrap gap-3">
-    <div class="d-flex align-items-center gap-3">
-      <i class="bi bi-buildings fs-2" style="color:var(--sand-dark)"></i>
+<!-- ── Masthead ─────────────────────────────────────────────── -->
+<header class="cd-mast">
+  <div class="container">
+    <div class="d-flex justify-content-between align-items-end flex-wrap gap-3">
       <div>
-        <h1 class="mb-0 fs-3" style="font-family:'Playfair Display',serif"><?= e($cityName) ?> — City Dashboard</h1>
-        <p class="mb-0 small opacity-75">Manage tourist spots, hotels and shops in <?= e($cityName) ?></p>
+        <div class="cd-eyebrow">City dashboard · Laguna</div>
+        <h1 class="cd-city"><?= e($cityName) ?></h1>
+        <?php if ($blurb !== ''): ?><p class="cd-blurb"><?= e($blurb) ?></p><?php endif; ?>
+      </div>
+      <div class="text-lg-end">
+        <div class="cd-date mb-2"><?= e(date('l, F j')) ?></div>
+        <div class="d-flex gap-2 flex-wrap justify-content-lg-end">
+          <a href="<?= APP_URL ?>/pages/admin-spots.php" class="cd-btn is-primary"><i class="bi bi-plus-lg"></i>Add a spot</a>
+          <a href="<?= APP_URL ?>/pages/admin-spot-photos.php" class="cd-btn"><i class="bi bi-images"></i>Photos</a>
+        </div>
       </div>
     </div>
-    <div class="d-flex gap-2 flex-wrap">
-      <a href="<?= APP_URL ?>/pages/admin-spots.php" class="btn btn-sm btn-light"><i class="bi bi-plus-circle me-1"></i>Add / Manage Spots</a>
-      <a href="<?= APP_URL ?>/pages/admin-spot-photos.php" class="btn btn-sm btn-outline-light"><i class="bi bi-images me-1"></i>Spot Photos</a>
-      <a href="<?= APP_URL ?>/pages/admin-hotel-photos.php" class="btn btn-sm btn-outline-light"><i class="bi bi-building me-1"></i>Hotel Photos</a>
-    </div>
   </div>
-</section>
+</header>
 
 <div class="container py-4">
 
-  <!-- Stats -->
-  <div class="stat-strip mb-4" style="border-radius:var(--radius)">
-    <div class="row g-0 text-center">
-      <?php
-      $stats = [
-        ['bi-geo-alt-fill',    'Active Spots',        (int) $spotStats['active'] . ' / ' . (int) $spotStats['total']],
-        ['bi-eye',             'Spot Views (30 days)', $views30],
-        ['bi-pin-map',         'Check-ins (30 days)',  $checkins30],
-        ['bi-star-fill',       'Spot Reviews',        (int) $reviewStats['n'] . ($reviewStats['avg_rating'] ? ' · ' . number_format((float) $reviewStats['avg_rating'], 1) . '★' : '')],
-        ['bi-calendar-check',  'Hotel Bookings (30 days)', $bookings30],
-        ['bi-bag-check',       'Shop Orders (30 days)',    $orders30],
-      ];
-      foreach ($stats as [$ico, $lbl, $val]): ?>
-      <div class="col-6 col-lg-2">
-        <div class="stat-item">
-          <div class="stat-item-icon"><i class="bi <?= $ico ?>"></i></div>
-          <div class="stat-num" style="font-size:1.3rem"><?= e((string) $val) ?></div>
-          <div class="stat-lbl"><?= e($lbl) ?></div>
-        </div>
+  <!-- ── Pulse ──────────────────────────────────────────────── -->
+  <section class="cd-pulse mb-4" aria-label="Last 30 days">
+    <div class="cd-card p-4">
+      <div class="cd-label">Spot views · last 30 days</div>
+      <div class="d-flex align-items-baseline gap-3 mt-2">
+        <div class="cd-big"><?= number_format($views30) ?></div>
+        <div class="cd-delta"><?= e($deltaText) ?></div>
       </div>
-      <?php endforeach; ?>
+      <svg class="cd-spark" viewBox="0 0 300 70" preserveAspectRatio="none" role="img"
+           aria-label="Daily spot views in <?= e($cityName) ?> over the last 30 days">
+        <path d="<?= e($area) ?>" fill="var(--maroon-pale)" opacity=".7"/>
+        <path d="<?= e($line) ?>" fill="none" stroke="var(--maroon-mid)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+        <circle cx="<?= (float) $last[0] ?>" cy="<?= (float) $last[1] ?>" r="3" fill="var(--maroon-dark)" vector-effect="non-scaling-stroke"/>
+      </svg>
+      <div class="d-flex justify-content-between cd-delta mt-1"><span>30 days ago</span><span>Today</span></div>
     </div>
-  </div>
+
+    <div class="cd-card cd-stats">
+      <div class="cd-stat"><b><?= $spotActive ?><span style="font-size:1rem;color:var(--text-muted);font-weight:400"> / <?= $spotTotal ?></span></b><span>Spots live</span></div>
+      <div class="cd-stat"><b><?= number_format($checkins30) ?></b><span>Check-ins</span></div>
+      <div class="cd-stat"><b><?= (int) $reviewStats['n'] ?><?php if ($reviewStats['avg_rating']): ?><span style="font-size:1rem;color:var(--terracotta);font-weight:400"> · <?= number_format((float) $reviewStats['avg_rating'], 1) ?>★</span><?php endif; ?></b><span>Spot reviews</span></div>
+      <div class="cd-stat"><b><?= count($verified_hotels) ?></b><span>Hotels published</span></div>
+      <div class="cd-stat"><b><?= $bookings30 ?></b><span>Hotel bookings</span></div>
+      <div class="cd-stat"><b><?= $orders30 ?></b><span>Shop orders</span></div>
+    </div>
+  </section>
 
   <div class="row g-4">
+    <div class="col-lg-8">
 
-    <!-- ── Approvals ─────────────────────────────────────────── -->
-    <div class="col-lg-8" id="approvals">
-
-      <div class="d-flex align-items-center gap-2 mb-3 pb-2" style="border-bottom:2px solid var(--maroon-pale)">
-        <i class="bi bi-hourglass-split" style="color:var(--maroon-mid)"></i>
-        <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">Waiting for your approval</h6>
-        <?php if ($pendingTotal): ?>
-          <span class="badge rounded-pill" style="background:#c0392b"><?= $pendingTotal ?></span>
+      <!-- ── To do ───────────────────────────────────────────── -->
+      <section class="cd-card cd-todo p-4 mb-4 <?= $pendingTotal ? 'has-urgent' : '' ?>">
+        <div class="d-flex align-items-center justify-content-between mb-1">
+          <h2 class="cd-h">To do</h2>
+          <?php if ($todo): ?><span class="cd-label"><?= count($todo) ?> item<?= count($todo) === 1 ? '' : 's' ?></span><?php endif; ?>
+        </div>
+        <?php if (!$todoShown): ?>
+          <p class="mb-0 mt-2 text-muted" style="font-size:.9rem">Nothing needs attention right now. Spots have photos, descriptions and a real pin, and nothing is waiting for approval.</p>
+        <?php else: ?>
+          <div>
+            <?php foreach ($todoShown as $t): ?>
+              <div class="cd-row">
+                <div class="d-flex align-items-center"><span class="cd-dot <?= $t['urgent'] ? 'is-urgent' : '' ?>"></span><span><?= $t['text'] ?></span></div>
+                <a class="cd-cta" href="<?= e((string) $t['href']) ?>"><?= e((string) $t['cta']) ?> →</a>
+              </div>
+            <?php endforeach; ?>
+          </div>
+          <?php if ($todoMore > 0): ?>
+            <div class="cd-delta mt-2">…and <?= $todoMore ?> more once these are done.</div>
+          <?php endif; ?>
         <?php endif; ?>
-      </div>
+      </section>
 
-      <?php if (!$pendingTotal): ?>
-        <div class="text-center py-4 mb-4">
-          <i class="bi bi-check2-circle fs-1 text-muted d-block mb-2"></i>
-          <div class="fw-semibold">All caught up!</div>
-          <div class="text-muted small">No pending hotel or shop registrations in <?= e($cityName) ?>.</div>
+      <!-- ── Your spots ──────────────────────────────────────── -->
+      <section class="mb-4">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h2 class="cd-h">Your spots</h2>
+          <a href="<?= APP_URL ?>/pages/admin-spots.php" class="cd-mini ms-0">Manage all →</a>
         </div>
-      <?php else: ?>
-        <div class="d-flex flex-column gap-3 mb-4">
-
-          <?php foreach ($pending_hotels as $h): ?>
-          <div class="p-3" style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius)">
-            <div class="row g-3 align-items-center">
-              <div class="col-md-8">
-                <div class="d-flex align-items-center gap-2 mb-1">
-                  <span class="badge" style="background:var(--maroon-dark);font-size:.7rem">Hotel</span>
-                  <span class="fw-bold" style="font-family:'Playfair Display',serif;font-size:1.05rem"><?= e((string) $h['name']) ?></span>
-                </div>
-                <div class="small text-muted mb-1"><i class="bi bi-geo-alt me-1"></i><?= e((string) ($h['address'] ?? '')) ?></div>
-                <?php if (!empty($h['description'])): ?>
-                  <div class="small text-muted mb-1"><?= e((string) $h['description']) ?></div>
+        <?php if (!$spots): ?>
+          <div class="cd-card p-4 text-center">
+            <p class="mb-2">No spots in <?= e($cityName) ?> yet.</p>
+            <a href="<?= APP_URL ?>/pages/admin-spots.php" class="cd-btn is-primary" style="border-color:var(--sand-dark)"><i class="bi bi-plus-lg"></i>Add the first one</a>
+          </div>
+        <?php else: ?>
+          <div class="cd-card" style="overflow:hidden">
+            <div class="cd-spots-head cd-label">
+              <span>Spot</span><span class="cd-hide-sm">Type</span><span class="cd-hide-sm">Views (30 days)</span><span class="cd-hide-sm">Photos</span><span>Status</span><span></span>
+            </div>
+            <?php foreach (array_slice($spots, 0, 15) as $sp):
+              $img    = (string) ($sp['main_photo_url'] ?: $sp['image_url']);
+              $status = !(int) $sp['is_active'] ? ['hidden', 'Hidden'] : ((int) $sp['is_closed'] ? ['closed', 'Closed'] : ['live', 'Live']);
+              $w      = (int) round(((int) $sp['views30'] / $maxViews) * 100);
+            ?>
+            <div class="cd-spot">
+              <div class="d-flex align-items-center gap-3 min-w-0">
+                <?php if ($img !== ''): ?>
+                  <img class="cd-thumb" src="<?= e($img) ?>" alt="" loading="lazy">
+                <?php else: ?>
+                  <span class="cd-thumb"><i class="bi bi-image"></i></span>
                 <?php endif; ?>
-                <div class="small mt-2">
-                  <i class="bi bi-person-circle me-1"></i><strong><?= e((string) ($h['owner_name'] ?? 'No owner')) ?></strong>
-                  <?php if (!empty($h['owner_email'])): ?>&nbsp;·&nbsp;<i class="bi bi-envelope me-1"></i><?= e((string) $h['owner_email']) ?><?php endif; ?>
-                  <?php if (!empty($h['owner_phone'])): ?>&nbsp;·&nbsp;<i class="bi bi-telephone me-1"></i><?= e((string) $h['owner_phone']) ?><?php endif; ?>
+                <a class="cd-name text-truncate" href="<?= APP_URL ?>/pages/admin-spots.php?id=<?= (int) $sp['id'] ?>"><?= e((string) $sp['name']) ?></a>
+              </div>
+              <span class="cd-hide-sm text-muted"><?= e($categoryLabel((string) $sp['category'])) ?></span>
+              <div class="cd-hide-sm">
+                <?= number_format((int) $sp['views30']) ?>
+                <div class="cd-bar"><i style="width:<?= $w ?>%"></i></div>
+              </div>
+              <span class="cd-hide-sm"><?= (int) $sp['photo_count'] ?></span>
+              <span><span class="cd-pill <?= $status[0] ?>"><?= $status[1] ?></span></span>
+              <span class="text-nowrap">
+                <a class="cd-mini" href="<?= APP_URL ?>/pages/admin-spots.php?id=<?= (int) $sp['id'] ?>">Edit</a>
+                <a class="cd-mini" href="<?= APP_URL ?>/pages/admin-spot-photos.php?spot_id=<?= (int) $sp['id'] ?>">Photos</a>
+              </span>
+            </div>
+            <?php endforeach; ?>
+          </div>
+          <?php if ($spotTotal > 15): ?>
+            <div class="cd-delta mt-2"><?= $spotTotal - 15 ?> more spots — <a href="<?= APP_URL ?>/pages/admin-spots.php">see the full list</a>.</div>
+          <?php endif; ?>
+        <?php endif; ?>
+      </section>
+
+      <!-- ── Approvals ───────────────────────────────────────── -->
+      <section id="approvals" class="mb-4">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <h2 class="cd-h">Hotels &amp; shops</h2>
+          <?php if ($pendingTotal): ?><span class="badge rounded-pill" style="background:var(--maroon-mid)"><?= $pendingTotal ?> waiting</span><?php endif; ?>
+        </div>
+
+        <?php if (!$pendingTotal): ?>
+          <div class="cd-card p-3 mb-3 text-muted" style="font-size:.9rem">No registrations are waiting for approval.</div>
+        <?php else: ?>
+          <div class="d-flex flex-column gap-3 mb-3">
+
+            <?php foreach ($pending_hotels as $h): ?>
+            <div class="cd-card p-3">
+              <div class="row g-3 align-items-center">
+                <div class="col-md-8">
+                  <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge" style="background:var(--maroon-dark);font-size:.68rem">Hotel</span>
+                    <span class="fw-bold" style="font-family:'Playfair Display',serif;font-size:1.05rem"><?= e((string) $h['name']) ?></span>
+                  </div>
+                  <div class="small text-muted mb-1"><i class="bi bi-geo-alt me-1"></i><?= e((string) ($h['address'] ?? '')) ?></div>
+                  <?php if (!empty($h['description'])): ?><div class="small text-muted mb-1"><?= e((string) $h['description']) ?></div><?php endif; ?>
+                  <div class="small mt-2">
+                    <i class="bi bi-person-circle me-1"></i><strong><?= e((string) ($h['owner_name'] ?? 'No owner')) ?></strong>
+                    <?php if (!empty($h['owner_email'])): ?>&nbsp;·&nbsp;<?= e((string) $h['owner_email']) ?><?php endif; ?>
+                    <?php if (!empty($h['owner_phone'])): ?>&nbsp;·&nbsp;<?= e((string) $h['owner_phone']) ?><?php endif; ?>
+                  </div>
+                </div>
+                <div class="col-md-4 d-flex gap-2 justify-content-md-end">
+                  <form method="POST"><?= csrf_field() ?>
+                    <input type="hidden" name="action" value="approve_hotel">
+                    <input type="hidden" name="hotel_id" value="<?= (int) $h['id'] ?>">
+                    <button class="btn btn-sm" style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-pill);padding:.4rem 1rem"><i class="bi bi-check-lg me-1"></i>Approve</button>
+                  </form>
+                  <form method="POST" onsubmit="return confirm('Reject this hotel? The owner will need to re-submit their registration.');"><?= csrf_field() ?>
+                    <input type="hidden" name="action" value="reject_hotel">
+                    <input type="hidden" name="hotel_id" value="<?= (int) $h['id'] ?>">
+                    <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill);padding:.4rem 1rem"><i class="bi bi-x-lg me-1"></i>Reject</button>
+                  </form>
                 </div>
               </div>
-              <div class="col-md-4 d-flex gap-2 justify-content-md-end">
-                <form method="POST"><?= csrf_field() ?>
-                  <input type="hidden" name="action" value="approve_hotel">
+            </div>
+            <?php endforeach; ?>
+
+            <?php foreach ($pending_shops as $s): ?>
+            <div class="cd-card p-3">
+              <div class="row g-3 align-items-center">
+                <div class="col-md-8">
+                  <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                    <span class="badge" style="background:var(--terracotta);font-size:.68rem">Shop</span>
+                    <span class="fw-bold" style="font-family:'Playfair Display',serif;font-size:1.05rem"><?= e((string) $s['name']) ?></span>
+                    <span class="badge" style="background:var(--maroon-pale);color:var(--maroon-dark);font-size:.68rem"><?= e(ucfirst((string) $s['category'])) ?></span>
+                  </div>
+                  <div class="small text-muted mb-1"><i class="bi bi-geo-alt me-1"></i><?= e((string) ($s['address'] ?? '')) ?></div>
+                  <?php if (!empty($s['description'])): ?><div class="small text-muted mb-1"><?= e((string) $s['description']) ?></div><?php endif; ?>
+                  <div class="small mt-2">
+                    <i class="bi bi-person-circle me-1"></i><strong><?= e((string) $s['owner_name']) ?></strong>
+                    &nbsp;·&nbsp;<?= e((string) $s['owner_email']) ?>
+                    <?php if (!empty($s['owner_phone'])): ?>&nbsp;·&nbsp;<?= e((string) $s['owner_phone']) ?><?php endif; ?>
+                  </div>
+                </div>
+                <div class="col-md-4 d-flex gap-2 justify-content-md-end">
+                  <form method="POST"><?= csrf_field() ?>
+                    <input type="hidden" name="action" value="approve_shop">
+                    <input type="hidden" name="shop_id" value="<?= (int) $s['id'] ?>">
+                    <button class="btn btn-sm" style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-pill);padding:.4rem 1rem"><i class="bi bi-check-lg me-1"></i>Approve</button>
+                  </form>
+                  <form method="POST" onsubmit="return confirm('Reject this shop? The owner will need to re-submit their registration.');"><?= csrf_field() ?>
+                    <input type="hidden" name="action" value="reject_shop">
+                    <input type="hidden" name="shop_id" value="<?= (int) $s['id'] ?>">
+                    <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill);padding:.4rem 1rem"><i class="bi bi-x-lg me-1"></i>Reject</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <?php endforeach; ?>
+
+          </div>
+        <?php endif; ?>
+
+        <details class="cd-fold">
+          <summary>Published hotels <span class="cd-label ms-auto me-3"><?= count($verified_hotels) ?></span></summary>
+          <div class="cd-fold-body">
+            <?php if (!$verified_hotels): ?>
+              <p class="text-muted small my-2">No published hotels in <?= e($cityName) ?> yet.</p>
+            <?php else: foreach ($verified_hotels as $h): ?>
+              <div class="cd-row">
+                <div>
+                  <div class="fw-semibold"><?= e((string) $h['name']) ?></div>
+                  <div class="small text-muted">
+                    <?php if (!empty($h['star_rating'])): ?><?= str_repeat('★', (int) $h['star_rating']) ?> · <?php endif; ?>
+                    <?= e((string) ($h['owner_name'] ?? 'No owner')) ?>
+                  </div>
+                </div>
+                <form method="POST" onsubmit="return confirm('Unpublish this hotel? It will be hidden from tourists until re-approved.');"><?= csrf_field() ?>
+                  <input type="hidden" name="action" value="revoke_hotel">
                   <input type="hidden" name="hotel_id" value="<?= (int) $h['id'] ?>">
-                  <button class="btn btn-sm" style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-pill);padding:.4rem 1rem">
-                    <i class="bi bi-check-lg me-1"></i>Approve
-                  </button>
-                </form>
-                <form method="POST" onsubmit="return confirm('Reject this hotel? The owner will need to re-submit their registration.');"><?= csrf_field() ?>
-                  <input type="hidden" name="action" value="reject_hotel">
-                  <input type="hidden" name="hotel_id" value="<?= (int) $h['id'] ?>">
-                  <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill);padding:.4rem 1rem">
-                    <i class="bi bi-x-lg me-1"></i>Reject
-                  </button>
+                  <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill);font-size:.76rem;padding:.25rem .8rem"><i class="bi bi-eye-slash me-1"></i>Unpublish</button>
                 </form>
               </div>
-            </div>
+            <?php endforeach; endif; ?>
           </div>
-          <?php endforeach; ?>
+        </details>
 
-          <?php foreach ($pending_shops as $s): ?>
-          <div class="p-3" style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius)">
-            <div class="row g-3 align-items-center">
-              <div class="col-md-8">
-                <div class="d-flex align-items-center gap-2 mb-1">
-                  <span class="badge" style="background:var(--terracotta);font-size:.7rem">Shop</span>
-                  <span class="fw-bold" style="font-family:'Playfair Display',serif;font-size:1.05rem"><?= e((string) $s['name']) ?></span>
-                  <span class="badge" style="background:var(--maroon-pale);color:var(--maroon-dark);font-size:.7rem"><?= e(ucfirst((string) $s['category'])) ?></span>
+        <details class="cd-fold">
+          <summary>Published shops <span class="cd-label ms-auto me-3"><?= count($verified_shops) ?></span></summary>
+          <div class="cd-fold-body">
+            <?php if (!$verified_shops): ?>
+              <p class="text-muted small my-2">No published shops in <?= e($cityName) ?> yet.</p>
+            <?php else: foreach ($verified_shops as $s): ?>
+              <div class="cd-row">
+                <div>
+                  <div class="fw-semibold"><?= e((string) $s['name']) ?> <span class="badge" style="background:var(--maroon-pale);color:var(--maroon-dark);font-size:.66rem"><?= e(ucfirst((string) $s['category'])) ?></span></div>
+                  <div class="small text-muted"><?= e((string) $s['owner_name']) ?></div>
                 </div>
-                <div class="small text-muted mb-1"><i class="bi bi-geo-alt me-1"></i><?= e((string) ($s['address'] ?? '')) ?></div>
-                <?php if (!empty($s['description'])): ?>
-                  <div class="small text-muted mb-1"><?= e((string) $s['description']) ?></div>
-                <?php endif; ?>
-                <div class="small mt-2">
-                  <i class="bi bi-person-circle me-1"></i><strong><?= e((string) $s['owner_name']) ?></strong>
-                  &nbsp;·&nbsp;<i class="bi bi-envelope me-1"></i><?= e((string) $s['owner_email']) ?>
-                  <?php if (!empty($s['owner_phone'])): ?>&nbsp;·&nbsp;<i class="bi bi-telephone me-1"></i><?= e((string) $s['owner_phone']) ?><?php endif; ?>
-                </div>
-              </div>
-              <div class="col-md-4 d-flex gap-2 justify-content-md-end">
-                <form method="POST"><?= csrf_field() ?>
-                  <input type="hidden" name="action" value="approve_shop">
+                <form method="POST" onsubmit="return confirm('Unpublish this shop? It will be hidden from tourists until re-approved.');"><?= csrf_field() ?>
+                  <input type="hidden" name="action" value="revoke_shop">
                   <input type="hidden" name="shop_id" value="<?= (int) $s['id'] ?>">
-                  <button class="btn btn-sm" style="background:var(--maroon-mid);color:#fff;border-radius:var(--radius-pill);padding:.4rem 1rem">
-                    <i class="bi bi-check-lg me-1"></i>Approve
-                  </button>
-                </form>
-                <form method="POST" onsubmit="return confirm('Reject this shop? The owner will need to re-submit their registration.');"><?= csrf_field() ?>
-                  <input type="hidden" name="action" value="reject_shop">
-                  <input type="hidden" name="shop_id" value="<?= (int) $s['id'] ?>">
-                  <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill);padding:.4rem 1rem">
-                    <i class="bi bi-x-lg me-1"></i>Reject
-                  </button>
+                  <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill);font-size:.76rem;padding:.25rem .8rem"><i class="bi bi-eye-slash me-1"></i>Unpublish</button>
                 </form>
               </div>
-            </div>
+            <?php endforeach; endif; ?>
           </div>
-          <?php endforeach; ?>
-
-        </div>
-      <?php endif; ?>
-
-      <!-- Published hotels -->
-      <div class="d-flex align-items-center gap-2 mt-4 mb-3 pb-2" style="border-bottom:2px solid var(--maroon-pale)">
-        <i class="bi bi-patch-check-fill" style="color:var(--maroon-mid)"></i>
-        <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">Published hotels (<?= count($verified_hotels) ?>)</h6>
-      </div>
-      <?php if (!$verified_hotels): ?>
-        <p class="text-muted small">No published hotels in <?= e($cityName) ?> yet.</p>
-      <?php else: ?>
-        <div class="d-flex flex-column gap-2 mb-4">
-          <?php foreach ($verified_hotels as $h): ?>
-          <div class="d-flex align-items-center justify-content-between gap-3 p-3" style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-            <div class="min-w-0">
-              <div class="fw-bold" style="font-size:.92rem"><?= e((string) $h['name']) ?></div>
-              <div class="small text-muted">
-                <?php if (!empty($h['star_rating'])): ?><?= str_repeat('★', (int) $h['star_rating']) ?> &nbsp;·&nbsp;<?php endif; ?>
-                <i class="bi bi-person-circle me-1"></i><?= e((string) ($h['owner_name'] ?? 'No owner')) ?>
-              </div>
-            </div>
-            <form method="POST" class="flex-shrink-0" onsubmit="return confirm('Unpublish this hotel? It will be hidden from tourists until re-approved.');"><?= csrf_field() ?>
-              <input type="hidden" name="action" value="revoke_hotel">
-              <input type="hidden" name="hotel_id" value="<?= (int) $h['id'] ?>">
-              <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill);font-size:.78rem;padding:.3rem .8rem">
-                <i class="bi bi-eye-slash me-1"></i>Unpublish
-              </button>
-            </form>
-          </div>
-          <?php endforeach; ?>
-        </div>
-      <?php endif; ?>
-
-      <!-- Published shops -->
-      <div class="d-flex align-items-center gap-2 mt-4 mb-3 pb-2" style="border-bottom:2px solid var(--maroon-pale)">
-        <i class="bi bi-patch-check-fill" style="color:var(--maroon-mid)"></i>
-        <h6 class="fw-bold mb-0" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">Published shops (<?= count($verified_shops) ?>)</h6>
-      </div>
-      <?php if (!$verified_shops): ?>
-        <p class="text-muted small">No published shops in <?= e($cityName) ?> yet.</p>
-      <?php else: ?>
-        <div class="d-flex flex-column gap-2">
-          <?php foreach ($verified_shops as $s): ?>
-          <div class="d-flex align-items-center justify-content-between gap-3 p-3" style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-            <div class="min-w-0">
-              <div class="d-flex align-items-center gap-2 flex-wrap">
-                <span class="fw-bold" style="font-size:.92rem"><?= e((string) $s['name']) ?></span>
-                <span class="badge" style="background:var(--maroon-pale);color:var(--maroon-dark);font-size:.68rem"><?= e(ucfirst((string) $s['category'])) ?></span>
-              </div>
-              <div class="small text-muted"><i class="bi bi-person-circle me-1"></i><?= e((string) $s['owner_name']) ?></div>
-            </div>
-            <form method="POST" class="flex-shrink-0" onsubmit="return confirm('Unpublish this shop? It will be hidden from tourists until re-approved.');"><?= csrf_field() ?>
-              <input type="hidden" name="action" value="revoke_shop">
-              <input type="hidden" name="shop_id" value="<?= (int) $s['id'] ?>">
-              <button class="btn btn-sm btn-outline-danger" style="border-radius:var(--radius-pill);font-size:.78rem;padding:.3rem .8rem">
-                <i class="bi bi-eye-slash me-1"></i>Unpublish
-              </button>
-            </form>
-          </div>
-          <?php endforeach; ?>
-        </div>
-      <?php endif; ?>
+        </details>
+      </section>
 
     </div>
 
-    <!-- ── Side column ───────────────────────────────────────── -->
+    <!-- ── Activity ──────────────────────────────────────────── -->
     <div class="col-lg-4">
-
-      <div class="form-panel mb-4">
-        <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
-          <i class="bi bi-graph-up me-2"></i>Top spots (last 30 days)
-        </h6>
-        <?php if (!$topSpots): ?>
-          <p class="text-muted small mb-2">No spots yet. <a href="<?= APP_URL ?>/pages/admin-spots.php">Add your first spot</a>.</p>
-        <?php else: ?>
-          <ol class="ps-3 mb-0 small">
-            <?php foreach ($topSpots as $sp): ?>
-              <li class="mb-1">
-                <a href="<?= APP_URL ?>/pages/admin-spots.php?id=<?= (int) $sp['id'] ?>" class="text-decoration-none"><?= e((string) $sp['name']) ?></a>
-                <span class="text-muted">· <?= (int) $sp['views'] ?> view<?= (int) $sp['views'] === 1 ? '' : 's' ?></span>
-              </li>
-            <?php endforeach; ?>
-          </ol>
-        <?php endif; ?>
-      </div>
-
-      <div class="form-panel">
-        <h6 class="fw-bold mb-3" style="font-family:'Playfair Display',serif;color:var(--maroon-dark)">
-          <i class="bi bi-clock-history me-2"></i>Recent activity
-        </h6>
+      <section class="cd-card p-4">
+        <h2 class="cd-h mb-3">Recent changes</h2>
         <?php if (!$activity): ?>
-          <p class="text-muted small mb-0">Nothing yet. Your changes will be listed here.</p>
+          <p class="text-muted small mb-0">Nothing yet. Everything you add or approve is listed here, with the date and who did it.</p>
         <?php else: ?>
-          <ul class="list-unstyled mb-0 small">
+          <ul class="cd-time">
             <?php foreach ($activity as $a): ?>
-              <li class="mb-2 pb-2" style="border-bottom:1px solid var(--border)">
-                <div><strong><?= e(ucwords(str_replace('_', ' ', (string) $a['action']))) ?></strong><?= $a['details'] ? ' — ' . e((string) $a['details']) : '' ?></div>
-                <div class="text-muted"><?= e((string) ($a['user_name'] ?? 'Unknown')) ?> · <?= e(date('M d, g:i A', strtotime((string) $a['created_at']))) ?></div>
+              <li>
+                <strong><?= e(ucfirst(strtolower(str_replace('_', ' ', (string) $a['action'])))) ?></strong><?= $a['details'] ? ' — ' . e((string) $a['details']) : '' ?>
+                <small><?= e((string) ($a['user_name'] ?? 'Unknown')) ?> · <?= e(date('M j, g:i A', strtotime((string) $a['created_at']))) ?></small>
               </li>
             <?php endforeach; ?>
           </ul>
         <?php endif; ?>
-      </div>
-
+      </section>
     </div>
   </div>
 </div>
