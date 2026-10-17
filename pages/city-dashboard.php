@@ -150,7 +150,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // ── Data for this city only ───────────────────────────────────
 ensure_admin_activity_table();
 
-$today = new DateTimeImmutable('today');
+// All dates come from the DATABASE clock, in Philippine time, so "today"
+// matches the way views and check-ins were recorded.
+try { db()->exec("SET time_zone = '+08:00'"); } catch (Throwable $e) { /* keep the server default */ }
+$clock   = db_fetch_one("SELECT CURDATE() AS d, NOW() AS n");
+$today   = new DateTimeImmutable((string) $clock['d']);
+$nowTs   = (string) $clock['n'];
+$nowHour = (int) substr($nowTs, 11, 2);
+
+// ── Reporting period (chosen with the buttons above the chart) ──
+$ranges = [
+    'today' => ['label' => 'Today',     'long' => 'today',               'prev' => 'yesterday so far'],
+    '7d'    => ['label' => '7 days',    'long' => 'the last 7 days',     'prev' => 'the 7 days before'],
+    '30d'   => ['label' => '30 days',   'long' => 'the last 30 days',    'prev' => 'the 30 days before'],
+    '90d'   => ['label' => '3 months',  'long' => 'the last 3 months',   'prev' => 'the 3 months before'],
+    '12m'   => ['label' => '12 months', 'long' => 'the last 12 months',  'prev' => 'the 12 months before'],
+];
+$rangeKey = (string) input('range', 'get', '30d');
+if (!isset($ranges[$rangeKey])) { $rangeKey = '30d'; }
+$range = $ranges[$rangeKey];
+
+switch ($rangeKey) {
+    case 'today': $start = $today;                                              $pStart = $today->modify('-1 day');
+                  $pEnd  = (new DateTimeImmutable($nowTs))->modify('-1 day');   break;
+    case '7d':    $start = $today->modify('-6 day');                            $pStart = $start->modify('-7 day');   $pEnd = $start; break;
+    case '30d':   $start = $today->modify('-29 day');                           $pStart = $start->modify('-30 day');  $pEnd = $start; break;
+    case '90d':   $start = $today->modify('-90 day');                           $pStart = $start->modify('-91 day');  $pEnd = $start; break; // 91 days = 13 whole weeks
+    default:      $start = $today->modify('first day of this month')->modify('-11 month');
+                  $pStart = $start->modify('-12 month');                        $pEnd = $start; break;
+}
+$S  = $start->format('Y-m-d 00:00:00');
+$E  = $today->modify('+1 day')->format('Y-m-d 00:00:00');   // exclusive
+$PS = $pStart->format('Y-m-d 00:00:00');
+$PE = $pEnd->format('Y-m-d H:i:s');
 
 // Every spot in this city, with what the table and the to-do list need.
 $spots = db_fetch_all(
@@ -160,49 +192,69 @@ $spots = db_fetch_all(
               ORDER BY sort_order, id LIMIT 1) AS main_photo_url,
             (SELECT COUNT(*) FROM spot_photos WHERE spot_id = s.id) AS photo_count,
             (SELECT COUNT(*) FROM spot_views v
-              WHERE v.spot_id = s.id AND v.viewed_at >= (CURDATE() - INTERVAL 29 DAY)) AS views30
+              WHERE v.spot_id = s.id AND v.viewed_at >= ? AND v.viewed_at < ?) AS views_range
      FROM tourist_spots s
      WHERE s.city_id = ?
-     ORDER BY views30 DESC, s.name", [$cityId]);
+     ORDER BY views_range DESC, s.name", [$S, $E, $cityId]);
 
 $spotTotal  = count($spots);
 $spotActive = count(array_filter($spots, fn($x) => (int) $x['is_active'] === 1));
-$maxViews   = max(1, ...array_map(fn($x) => (int) $x['views30'], $spots ?: [['views30' => 0]]));
+$maxViews   = max(1, ...array_map(fn($x) => (int) $x['views_range'], $spots ?: [['views_range' => 0]]));
 
-// Views per day for the last 30 days (gaps filled with 0) + the 30 days before.
-$dailyRows = db_fetch_all(
-    "SELECT DATE(v.viewed_at) AS d, COUNT(*) AS n
-     FROM spot_views v JOIN tourist_spots s ON s.id = v.spot_id
-     WHERE s.city_id = ? AND v.viewed_at >= (CURDATE() - INTERVAL 29 DAY)
-     GROUP BY DATE(v.viewed_at)", [$cityId]);
-$byDay = [];
-foreach ($dailyRows as $r) { $byDay[(string) $r['d']] = (int) $r['n']; }
-$series = [];
-for ($i = 29; $i >= 0; $i--) {
-    $series[] = $byDay[$today->modify("-{$i} day")->format('Y-m-d')] ?? 0;
+// Views over the chosen period, grouped into buckets that suit its length:
+//   today = hours · 7 / 30 days = days · 3 months = weeks · 12 months = months
+$series = [];   // each: ['label' => tooltip text, 'n' => views]
+$viewsFrom = "FROM spot_views v JOIN tourist_spots s ON s.id = v.spot_id
+              WHERE s.city_id = ? AND v.viewed_at >= ? AND v.viewed_at < ?";
+if ($rangeKey === 'today') {
+    $by = [];
+    foreach (db_fetch_all("SELECT HOUR(v.viewed_at) AS b, COUNT(*) AS n $viewsFrom GROUP BY HOUR(v.viewed_at)", [$cityId, $S, $E]) as $r) { $by[(int) $r['b']] = (int) $r['n']; }
+    for ($h = 0; $h <= $nowHour; $h++) {
+        $series[] = ['label' => (($h % 12) ?: 12) . ($h < 12 ? ' AM' : ' PM'), 'n' => $by[$h] ?? 0];
+    }
+} elseif ($rangeKey === '12m') {
+    $by = [];
+    foreach (db_fetch_all("SELECT DATE_FORMAT(v.viewed_at, '%Y-%m') AS b, COUNT(*) AS n $viewsFrom GROUP BY DATE_FORMAT(v.viewed_at, '%Y-%m')", [$cityId, $S, $E]) as $r) { $by[(string) $r['b']] = (int) $r['n']; }
+    for ($i = 0; $i < 12; $i++) {
+        $m = $start->modify("+{$i} month");
+        $series[] = ['label' => $m->format('F Y'), 'n' => $by[$m->format('Y-m')] ?? 0];
+    }
+} else {
+    $by = [];
+    foreach (db_fetch_all("SELECT DATE(v.viewed_at) AS b, COUNT(*) AS n $viewsFrom GROUP BY DATE(v.viewed_at)", [$cityId, $S, $E]) as $r) { $by[(string) $r['b']] = (int) $r['n']; }
+    $dayCount = (int) $start->diff($today)->days + 1;
+    if ($rangeKey === '90d') {
+        for ($w = 0; $w < 13; $w++) {
+            $sum = 0;
+            for ($d = 0; $d < 7; $d++) { $sum += $by[$start->modify('+' . ($w * 7 + $d) . ' day')->format('Y-m-d')] ?? 0; }
+            $series[] = ['label' => 'Week of ' . $start->modify('+' . ($w * 7) . ' day')->format('M j'), 'n' => $sum];
+        }
+    } else {
+        for ($d = 0; $d < $dayCount; $d++) {
+            $day = $start->modify("+{$d} day");
+            $series[] = ['label' => $day->format('D, M j'), 'n' => $by[$day->format('Y-m-d')] ?? 0];
+        }
+    }
 }
-$views30 = array_sum($series);
-$viewsPrev30 = (int) (db_fetch_one(
-    "SELECT COUNT(*) AS n FROM spot_views v JOIN tourist_spots s ON s.id = v.spot_id
-     WHERE s.city_id = ? AND v.viewed_at >= (CURDATE() - INTERVAL 59 DAY)
-       AND v.viewed_at <  (CURDATE() - INTERVAL 29 DAY)", [$cityId])['n'] ?? 0);
+$periodViews = array_sum(array_column($series, 'n'));
+$prevViews   = (int) (db_fetch_one("SELECT COUNT(*) AS n $viewsFrom", [$cityId, $PS, $PE])['n'] ?? 0);
 
-$checkins30 = (int) (db_fetch_one(
+$checkinsN = (int) (db_fetch_one(
     "SELECT COUNT(*) AS n FROM spot_checkins c JOIN tourist_spots s ON s.id = c.spot_id
-     WHERE s.city_id = ? AND c.checked_in_at >= (NOW() - INTERVAL 30 DAY)", [$cityId])['n'] ?? 0);
+     WHERE s.city_id = ? AND c.checked_in_at >= ? AND c.checked_in_at < ?", [$cityId, $S, $E])['n'] ?? 0);
 
 $reviewStats = db_fetch_one(
     "SELECT COUNT(*) AS n, AVG(r.rating) AS avg_rating
      FROM spot_reviews r JOIN tourist_spots s ON s.id = r.spot_id
-     WHERE s.city_id = ?", [$cityId]) ?: ['n' => 0, 'avg_rating' => null];
+     WHERE s.city_id = ? AND r.created_at >= ? AND r.created_at < ?", [$cityId, $S, $E]) ?: ['n' => 0, 'avg_rating' => null];
 
-$bookings30 = (int) (db_fetch_one(
+$bookingsN = (int) (db_fetch_one(
     "SELECT COUNT(*) AS n FROM bookings b JOIN hotels h ON h.id = b.hotel_id
-     WHERE h.city_id = ? AND b.created_at >= (NOW() - INTERVAL 30 DAY)", [$cityId])['n'] ?? 0);
+     WHERE h.city_id = ? AND b.created_at >= ? AND b.created_at < ?", [$cityId, $S, $E])['n'] ?? 0);
 
-$orders30 = (int) (db_fetch_one(
+$ordersN = (int) (db_fetch_one(
     "SELECT COUNT(*) AS n FROM orders o JOIN shops s ON s.id = o.shop_id
-     WHERE s.city_id = ? AND o.created_at >= (NOW() - INTERVAL 30 DAY)", [$cityId])['n'] ?? 0);
+     WHERE s.city_id = ? AND o.created_at >= ? AND o.created_at < ?", [$cityId, $S, $E])['n'] ?? 0);
 
 $pending_shops = db_fetch_all(
     "SELECT s.*, u.name AS owner_name, u.email AS owner_email, u.phone AS owner_phone
@@ -270,24 +322,32 @@ foreach ($spots as $sp) {
 $todoShown = array_slice($todo, 0, 6);
 $todoMore  = count($todo) - count($todoShown);
 
-// ── Sparkline geometry (viewBox 300 × 70) ─────────────────────
-$sparkMax = max(1, max($series));
-$pts = [];
-foreach ($series as $i => $v) {
-    $x = round($i * (300 / 29), 1);
-    $y = round(62 - ($v / $sparkMax) * 52, 1);
-    $pts[] = [$x, $y];
+// ── Bar chart geometry (viewBox 300 × 70) ─────────────────────
+$barN   = max(1, count($series));
+$barMax = max(1, max(array_column($series, 'n') ?: [0]));
+$gap    = $barN <= 14 ? 6.0 : 2.0;
+$barW   = ($barN > 1) ? (300 - $gap * ($barN - 1)) / $barN : 300.0;
+if ($barW > 30) { $barW = 30.0; $gap = $barN > 1 ? (300 - $barW * $barN) / ($barN - 1) : 0.0; }
+$bars = [];
+foreach ($series as $i => $pt) {
+    $h = $pt['n'] > 0 ? max(3.0, ($pt['n'] / $barMax) * 58) : 0.0;
+    $bars[] = ['x' => round($i * ($barW + $gap), 2), 'y' => round(66 - $h, 2), 'h' => round($h, 2),
+               'w' => round($barW, 2), 'label' => $pt['label'], 'n' => $pt['n']];
 }
-$line = 'M' . implode(' L', array_map(fn($p) => $p[0] . ' ' . $p[1], $pts));
-$area = $line . ' L300 70 L0 70 Z';
-$last = end($pts);
+$axisLeft  = $series ? $series[0]['label'] : '';
+$axisRight = $rangeKey === 'today' ? 'Now' : ($rangeKey === '12m' ? 'This month' : ($rangeKey === '90d' ? 'This week' : 'Today'));
 
-$delta = $views30 - $viewsPrev30;
-if ($viewsPrev30 === 0 && $views30 === 0)      $deltaText = 'No views yet in the last 60 days';
-elseif ($viewsPrev30 === 0)                       $deltaText = 'No views in the 30 days before';
-elseif ($delta === 0)                             $deltaText = 'Same as the 30 days before';
-elseif ($delta > 0)                               $deltaText = '↑ ' . $delta . ' more than the 30 days before';
-else                                              $deltaText = '↓ ' . abs($delta) . ' fewer than the 30 days before';
+$delta = $periodViews - $prevViews;
+if ($prevViews === 0 && $periodViews === 0) $deltaText = 'No views in this period or the one before';
+elseif ($prevViews === 0)                   $deltaText = 'No views ' . ($rangeKey === 'today' ? 'yesterday so far' : 'in ' . $range['prev']);
+elseif ($delta === 0)                       $deltaText = 'Same as ' . $range['prev'];
+elseif ($delta > 0)                         $deltaText = '↑ ' . number_format($delta) . ' more than ' . $range['prev'];
+else                                        $deltaText = '↓ ' . number_format(abs($delta)) . ' fewer than ' . $range['prev'];
+
+// Human-readable window for the label above the chart.
+if     ($rangeKey === 'today') $windowText = $today->format('l, F j');
+elseif ($rangeKey === '12m')   $windowText = $start->format('M Y') . ' – ' . $today->format('M Y');
+else                           $windowText = $start->format('M j') . ' – ' . $today->format('M j, Y');
 
 $blurb = trim((string) ($city['description'] ?? ''));
 if ($blurb !== '' && mb_strlen($blurb) > 170) { $blurb = rtrim(mb_substr($blurb, 0, 167)) . '…'; }
@@ -319,6 +379,10 @@ require_once __DIR__ . '/../includes/header.php';
   .cd-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm)}
   .cd-h{font-family:'Playfair Display',serif;font-size:1.15rem;color:var(--maroon-dark);margin:0}
 
+  .cd-range{display:inline-flex;flex-wrap:wrap;background:#fff;border:1px solid var(--border);border-radius:var(--radius-pill);padding:3px;gap:2px}
+  .cd-range a{font-size:.8rem;font-weight:600;padding:.3rem .85rem;border-radius:var(--radius-pill);color:var(--text-muted);text-decoration:none;transition:var(--transition)}
+  .cd-range a:hover{color:var(--maroon-dark)}
+  .cd-range a.is-active{background:var(--maroon-dark);color:#fff}
   .cd-pulse{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:1.25rem}
   .cd-big{font-family:'Playfair Display',serif;font-size:3.1rem;line-height:1;color:var(--maroon-dark)}
   .cd-delta{font-size:.82rem;color:var(--text-muted)}
@@ -414,29 +478,45 @@ require_once __DIR__ . '/../includes/header.php';
 <div class="container py-4">
 
   <!-- ── Pulse ──────────────────────────────────────────────── -->
-  <section class="cd-pulse mb-4" aria-label="Last 30 days">
+  <div id="pulse" class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+    <div class="cd-delta"><strong style="color:var(--charcoal)"><?= e($windowText) ?></strong></div>
+    <nav class="cd-range" aria-label="Reporting period">
+      <?php foreach ($ranges as $k => $r): ?>
+        <a href="?range=<?= e($k) ?>#pulse" class="<?= $k === $rangeKey ? 'is-active' : '' ?>" <?= $k === $rangeKey ? 'aria-current="true"' : '' ?>><?= e($r['label']) ?></a>
+      <?php endforeach; ?>
+    </nav>
+  </div>
+
+  <section class="cd-pulse mb-4" aria-label="Activity in <?= e($range['long']) ?>">
     <div class="cd-card p-4">
-      <div class="cd-label">Spot views · last 30 days</div>
-      <div class="d-flex align-items-baseline gap-3 mt-2">
-        <div class="cd-big"><?= number_format($views30) ?></div>
+      <div class="cd-label">Spot views · <?= e($range['long']) ?></div>
+      <div class="d-flex align-items-baseline gap-3 mt-2 flex-wrap">
+        <div class="cd-big"><?= number_format($periodViews) ?></div>
         <div class="cd-delta"><?= e($deltaText) ?></div>
       </div>
       <svg class="cd-spark" viewBox="0 0 300 70" preserveAspectRatio="none" role="img"
-           aria-label="Daily spot views in <?= e($cityName) ?> over the last 30 days">
-        <path d="<?= e($area) ?>" fill="var(--maroon-pale)" opacity=".7"/>
-        <path d="<?= e($line) ?>" fill="none" stroke="var(--maroon-mid)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
-        <circle cx="<?= (float) $last[0] ?>" cy="<?= (float) $last[1] ?>" r="3" fill="var(--maroon-dark)" vector-effect="non-scaling-stroke"/>
+           aria-label="Spot views in <?= e($cityName) ?> over <?= e($range['long']) ?>">
+        <line x1="0" y1="66.5" x2="300" y2="66.5" stroke="var(--border)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+        <?php foreach ($bars as $i => $b): if ($b['h'] <= 0) { continue; } ?>
+          <rect x="<?= $b['x'] ?>" y="<?= $b['y'] ?>" width="<?= $b['w'] ?>" height="<?= $b['h'] ?>" rx="1.5"
+                fill="<?= $i === count($bars) - 1 ? 'var(--maroon-dark)' : 'var(--maroon-mid)' ?>">
+            <title><?= e($b['label']) ?> — <?= (int) $b['n'] ?> view<?= (int) $b['n'] === 1 ? '' : 's' ?></title>
+          </rect>
+        <?php endforeach; ?>
       </svg>
-      <div class="d-flex justify-content-between cd-delta mt-1"><span>30 days ago</span><span>Today</span></div>
+      <div class="d-flex justify-content-between cd-delta mt-1"><span><?= e($axisLeft) ?></span><span><?= e($axisRight) ?></span></div>
+      <?php if ($periodViews === 0): ?>
+        <div class="cd-delta mt-2" style="font-style:italic">No spot views recorded for this period yet.</div>
+      <?php endif; ?>
     </div>
 
     <div class="cd-card cd-stats">
       <div class="cd-stat"><b><?= $spotActive ?><span style="font-size:1rem;color:var(--text-muted);font-weight:400"> / <?= $spotTotal ?></span></b><span>Spots live</span></div>
-      <div class="cd-stat"><b><?= number_format($checkins30) ?></b><span>Check-ins</span></div>
-      <div class="cd-stat"><b><?= (int) $reviewStats['n'] ?><?php if ($reviewStats['avg_rating']): ?><span style="font-size:1rem;color:var(--terracotta);font-weight:400"> · <?= number_format((float) $reviewStats['avg_rating'], 1) ?>★</span><?php endif; ?></b><span>Spot reviews</span></div>
+      <div class="cd-stat"><b><?= number_format($checkinsN) ?></b><span>Check-ins</span></div>
+      <div class="cd-stat"><b><?= (int) $reviewStats['n'] ?><?php if ($reviewStats['avg_rating']): ?><span style="font-size:1rem;color:var(--terracotta);font-weight:400"> · <?= number_format((float) $reviewStats['avg_rating'], 1) ?>★</span><?php endif; ?></b><span>New reviews</span></div>
       <div class="cd-stat"><b><?= count($verified_hotels) ?></b><span>Hotels published</span></div>
-      <div class="cd-stat"><b><?= $bookings30 ?></b><span>Hotel bookings</span></div>
-      <div class="cd-stat"><b><?= $orders30 ?></b><span>Shop orders</span></div>
+      <div class="cd-stat"><b><?= $bookingsN ?></b><span>Hotel bookings</span></div>
+      <div class="cd-stat"><b><?= $ordersN ?></b><span>Shop orders</span></div>
     </div>
   </section>
 
@@ -480,12 +560,12 @@ require_once __DIR__ . '/../includes/header.php';
         <?php else: ?>
           <div class="cd-card" style="overflow:hidden">
             <div class="cd-spots-head cd-label">
-              <span>Spot</span><span class="cd-hide-sm">Type</span><span class="cd-hide-sm">Views (30 days)</span><span class="cd-hide-sm">Photos</span><span>Status</span><span></span>
+              <span>Spot</span><span class="cd-hide-sm">Type</span><span class="cd-hide-sm">Views · <?= e($range['label']) ?></span><span class="cd-hide-sm">Photos</span><span>Status</span><span></span>
             </div>
             <?php foreach (array_slice($spots, 0, 15) as $sp):
               $img    = (string) ($sp['main_photo_url'] ?: $sp['image_url']);
               $status = !(int) $sp['is_active'] ? ['hidden', 'Hidden'] : ((int) $sp['is_closed'] ? ['closed', 'Closed'] : ['live', 'Live']);
-              $w      = (int) round(((int) $sp['views30'] / $maxViews) * 100);
+              $w      = (int) round(((int) $sp['views_range'] / $maxViews) * 100);
             ?>
             <div class="cd-spot">
               <div class="d-flex align-items-center gap-3 min-w-0">
@@ -498,7 +578,7 @@ require_once __DIR__ . '/../includes/header.php';
               </div>
               <span class="cd-hide-sm text-muted"><?= e($categoryLabel((string) $sp['category'])) ?></span>
               <div class="cd-hide-sm">
-                <?= number_format((int) $sp['views30']) ?>
+                <?= number_format((int) $sp['views_range']) ?>
                 <div class="cd-bar"><i style="width:<?= $w ?>%"></i></div>
               </div>
               <span class="cd-hide-sm"><?= (int) $sp['photo_count'] ?></span>
