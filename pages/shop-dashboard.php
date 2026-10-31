@@ -668,6 +668,9 @@ require_once __DIR__ . '/../includes/header.php';
       <a class="nav-link" data-bs-toggle="tab" href="#products">Products<span class="sd-tabn"><?= (int) $total_products ?></span></a>
     </li>
     <li class="nav-item">
+      <a class="nav-link" data-bs-toggle="tab" href="#visitors">Customer origins</a>
+    </li>
+    <li class="nav-item">
       <a class="nav-link" data-bs-toggle="tab" href="#settings">Shop settings</a>
     </li>
   </ul>
@@ -1000,6 +1003,18 @@ require_once __DIR__ . '/../includes/header.php';
       });
     });
     </script>
+
+    <!-- ── CUSTOMER ORIGINS TAB ──────────────────────────────── -->
+    <div class="tab-pane fade" id="visitors">
+      <?php
+        require_once __DIR__ . '/../includes/visitors.php';
+        $__vp = visitor_period_bounds('30d');
+        render_visitor_origin_panel(
+            ['type' => 'shop', 'id' => (int) $shop['id']], $__vp['from'], $__vp['to'], $__vp['long'],
+            ['title' => 'Where your customers come from', 'level' => 'province', 'top' => 8, 'can_record' => true,
+             'log_url' => APP_URL . '/pages/visitor-log.php']);
+      ?>
+    </div>
 
     <!-- ── SETTINGS TAB ──────────────────────────────────────── -->
     <div class="tab-pane fade" id="settings">

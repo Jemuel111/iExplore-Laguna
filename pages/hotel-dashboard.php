@@ -681,6 +681,9 @@ require_once __DIR__ . '/../includes/header.php';
       <a class="nav-link" data-bs-toggle="tab" href="#photos">Photos</a>
     </li>
     <li class="nav-item">
+      <a class="nav-link" data-bs-toggle="tab" href="#visitors">Guest origins</a>
+    </li>
+    <li class="nav-item">
       <a class="nav-link" data-bs-toggle="tab" href="#settings">Hotel settings</a>
     </li>
   </ul>
@@ -1049,6 +1052,18 @@ require_once __DIR__ . '/../includes/header.php';
           <?php endif; ?>
         </div>
       </div>
+    </div>
+
+    <!-- ── GUEST ORIGINS TAB ─────────────────────────────────── -->
+    <div class="tab-pane fade" id="visitors">
+      <?php
+        require_once __DIR__ . '/../includes/visitors.php';
+        $__vp = visitor_period_bounds('30d');
+        render_visitor_origin_panel(
+            ['type' => 'hotel', 'id' => (int) $hotel['id']], $__vp['from'], $__vp['to'], $__vp['long'],
+            ['title' => 'Where your guests come from', 'level' => 'province', 'top' => 8, 'can_record' => true,
+             'log_url' => APP_URL . '/pages/visitor-log.php']);
+      ?>
     </div>
 
     <!-- ── SETTINGS TAB ──────────────────────────────────────── -->

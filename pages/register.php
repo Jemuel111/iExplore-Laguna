@@ -13,7 +13,7 @@ if (is_logged_in()) { header('Location: ' . APP_URL); exit; }
 
 $errors = [];
 $name = $email = '';
-$birthdate = $gender = $tourist_type = $nationality = $province = $city = '';
+$birthdate = $gender = $tourist_type = $nationality = $province = $city = $barangay = '';
 
 ensure_user_demographic_columns();
 
@@ -29,6 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nationality  = trim(input('nationality', 'post', ''));
     $province     = trim(input('province',    'post', ''));
     $city         = trim(input('city',        'post', ''));
+    $barangay     = mb_substr(trim(input('barangay', 'post', '')), 0, 100);   // optional
     $privacy_consent = input('privacy_consent', 'post', '') === 'on';
 
     if (strlen($name) < 2)                          $errors[] = 'Name must be at least 2 characters.';
@@ -67,13 +68,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]);
             db_execute(
-                "INSERT INTO users (name, email, password, birthdate, gender, tourist_type, nationality, province, city)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO users (name, email, password, birthdate, gender, tourist_type, nationality, province, city, barangay)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
                     $name, $email, $hash, $birthdate, $gender, $tourist_type,
                     $tourist_type === 'international' ? $nationality : null,
                     $tourist_type === 'local' ? $province : null,
                     $tourist_type === 'local' ? $city : null,
+                    ($tourist_type === 'local' && $barangay !== '') ? $barangay : null,
                 ]
             );
             $user = db_fetch_one("SELECT * FROM users WHERE email = ?", [$email]);
@@ -196,6 +198,12 @@ require_once __DIR__ . '/../includes/header.php';
             <label class="form-label">City / Municipality</label>
             <input type="text" class="form-control" name="city"
                    value="<?= e($city) ?>" placeholder="e.g. Santa Rosa">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Barangay <span class="text-muted small">(optional)</span></label>
+            <input type="text" class="form-control" name="barangay" maxlength="100"
+                   value="<?= e($barangay) ?>" placeholder="e.g. Pulo">
+            <div class="form-text">Helps local tourism offices understand which communities visitors come from.</div>
           </div>
         </div>
 

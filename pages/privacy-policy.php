@@ -45,6 +45,7 @@ require_once __DIR__ . '/../includes/header.php';
     <ul class="mb-0">
       <li><strong>Account information</strong> — your name, email address, password (stored encrypted, never in plain text), birthdate, gender, and whether you're a local or international tourist (plus province/city or nationality).</li>
       <li><strong>Business registration information</strong> — if you register a hotel or shop, we additionally collect your business name, address, contact number, and any documents submitted for verification.</li>
+      <li><strong>Where you're from</strong> — for local tourists, your province, city/municipality and (optionally) barangay; for international tourists, your nationality. Tourism staff may also record walk-in visitors at a spot, hotel or shop as simple counts by place of origin, <em>without names or contact details</em>.</li>
       <li><strong>Trip planning data</strong> — routes, cities, tourist spots, and itineraries you build or save, so you can revisit them later under "My Itineraries".</li>
       <li><strong>Booking and order details</strong> — information needed to fulfill a hotel booking or shop order (e.g. dates, quantities, contact details), shared only with the specific business you're booking or ordering from.</li>
       <li><strong>Usage information</strong> — basic technical data like your session and the pages you visit, used only to keep the site working correctly (e.g. keeping you logged in, preventing cross-site request forgery).</li>
@@ -61,6 +62,7 @@ require_once __DIR__ . '/../includes/header.php';
       <li>To let you book hotels, order from local shops, and save your travel plans.</li>
       <li>To verify hotel and shop registrations before they're listed publicly.</li>
       <li>To improve the platform and understand which features are actually useful.</li>
+      <li>To produce visitor statistics — for example how many visitors come from each province or country — for city tourism offices, hotels and shops. These reports show totals and percentages only, never your name, email or other details that identify you.</li>
     </ul>
     <p class="mb-0 mt-3 small text-muted">We do not sell your personal information to third parties.</p>
   </div>

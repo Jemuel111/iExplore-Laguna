@@ -203,6 +203,7 @@ function ensure_user_demographic_columns(): void {
         'nationality'  => "VARCHAR(100) NULL",
         'province'     => "VARCHAR(100) NULL",
         'city'         => "VARCHAR(100) NULL",
+        'barangay'     => "VARCHAR(100) NULL",
     ];
     foreach ($wanted as $col => $def) {
         if (!in_array($col, $existing, true)) {

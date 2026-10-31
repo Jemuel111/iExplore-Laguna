@@ -1,6 +1,7 @@
 <?php
 ob_start();
 require_once __DIR__ . '/../includes/helpers.php';
+require_once __DIR__ . '/../includes/visitors.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') { csrf_verify(); }
 // ============================================================
 // iEXPLORE LAGUNA — City Admin Dashboard
@@ -469,6 +470,7 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="d-flex gap-2 flex-wrap justify-content-lg-end">
           <a href="<?= APP_URL ?>/pages/admin-spots.php" class="cd-btn is-primary"><i class="bi bi-plus-lg"></i>Add a spot</a>
           <a href="<?= APP_URL ?>/pages/admin-spot-photos.php" class="cd-btn"><i class="bi bi-images"></i>Photos</a>
+          <a href="<?= APP_URL ?>/pages/visitor-log.php" class="cd-btn"><i class="bi bi-people"></i>Visitors</a>
         </div>
       </div>
     </div>
@@ -726,6 +728,12 @@ require_once __DIR__ . '/../includes/header.php';
 
     <!-- ── Activity ──────────────────────────────────────────── -->
     <div class="col-lg-4">
+      <div class="mb-4">
+        <?php render_visitor_origin_panel(
+            ['type' => 'city', 'id' => $cityId], $S, $E, $range['long'],
+            ['title' => 'Where visitors come from', 'level' => 'province', 'top' => 5, 'can_record' => true,
+             'log_url' => APP_URL . '/pages/visitor-log.php?range=' . urlencode($rangeKey)]); ?>
+      </div>
       <section class="cd-card p-4">
         <h2 class="cd-h mb-3">Recent changes</h2>
         <?php if (!$activity): ?>

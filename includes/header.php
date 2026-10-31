@@ -26,7 +26,7 @@ $__theme_css = sprintf(
 // Admins are restricted to the admin area — bounce them off every
 // tourist-facing page (browsing, planner, ordering, booking, etc.)
 if ($user && ($user['role'] ?? '') === 'admin') {
-    $__admin_allowed = ['admin-dashboard.php', 'admin-packages.php', 'admin-spot-photos.php', 'admin-spots.php', 'admin-hotel-photos.php', 'admin-analytics.php', 'admin-city-admins.php', 'logout.php'];
+    $__admin_allowed = ['admin-dashboard.php', 'admin-packages.php', 'admin-spot-photos.php', 'admin-spots.php', 'admin-hotel-photos.php', 'admin-analytics.php', 'admin-city-admins.php', 'visitor-log.php', 'logout.php'];
     $__current_page  = basename($_SERVER['SCRIPT_NAME'] ?? '');
     if (!in_array($__current_page, $__admin_allowed, true)) {
         header('Location: ' . APP_URL . '/pages/admin-dashboard.php');
@@ -38,7 +38,7 @@ if ($user && ($user['role'] ?? '') === 'admin') {
 // (The pages themselves ALSO check the city on the server — this is
 // only the "keep them out of tourist pages" layer.)
 if ($user && ($user['role'] ?? '') === 'city_admin') {
-    $__city_allowed = ['city-dashboard.php', 'admin-spots.php', 'admin-spot-photos.php', 'admin-hotel-photos.php', 'logout.php'];
+    $__city_allowed = ['city-dashboard.php', 'admin-spots.php', 'admin-spot-photos.php', 'admin-hotel-photos.php', 'visitor-log.php', 'logout.php'];
     $__current_page = basename($_SERVER['SCRIPT_NAME'] ?? '');
     if (!in_array($__current_page, $__city_allowed, true)) {
         header('Location: ' . APP_URL . '/pages/city-dashboard.php');
@@ -51,7 +51,7 @@ if ($user && ($user['role'] ?? '') === 'city_admin') {
 // real access control on its own, since someone could still type the URL
 // directly — this is the actual enforcement.
 if ($user && ($user['role'] ?? '') === 'shop_owner') {
-    $__owner_allowed = ['shop-dashboard.php', 'register-shop.php', 'logout.php'];
+    $__owner_allowed = ['shop-dashboard.php', 'register-shop.php', 'visitor-log.php', 'logout.php'];
     $__current_page  = basename($_SERVER['SCRIPT_NAME'] ?? '');
     if (!in_array($__current_page, $__owner_allowed, true)) {
         header('Location: ' . APP_URL . '/pages/shop-dashboard.php');
@@ -59,7 +59,7 @@ if ($user && ($user['role'] ?? '') === 'shop_owner') {
     }
 }
 if ($user && ($user['role'] ?? '') === 'hotel_owner') {
-    $__owner_allowed = ['hotel-dashboard.php', 'register-hotel.php', 'logout.php'];
+    $__owner_allowed = ['hotel-dashboard.php', 'register-hotel.php', 'visitor-log.php', 'logout.php'];
     $__current_page  = basename($_SERVER['SCRIPT_NAME'] ?? '');
     if (!in_array($__current_page, $__owner_allowed, true)) {
         header('Location: ' . APP_URL . '/pages/hotel-dashboard.php');
@@ -217,6 +217,11 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
             <i class="bi bi-images me-1"></i>Hotel Photos
           </a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link <?= $active_page === 'visitor-log' ? 'active' : '' ?>" href="<?= APP_URL ?>/pages/visitor-log.php">
+            <i class="bi bi-people me-1"></i>Visitors
+          </a>
+        </li>
 
         <?php elseif ($user && ($user['role'] ?? '') === 'shop_owner'): ?>
         <!-- Shop owners run a business here, not browse as tourists — same
@@ -239,6 +244,11 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
             <i class="bi bi-grid me-1"></i>Products
           </a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link <?= $active_page === 'visitor-log' ? 'active' : '' ?>" href="<?= APP_URL ?>/pages/visitor-log.php">
+            <i class="bi bi-people me-1"></i>Visitor Log
+          </a>
+        </li>
 
         <?php elseif ($user && ($user['role'] ?? '') === 'hotel_owner'): ?>
         <li class="nav-item">
@@ -259,6 +269,11 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
         <li class="nav-item">
           <a class="nav-link" href="<?= APP_URL ?>/pages/hotel-dashboard.php#photos">
             <i class="bi bi-images me-1"></i>Photos
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link <?= $active_page === 'visitor-log' ? 'active' : '' ?>" href="<?= APP_URL ?>/pages/visitor-log.php">
+            <i class="bi bi-people me-1"></i>Visitor Log
           </a>
         </li>
 
@@ -343,6 +358,8 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
                   <i class="bi bi-grid me-2"></i>Manage Products</a></li>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/shop-dashboard.php#settings">
                   <i class="bi bi-gear me-2"></i>Shop Settings</a></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/visitor-log.php">
+                  <i class="bi bi-people me-2"></i>Visitor Log</a></li>
 
               <?php elseif ($__role === 'hotel_owner'): ?>
                 <li><a class="dropdown-item fw-bold" href="<?= APP_URL ?>/pages/hotel-dashboard.php">
@@ -352,6 +369,8 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
                   <i class="bi bi-calendar-check me-2"></i>Manage Bookings</a></li>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/hotel-dashboard.php#rooms">
                   <i class="bi bi-door-open me-2"></i>Manage Rooms</a></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/visitor-log.php">
+                  <i class="bi bi-people me-2"></i>Visitor Log</a></li>
 
               <?php elseif ($__role === 'admin'): ?>
                 <li><a class="dropdown-item fw-bold" href="<?= APP_URL ?>/pages/admin-dashboard.php">
@@ -371,6 +390,8 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
                   <i class="bi bi-images me-2"></i>Manage Hotel Photos</a></li>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-analytics.php">
                   <i class="bi bi-bar-chart-line me-2"></i>Analytics</a></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/visitor-log.php">
+                  <i class="bi bi-people me-2"></i>Visitor Origins</a></li>
 
               <?php elseif ($__role === 'city_admin'): ?>
                 <li><a class="dropdown-item fw-bold" href="<?= APP_URL ?>/pages/city-dashboard.php">
@@ -384,6 +405,8 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
                   <i class="bi bi-images me-2"></i>Manage Spot Photos</a></li>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-hotel-photos.php">
                   <i class="bi bi-images me-2"></i>Manage Hotel Photos</a></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/visitor-log.php">
+                  <i class="bi bi-people me-2"></i>Visitors &amp; Walk-in Log</a></li>
 
               <?php else: ?>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/itineraries.php">
