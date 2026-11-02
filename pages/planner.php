@@ -303,7 +303,7 @@ $transport_labels = [
         <div class="total-amount mb-3" id="total-budget">₱ 0.00</div>
         <div id="budget-breakdown"></div>
         <div class="small text-muted mt-2" id="budget-estimate-note">
-          Estimates use the selected budget level and the attractions included in the itinerary. When a priced hotel is listed for an overnight stay, its starting nightly rate is used in the accommodation estimate; actual prices may vary by date and room type.
+          Estimates use the selected budget level and the attractions included in the itinerary. Listed hotel prices are indicative nightly rates and may differ from the accommodation allowance in this estimate.
         </div>
       </div>
       <div class="mt-2 text-end">
@@ -496,7 +496,7 @@ function setTrafficEnabled(enabled) {
   // times up until the visitor happens to replan.
   if (lastItineraryRender) {
     const { routeData, spots, days, forceIncludeAll } = lastItineraryRender;
-    renderItinerary(routeData, spots, days, forceIncludeAll);
+    renderItinerary(routeData, spots, days, forceIncludeAll, lastItineraryRender.budgetLevel, lastItineraryRender.persons);
   }
 }
 
@@ -1016,9 +1016,17 @@ async function planRoute() {
       .filter(x => Number.isFinite(x.detourKm) && x.detourKm <= detourCapKm)
       .sort((a, b) => a.detourKm - b.detourKm);
 
-    allSpots = accepted.map(x => x.spot);
+    // Keep the planner focused on the two cities the traveler selected.
+    // The road corridor can pass near neighboring municipalities (for example,
+    // Calauan), but a nearby point is not necessarily a useful stop for this
+    // origin-to-destination itinerary. Only include spots registered in the
+    // selected origin or destination city.
+    allSpots = accepted.map(x => x.spot).filter(s =>
+      String(s.city_id) === String(routeData.origin.id) ||
+      String(s.city_id) === String(routeData.destination.id)
+    );
 
-    if (accepted.length === 0) {
+    if (allSpots.length === 0) {
       console.warn(
         `No attractions passed the road-detour check. ` +
         `Direct trip: ${directTripKm.toFixed(1)}km; ` +
@@ -1042,7 +1050,11 @@ async function planRoute() {
       try {
         const res = await fetch(API_BASE + `spots.php?action=by_ids&ids=${restoreSpotIds.join(',')}`).then(r => r.json());
         if (res.success && res.data.length) {
-          itinerarySpots = res.data;
+          itinerarySpots = res.data.filter(s =>
+            String(s.city_id) === String(routeData.origin.id) ||
+            String(s.city_id) === String(routeData.destination.id)
+          );
+          if (!itinerarySpots.length) itinerarySpots = allSpots;
         } else {
           IExploreApp.toast('Could not restore your saved spots — showing a fresh selection instead.', 'warning');
         }
@@ -1056,7 +1068,7 @@ async function planRoute() {
     // Itinerary first — it decides which spots actually get scheduled
     // (includedSpotIds), so the budget total below can match what's shown.
     const isRestoring = itinerarySpots !== allSpots; // true only when we just substituted in the saved spot list above
-    await renderItinerary(routeData, itinerarySpots, days, isRestoring);
+    await renderItinerary(routeData, itinerarySpots, days, isRestoring, budget, persons);
     renderBudget(routeData, itinerarySpots.filter(s => includedSpotIds.includes(s.id)), days, persons, budget);
 
     document.getElementById('route-summary').classList.remove('d-none');
@@ -1287,7 +1299,7 @@ function renderTransportOptions(options) {
         const days    = parseInt(document.getElementById('days-select').value);
         const persons = parseInt(document.getElementById('persons-select').value);
         const budget  = document.getElementById('budget-select').value;
-        renderItinerary(routeData, allSpots, days).then(() => {
+        renderItinerary(routeData, allSpots, days, false, budget, persons).then(() => {
           renderRouteStats(routeData);
           renderBudget(routeData, allSpots.filter(s => includedSpotIds.includes(s.id)), days, persons, budget);
         });
@@ -1445,43 +1457,45 @@ async function renderBudget(routeData, spots, days, persons, budgetLevel) {
   // call somehow ran first) so the row is never left blank.
   const flatLocalPerPerson = b.local * days;
   const realLocalPerPerson = lastLocalHopsEstimate !== null ? lastLocalHopsEstimate : flatLocalPerPerson;
-  // Carry itinerary-specific local transport into the header total.
-  const localDelta = (realLocalPerPerson - flatLocalPerPerson) * persons;
-
-  // Use the starting nightly prices of the hotels actually shown in the
-  // itinerary. For any night without a priced listing, retain the normal
-  // city-level accommodation estimate. Hotel prices are per room, so use
-  // the API's room count to estimate the group cost.
+  // Use the actual listed nightly rates from the hotels displayed in the
+  // itinerary when every overnight stay has a priced hotel. Otherwise retain
+  // the city's estimate and avoid pretending an unpriced hotel is free.
   const nights = Math.max(0, days - 1);
-  const fallbackAccommodationTotal = b.accommodation * persons * nights;
-  let accommodationTotal = 0;
-  for (let night = 0; night < nights; night++) {
-    const nightlyRate = lastHotelNightlyRates[night];
-    accommodationTotal += nightlyRate !== undefined && nightlyRate !== null
-      ? nightlyRate * (Number(b.rooms) || 1)
-      : (b.accommodation * persons);
-  }
-  const accommodationDelta = accommodationTotal - fallbackAccommodationTotal;
+  const fallbackAccommodation = b.accommodation * persons * nights;
+  const accommodationTotal = nights > 0 && lastAccommodationNights === nights
+    ? lastAccommodationTotal
+    : fallbackAccommodation;
+  const accommodationDelta = accommodationTotal - fallbackAccommodation;
+  const localDelta = (realLocalPerPerson - flatLocalPerPerson) * persons;
+  // Keep the 10% miscellaneous buffer in step with any accommodation change.
+  const miscellaneousTotal = Math.max(0, b.misc * persons + accommodationDelta * 0.10);
+  const transportTotal = b.transport * persons;
+  const foodTotal = b.food * persons * days;
+  const localTotal = realLocalPerPerson * persons;
+  const entranceTotal = totalFees * persons;
+  const grandTotal = transportTotal + accommodationTotal + foodTotal + localTotal + entranceTotal + miscellaneousTotal;
 
-  // Miscellaneous is a 10% buffer in budget.php, so adjust that buffer by
-  // 10% of the changed accommodation allowance as well.
-  const adjustedTotal = b.grand_total + totalFees * persons + localDelta + accommodationDelta * 1.10;
-  document.getElementById('total-budget').textContent = formatPeso(adjustedTotal);
+  document.getElementById('total-budget').textContent = formatPeso(grandTotal);
 
   document.getElementById('budget-breakdown').innerHTML = `
-    ${budgetRow('bi-bus-front',   'Transport',       b.transport * persons)}
+    ${budgetRow('bi-bus-front',   'Transport',       transportTotal)}
     ${budgetRow('bi-house-door',  'Accommodation',   accommodationTotal)}
-    ${budgetRow('bi-cup-hot',     'Food',            b.food * persons * days)}
-    ${budgetRow('bi-signpost-2',  'Local Transport', realLocalPerPerson * persons)}
-    ${budgetRow('bi-ticket',      'Entrance Fees',   totalFees * persons)}
-    ${budgetRow('bi-three-dots',  'Miscellaneous',   (b.misc * persons) + (accommodationDelta * 0.10))}
+    ${budgetRow('bi-cup-hot',     'Food',            foodTotal)}
+    ${budgetRow('bi-signpost-2',  'Local Transport', localTotal)}
+    ${budgetRow('bi-ticket',      'Entrance Fees',   entranceTotal)}
+    ${budgetRow('bi-three-dots',  'Miscellaneous',   miscellaneousTotal)}
   `;
 }
 
 function budgetRow(icon, label, amount) {
+  // Normalize any HTML numeric entities that may have been stored in a label
+  // by an earlier deployment, so users see normal words rather than &#x..;.
+  const decodedLabel = String(label).replace(/&#x([0-9a-f]+);/gi, (_, hex) =>
+    String.fromCharCode(parseInt(hex, 16))
+  ).replace(/&#([0-9]+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)));
   return `<div class="budget-row">
     <span class="label" style="display:flex;align-items:center;gap:.5rem">
-      <i class="bi ${icon}"></i>${label}
+      <i class="bi ${icon}"></i>${decodedLabel}
     </span>
     <span class="amount" style="white-space:nowrap">${formatPeso(amount)}</span>
   </div>`;
@@ -1622,7 +1636,11 @@ async function findNearestHotel(anchorSpot, budgetLevel = 'midrange') {
     const ceiling = roomCeilings[budgetLevel] ?? roomCeilings.midrange;
     const priced = res.data.filter(h => Number(h.price_min) > 0);
     const affordable = priced.filter(h => Number(h.price_min) <= ceiling);
-    const candidates = affordable.length ? affordable : (priced.length ? priced : res.data);
+    // Do not quietly recommend a hotel above the selected budget. If the
+    // database has prices but none fit, let the itinerary say no suitable
+    // accommodation is listed instead of presenting an expensive resort.
+    const candidates = priced.length ? affordable : res.data;
+    if (!candidates.length) return null;
 
     let best = null, bestKm = Infinity;
     candidates.forEach(h => {
@@ -1649,15 +1667,16 @@ let lastItineraryRender = null;
 // null at the top of every render so a stale total from a previous
 // itinerary is never shown against a new one.
 let lastLocalHopsEstimate = null;
-// Nightly starting prices for the actual hotels shown in the itinerary.
-// A null entry means no priced hotel was available for that night.
-let lastHotelNightlyRates = [];
+let lastAccommodationTotal = null;
+let lastAccommodationNights = 0;
 
-async function renderItinerary(routeData, spots, days, forceIncludeAll = false, budgetLevel = null) {
+async function renderItinerary(routeData, spots, days, forceIncludeAll = false, budgetLevel = null, persons = 1) {
   budgetLevel = budgetLevel || document.getElementById('budget-select')?.value || 'midrange';
+  persons = Math.max(1, parseInt(persons, 10) || 1);
   lastLocalHopsEstimate = null;
-  lastHotelNightlyRates = [];
-  lastItineraryRender = { routeData, spots, days, forceIncludeAll };
+  lastAccommodationTotal = 0;
+  lastAccommodationNights = 0;
+  lastItineraryRender = { routeData, spots, days, forceIncludeAll, budgetLevel, persons };
   const container = document.getElementById('itinerary-days');
 
   // Closed spots (that won't reopen before travel) are never scheduled.
@@ -1839,7 +1858,7 @@ async function renderItinerary(routeData, spots, days, forceIncludeAll = false, 
       if (!lunchInserted && time >= LUNCH_START_MIN) {
         const nearbyFood = await getNearbyFood(spot.city_id, spot.latitude, spot.longitude);
         const lunchDesc = nearbyFood
-          ? `${SHOP_CATEGORY_LABELS[nearbyFood.category] || 'Eatery'} <strong>${nearbyFood.name}</strong> is about ${nearbyFood.distance_km < 0.05 ? 'very nearby' : (nearbyFood.distance_km < 1 ? Math.round(nearbyFood.distance_km*1000)+' m' : nearbyFood.distance_km.toFixed(1)+' km')} from ${spot.name} — good spot for lunch.`
+          ? `${SHOP_CATEGORY_LABELS[nearbyFood.category] || 'Eatery'} <strong>${nearbyFood.name}</strong> is about ${nearbyFood.distance_km < 1 ? Math.round(nearbyFood.distance_km*1000)+'m' : nearbyFood.distance_km.toFixed(1)+' km'} from ${spot.name} — good spot for lunch.`
           : `No listed eateries near ${spot.name} yet — ask locally.`;
 
         events.push({
@@ -1857,7 +1876,7 @@ async function renderItinerary(routeData, spots, days, forceIncludeAll = false, 
     if (!lunchInserted && daySpots.length > 0) {
       const nearbyFood = await getNearbyFood(lastPoint.cityId, lastPoint.latitude, lastPoint.longitude);
       const lunchDesc = nearbyFood
-        ? `${SHOP_CATEGORY_LABELS[nearbyFood.category] || 'Eatery'} <strong>${nearbyFood.name}</strong> is about ${nearbyFood.distance_km < 0.05 ? 'very nearby' : (nearbyFood.distance_km < 1 ? Math.round(nearbyFood.distance_km*1000)+' m' : nearbyFood.distance_km.toFixed(1)+' km')} away — good spot for lunch.`
+        ? `${SHOP_CATEGORY_LABELS[nearbyFood.category] || 'Eatery'} <strong>${nearbyFood.name}</strong> is about ${nearbyFood.distance_km < 1 ? Math.round(nearbyFood.distance_km*1000)+'m' : nearbyFood.distance_km.toFixed(1)+' km'} away — good spot for lunch.`
         : `No listed eateries nearby yet — ask locally.`;
       events.push({ t: time, html: itineraryItem(minutesToLabel(time), 'bi-cup-hot', 'Lunch Break', lunchDesc) });
       time += LUNCH_MIN;
@@ -1870,14 +1889,17 @@ async function renderItinerary(routeData, spots, days, forceIncludeAll = false, 
       const nextSpot = daySlices[day][0]; // daySlices[day] is tomorrow (0-indexed)
       if (nextSpot) {
         const hotel = await findNearestHotel(nextSpot, budgetLevel);
-        lastHotelNightlyRates.push(hotel && Number(hotel.price_min) > 0 ? Number(hotel.price_min) : null);
         if (hotel) {
           const priceLabel = hotel.price_min
             ? `₱${Math.round(hotel.price_min).toLocaleString()}${hotel.price_max ? '–₱'+Math.round(hotel.price_max).toLocaleString() : ''}/night`
             : 'Price on request';
-          const budgetNote = hotel.overBudget
-            ? ' · No listed accommodation within the selected budget; this is the lowest-priced listed option'
-            : ' · selected-budget match where listed pricing is available';
+          const budgetNote = hotel.price_min
+            ? ' · within selected budget where listed pricing is available'
+            : ' · price not listed; confirm before booking';
+          if (Number(hotel.price_min) > 0) {
+            lastAccommodationTotal += Number(hotel.price_min) * Math.ceil(persons / 2);
+            lastAccommodationNights += 1;
+          }
           events.push({
             t: TOUR_END_MIN,
             html: itineraryItem(minutesToLabel(TOUR_END_MIN), 'bi-house-check', 'Check-in at ' + hotel.name,
