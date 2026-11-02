@@ -307,7 +307,8 @@ $transport_labels = [
      style="color: #FFF1D6 !important;
             -webkit-text-fill-color: #FFF1D6 !important;
             opacity: 1 !important;
-            line-height: 1.8;">
+            line-height: 1.8;
+            background: transparent !important;">
           Estimates use the selected budget level and the attractions included in the itinerary. Listed hotel prices are indicative nightly rates and may differ from the accommodation allowance in this estimate.
         </div>
       </div>
@@ -1495,9 +1496,20 @@ async function renderBudget(routeData, spots, days, persons, budgetLevel) {
 function budgetRow(icon, label, amount) {
   // Normalize any HTML numeric entities that may have been stored in a label
   // by an earlier deployment, so users see normal words rather than &#x..;.
-  const decodedLabel = String(label).replace(/&#x([0-9a-f]+);/gi, (_, hex) =>
-    String.fromCharCode(parseInt(hex, 16))
-  ).replace(/&#([0-9]+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)));
+  // Decode numeric entities repeatedly in case labels were double-encoded
+  // before being returned by the API/database.
+  let decodedLabel = String(label);
+  for (let i = 0; i < 3; i++) {
+    const decoded = decodedLabel
+      .replace(/&#x([0-9a-f]+);/gi, (_, hex) =>
+        String.fromCharCode(parseInt(hex, 16))
+      )
+      .replace(/&#([0-9]+);/g, (_, dec) =>
+        String.fromCharCode(parseInt(dec, 10))
+      );
+    if (decoded === decodedLabel) break;
+    decodedLabel = decoded;
+  }
   return `<div class="budget-row">
     <span class="label" style="display:flex;align-items:center;gap:.5rem">
       <i class="bi ${icon}"></i>${decodedLabel}
@@ -1863,7 +1875,7 @@ async function renderItinerary(routeData, spots, days, forceIncludeAll = false, 
       if (!lunchInserted && time >= LUNCH_START_MIN) {
         const nearbyFood = await getNearbyFood(spot.city_id, spot.latitude, spot.longitude);
         const lunchDesc = nearbyFood
-          ? `${SHOP_CATEGORY_LABELS[nearbyFood.category] || 'Eatery'} <strong>${nearbyFood.name}</strong> is about ${nearbyFood.distance_km < 1 ? Math.round(nearbyFood.distance_km*1000)+'m' : nearbyFood.distance_km.toFixed(1)+' km'} from ${spot.name} — good spot for lunch.`
+          ? `${SHOP_CATEGORY_LABELS[nearbyFood.category] || 'Eatery'} <strong>${nearbyFood.name}</strong> is about ${nearbyFood.distance_km < 0.05 ? 'very nearby' : nearbyFood.distance_km < 1 ? Math.max(50, Math.round(nearbyFood.distance_km*1000/10)*10)+' m' : nearbyFood.distance_km.toFixed(1)+' km'} from ${spot.name} — good spot for lunch.`
           : `No listed eateries near ${spot.name} yet — ask locally.`;
 
         events.push({
