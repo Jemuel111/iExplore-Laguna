@@ -302,6 +302,9 @@ $transport_labels = [
         <div class="total-label mb-1">Estimated Total Budget</div>
         <div class="total-amount mb-3" id="total-budget">₱ 0.00</div>
         <div id="budget-breakdown"></div>
+        <div class="small text-muted mt-2" id="budget-estimate-note">
+          Estimates use the selected budget level and the attractions included in the itinerary. Listed hotel prices are indicative nightly rates and may differ from the accommodation allowance in this estimate.
+        </div>
       </div>
       <div class="mt-2 text-end">
         <small class="text-muted">
@@ -1430,7 +1433,7 @@ async function renderBudget(routeData, spots, days, persons, budgetLevel) {
   if (!res.success) return;
   const b = res.data;
 
-  const totalFees = spots.reduce((sum, s) => sum + parseFloat(s.entrance_fee), 0);
+  const totalFees = spots.reduce((sum, s) => sum + Math.max(0, parseFloat(s.entrance_fee) || 0), 0);
 
   // budget.php's "local" figure is a flat per-day estimate (a rough
   // ₱/day rate looked up by city), not an actual count of this specific
@@ -1590,16 +1593,26 @@ function pickSpotsForTrip(ordered, routeData, totalSlots) {
 // nearby_hotels endpoint, which groups by the spot's own city_id) and
 // return the one closest to that spot — so travelers check in somewhere
 // that doesn't cost them a detour the next morning.
-async function findNearestHotel(anchorSpot) {
+async function findNearestHotel(anchorSpot, budgetLevel = 'midrange') {
   try {
     const res = await fetch(API_BASE + `spots.php?action=nearby_hotels&id=${anchorSpot.id}`).then(r => r.json());
     if (!res.success || !res.data.length) return null;
+
+    // Keep the suggested overnight stay reasonably aligned with the selected
+    // travel style. These are per-room nightly ceilings, not guarantees; if no
+    // listed hotel fits, show the lowest-priced available option with a note.
+    const roomCeilings = { budget: 1000, midrange: 3000, upscale: Infinity };
+    const ceiling = roomCeilings[budgetLevel] ?? roomCeilings.midrange;
+    const priced = res.data.filter(h => Number(h.price_min) > 0);
+    const affordable = priced.filter(h => Number(h.price_min) <= ceiling);
+    const candidates = affordable.length ? affordable : (priced.length ? priced : res.data);
+
     let best = null, bestKm = Infinity;
-    res.data.forEach(h => {
+    candidates.forEach(h => {
       const km = haversineKm(anchorSpot.latitude, anchorSpot.longitude, parseFloat(h.latitude), parseFloat(h.longitude));
       if (km < bestKm) { bestKm = km; best = h; }
     });
-    return best ? { ...best, distKm: bestKm } : null;
+    return best ? { ...best, distKm: bestKm, overBudget: Number(best.price_min) > ceiling } : null;
   } catch {
     return null;
   }
@@ -1620,7 +1633,8 @@ let lastItineraryRender = null;
 // itinerary is never shown against a new one.
 let lastLocalHopsEstimate = null;
 
-async function renderItinerary(routeData, spots, days, forceIncludeAll = false) {
+async function renderItinerary(routeData, spots, days, forceIncludeAll = false, budgetLevel = null) {
+  budgetLevel = budgetLevel || document.getElementById('budget-select')?.value || 'midrange';
   lastLocalHopsEstimate = null;
   lastItineraryRender = { routeData, spots, days, forceIncludeAll };
   const container = document.getElementById('itinerary-days');
@@ -1834,15 +1848,18 @@ async function renderItinerary(routeData, spots, days, forceIncludeAll = false) 
     if (day < days) {
       const nextSpot = daySlices[day][0]; // daySlices[day] is tomorrow (0-indexed)
       if (nextSpot) {
-        const hotel = await findNearestHotel(nextSpot);
+        const hotel = await findNearestHotel(nextSpot, budgetLevel);
         if (hotel) {
           const priceLabel = hotel.price_min
             ? `₱${Math.round(hotel.price_min).toLocaleString()}${hotel.price_max ? '–₱'+Math.round(hotel.price_max).toLocaleString() : ''}/night`
             : 'Price on request';
+          const budgetNote = hotel.overBudget
+            ? ' · No listed accommodation within the selected budget; this is the lowest-priced listed option'
+            : ' · selected-budget match where listed pricing is available';
           events.push({
             t: TOUR_END_MIN,
             html: itineraryItem(minutesToLabel(TOUR_END_MIN), 'bi-house-check', 'Check-in at ' + hotel.name,
-              `${hotel.address || nextSpot.city_name} · ${priceLabel} · ${distanceTimeLabel(hotel.distKm)} from tomorrow's first stop`)
+              `${hotel.address || nextSpot.city_name} · ${priceLabel} · ${distanceTimeLabel(hotel.distKm)} from tomorrow's first stop${budgetNote}`)
           });
           // Sleep at the hotel, not at the last spot visited — tomorrow's
           // first "distance from previous stop" should measure from here.

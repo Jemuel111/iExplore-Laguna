@@ -198,8 +198,8 @@ switch ($action) {
              FROM hotels h
              JOIN cities c ON h.city_id = c.id
              WHERE h.city_id = ? AND h.is_active = 1 AND h.is_verified = 1
-             ORDER BY h.star_rating DESC
-             LIMIT 4",
+             ORDER BY (h.price_min IS NULL OR h.price_min <= 0) ASC, h.price_min ASC, h.star_rating DESC
+             LIMIT 12",
             [$spot_city['city_id']]
         );
 
