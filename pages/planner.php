@@ -302,7 +302,7 @@ $transport_labels = [
         <div class="total-label mb-1">Estimated Total Budget</div>
         <div class="total-amount mb-3" id="total-budget">₱ 0.00</div>
         <div id="budget-breakdown"></div>
-        <div class="small text-muted mt-2" id="budget-estimate-note">
+        <div class="small mt-2" id="budget-estimate-note" style="color: #f5e6d0 !important; line-height: 1.8;">
           Estimates use the selected budget level and the attractions included in the itinerary. Listed hotel prices are indicative nightly rates and may differ from the accommodation allowance in this estimate.
         </div>
       </div>
