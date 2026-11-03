@@ -117,7 +117,7 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
       function page_needs_leaflet(): bool {
           return in_array(basename($_SERVER['SCRIPT_NAME'] ?? ''), [
               'explore.php', 'hotel.php', 'hotels.php', 'package.php', 'planner.php',
-              'shop.php', 'shops.php', 'spot-detail.php', 'spots.php',
+              'shop.php', 'shops.php', 'spot-detail.php', 'spots.php', 'nearby.php',
           ], true);
       }
   }
@@ -288,6 +288,12 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
           <a class="nav-link <?= $active_page === 'planner'   ? 'active' : '' ?>"
              href="<?= APP_URL ?>/pages/planner.php">
             <i class="bi bi-compass me-1"></i>Trip Planner
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link <?= $active_page === 'nearby'    ? 'active' : '' ?>"
+             href="<?= APP_URL ?>/pages/nearby.php">
+            <i class="bi bi-geo-fill me-1"></i>Near Me
           </a>
         </li>
         <li class="nav-item">
