@@ -44,9 +44,8 @@ switch ($action) {
         }
         $attempts[] = $transport_map[$level];
 
-        $same_city = ($origin_id === $dest_id);
         $route = null;
-        foreach ($same_city ? [] : $attempts as $preferred) {
+        foreach ($attempts as $preferred) {
             $placeholders = implode(',', array_fill(0, count($preferred), '?'));
 
             $route = db_fetch_one(
@@ -92,9 +91,7 @@ switch ($action) {
         $vehicles = 1;
         $route_type = $route['transport_type'] ?? 'bus';
 
-        if ($same_city) {
-            $transport_pp = 0.0;                 // exploring one city: only local rides
-        } elseif (!$route) {
+        if (!$route) {
             $transport_pp = 80.00 * 2;           // per person, round trip
             $estimated[]  = 'transport';
         } elseif ($route_type === 'private_car') {

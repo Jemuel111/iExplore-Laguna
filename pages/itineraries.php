@@ -120,10 +120,10 @@ require_once __DIR__ . '/../includes/header.php';
               <span>·</span>
               <span><?= $it['num_days'] ?> day<?= $it['num_days']>1?'s':'' ?></span>
             </div>
-            <h5 class="card-title-app mb-2"><?= e($it['title'] ?: ($it['origin_city_id'] == $it['dest_city_id'] ? 'Explore '.$it['origin_name'] : $it['origin_name'].' → '.$it['dest_name'])) ?></h5>
+            <h5 class="card-title-app mb-2"><?= e($it['title'] ?: $it['origin_name'].' → '.$it['dest_name']) ?></h5>
             <div class="d-flex align-items-center gap-2 mb-3" style="font-size:.85rem;color:var(--text-muted)">
               <i class="bi bi-geo-alt text-maroon"></i>
-              <span><?= $it['origin_city_id'] == $it['dest_city_id'] ? 'Exploring ' . e($it['origin_name']) : e($it['origin_name']) . ' → ' . e($it['dest_name']) ?></span>
+              <span><?= e($it['origin_name']) ?> → <?= e($it['dest_name']) ?></span>
             </div>
             <div class="d-flex gap-2 mb-3 flex-wrap">
               <span class="badge rounded-pill" style="background:var(--maroon-pale);color:var(--maroon-dark);padding:.3rem .8rem;font-size:.75rem">

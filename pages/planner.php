@@ -93,9 +93,6 @@ $transport_labels = [
             </option>
           <?php endforeach; ?>
         </select>
-        <div class="form-text" id="same-city-hint">
-          <i class="bi bi-lightbulb me-1"></i>Pick the <strong>same city</strong> as your starting point to just explore that city.
-        </div>
       </div>
 
       <div class="mb-3">
@@ -658,25 +655,6 @@ function detourKm(oLat, oLng, spotLat, spotLng, dLat, dLng) {
 // one planning operation.
 const roadDetourCache = new Map();
 
-// Limit routing lookups so a route with many nearby attractions does not
-// flood the PHP endpoint or the external routing provider with requests.
-async function mapWithConcurrency(items, limit, mapper) {
-  const results = new Array(items.length);
-  let nextIndex = 0;
-
-  async function worker() {
-    while (true) {
-      const index = nextIndex++;
-      if (index >= items.length) return;
-      results[index] = await mapper(items[index], index);
-    }
-  }
-
-  const workerCount = Math.min(Math.max(1, limit), items.length);
-  await Promise.all(Array.from({ length: workerCount }, () => worker()));
-  return results;
-}
-
 async function getRoadDetour(origin, spot, destination, directRoadKm = null) {
   const oLat = parseFloat(origin.latitude);
   const oLng = parseFloat(origin.longitude);
@@ -707,24 +685,7 @@ async function getRoadDetour(origin, spot, destination, directRoadKm = null) {
       params.set('direct_km', directRoadKm);
     }
 
-    // Do not leave a browser request hanging indefinitely if the server or
-    // routing provider becomes slow. The PHP endpoint has its own timeout.
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
-    let response;
-    try {
-      response = await fetch(API_BASE + 'routes.php?' + params.toString(), {
-        signal: controller.signal,
-        headers: { 'Accept': 'application/json' },
-      });
-    } finally {
-      clearTimeout(timeoutId);
-    }
-
-    if (!response.ok) {
-      throw new Error(`Route API returned HTTP ${response.status}`);
-    }
-    const res = await response.json();
+    const res = await fetch(API_BASE + 'routes.php?' + params.toString()).then(r => r.json());
 
     if (res.success && res.data) {
       const result = {
@@ -933,21 +894,6 @@ document.getElementById('swap-btn').addEventListener('click', () => {
   d.value = tmp;
 });
 
-// Show a friendly note when both selects hold the same city.
-function updateSameCityHint() {
-  const o = document.getElementById('origin-select').value;
-  const d = document.getElementById('dest-select').value;
-  const hint = document.getElementById('same-city-hint');
-  if (!hint) return;
-  const city = document.getElementById('origin-select').selectedOptions[0]?.textContent.trim();
-  hint.innerHTML = (o && o === d)
-    ? `<i class="bi bi-check-circle-fill me-1" style="color:var(--maroon-light)"></i>Exploring <strong>${city}</strong> only — no inter-city travel.`
-    : `<i class="bi bi-lightbulb me-1"></i>Pick the <strong>same city</strong> as your starting point to just explore that city.`;
-}
-['origin-select','dest-select'].forEach(id => document.getElementById(id).addEventListener('change', updateSameCityHint));
-document.getElementById('swap-btn').addEventListener('click', updateSameCityHint);
-updateSameCityHint();
-
 // Auto-plan if pre-filled from query string
 <?php if ($pre_origin && $pre_dest): ?>
 setTimeout(planRoute, 500);
@@ -972,7 +918,10 @@ async function planRoute() {
     IExploreApp.toast('Please select both origin and destination.', 'warning');
     return;
   }
-  const sameCity = origin === dest; // "explore this city" mode
+  if (origin === dest) {
+    IExploreApp.toast('Origin and destination must be different cities.', 'warning');
+    return;
+  }
 
   showMapLoading(true);
   IExploreApp.setLoading(document.getElementById('plan-btn'), true);
@@ -994,124 +943,105 @@ async function planRoute() {
     }
 
     routeData = routeRes.data;
-    routeData.same_city = sameCity;
     allSpots  = spotsRes.success ? spotsRes.data : [];
-    if (sameCity) selectedTransport = null;
 
     const routeLine = await drawRoute(routeData);
 
-    if (sameCity) {
-      // Exploring one city: no corridor/detour filtering. Every active spot
-      // filed under that city is a candidate, best-rated first.
-      allSpots = allSpots
-        .filter(s => String(s.city_id) === String(routeData.origin.id)
-                  && Number.isFinite(parseFloat(s.latitude)) && Number.isFinite(parseFloat(s.longitude)))
-        .sort((a, b) => (b.rating || 0) - (a.rating || 0));
-    } else {
-      // Keep only spots genuinely along the way. The backend's bounding-box
-      // query is deliberately loose (fast, simple SQL) and can include spots
-      // that sit off to the side and are never actually passed — filter
-      // those out here against the real drawn route line AND against how
-      // much actual detour reaching them would add (see detourKm() above —
-      // distance-to-route-line alone isn't enough, since a real winding
-      // road can pass near a spot at some bend without it being remotely
-      // on the way).
-      const oLat = parseFloat(routeData.origin.latitude), oLng = parseFloat(routeData.origin.longitude);
-      const dLat = parseFloat(routeData.destination.latitude), dLng = parseFloat(routeData.destination.longitude);
+    // Keep only spots genuinely along the way. The backend's bounding-box
+    // query is deliberately loose (fast, simple SQL) and can include spots
+    // that sit off to the side and are never actually passed — filter
+    // those out here against the real drawn route line AND against how
+    // much actual detour reaching them would add (see detourKm() above —
+    // distance-to-route-line alone isn't enough, since a real winding
+    // road can pass near a spot at some bend without it being remotely
+    // on the way).
+    const oLat = parseFloat(routeData.origin.latitude), oLng = parseFloat(routeData.origin.longitude);
+    const dLat = parseFloat(routeData.destination.latitude), dLng = parseFloat(routeData.destination.longitude);
 
-      // drawRoute() already asked the server for the actual road route.
-      // Ask once more for the direct road distance so the detour comparison
-      // uses the same routing provider as the map whenever possible.
-      let directRoadKm = null;
-      try {
-        const directParams = new URLSearchParams({
-          action: 'road_distance',
-          origin_lat: oLat,
-          origin_lng: oLng,
-          dest_lat: dLat,
-          dest_lng: dLng,
-        });
-        const directRes = await fetch(API_BASE + 'routes.php?' + directParams.toString()).then(r => r.json());
-        if (directRes.success && directRes.data && Number.isFinite(Number(directRes.data.distance_km))) {
-          directRoadKm = Number(directRes.data.distance_km);
-        }
-      } catch (err) {
-        console.warn('Direct road-distance lookup failed; using straight-line fallback.', err);
-      }
-
-      const directTripKm = directRoadKm ?? haversineKm(oLat, oLng, dLat, dLng);
-      const detourCapKm  = maxReasonableDetourKm(directTripKm);
-
-      // First remove attractions that are obviously far from the actual
-      // road. This keeps the number of expensive road-detour API calls low.
-      // The final decision is made using actual driving distance below.
-      const corridorCandidates = (corridorKm) => allSpots.filter(s => {
-        const lat = parseFloat(s.latitude), lng = parseFloat(s.longitude);
-        return Number.isFinite(lat) && Number.isFinite(lng)
-            && distanceToRouteKm(lat, lng, routeLine) <= corridorKm;
+    // drawRoute() already asked the server for the actual road route.
+    // Ask once more for the direct road distance so the detour comparison
+    // uses the same routing provider as the map whenever possible.
+    let directRoadKm = null;
+    try {
+      const directParams = new URLSearchParams({
+        action: 'road_distance',
+        origin_lat: oLat,
+        origin_lng: oLng,
+        dest_lat: dLat,
+        dest_lng: dLng,
       });
-
-      let candidates = corridorCandidates(ROUTE_CORRIDOR_KM);
-      if (candidates.length === 0) {
-        candidates = corridorCandidates(ROUTE_CORRIDOR_KM_FALLBACK);
-        if (candidates.length > 0) {
-          console.warn(`No spots within ${ROUTE_CORRIDOR_KM}km of the route — widened to ${ROUTE_CORRIDOR_KM_FALLBACK}km.`);
-        }
+      const directRes = await fetch(API_BASE + 'routes.php?' + directParams.toString()).then(r => r.json());
+      if (directRes.success && directRes.data && Number.isFinite(Number(directRes.data.distance_km))) {
+        directRoadKm = Number(directRes.data.distance_km);
       }
+    } catch (err) {
+      console.warn('Direct road-distance lookup failed; using straight-line fallback.', err);
+    }
 
-      // Now use REAL ROAD distance for each candidate:
-      // origin → attraction → destination. This is the important fix.
-      // A place is included only if the extra driving distance is within
-      // the allowed detour.
-      // Check at most 3 attractions at a time. Promise.all(candidates.map(...))
-      // can launch dozens of PHP/TomTom requests simultaneously and overload
-      // shared hosting. The worker pool preserves candidate order while
-      // keeping the number of in-flight requests predictable.
-      const checked = await mapWithConcurrency(candidates, 3, async s => {
-        const result = await getRoadDetour(
-          routeData.origin,
-          s,
-          routeData.destination,
-          directRoadKm
-        );
+    const directTripKm = directRoadKm ?? haversineKm(oLat, oLng, dLat, dLng);
+    const detourCapKm  = maxReasonableDetourKm(directTripKm);
 
-        return {
-          spot: s,
-          detourKm: result.detourKm,
-          viaRoadKm: result.viaRoadKm,
-          roadBased: result.roadBased,
-        };
-      });
+    // First remove attractions that are obviously far from the actual
+    // road. This keeps the number of expensive road-detour API calls low.
+    // The final decision is made using actual driving distance below.
+    const corridorCandidates = (corridorKm) => allSpots.filter(s => {
+      const lat = parseFloat(s.latitude), lng = parseFloat(s.longitude);
+      return Number.isFinite(lat) && Number.isFinite(lng)
+          && distanceToRouteKm(lat, lng, routeLine) <= corridorKm;
+    });
 
-      const accepted = checked
-        .filter(x => Number.isFinite(x.detourKm) && x.detourKm <= detourCapKm)
-        .sort((a, b) => a.detourKm - b.detourKm);
+    let candidates = corridorCandidates(ROUTE_CORRIDOR_KM);
+    if (candidates.length === 0) {
+      candidates = corridorCandidates(ROUTE_CORRIDOR_KM_FALLBACK);
+      if (candidates.length > 0) {
+        console.warn(`No spots within ${ROUTE_CORRIDOR_KM}km of the route — widened to ${ROUTE_CORRIDOR_KM_FALLBACK}km.`);
+      }
+    }
 
-      // Keep the planner focused on the two cities the traveler selected.
-      // The road corridor can pass near neighboring municipalities (for example,
-      // Calauan), but a nearby point is not necessarily a useful stop for this
-      // origin-to-destination itinerary. Only include spots registered in the
-      // selected origin or destination city.
-      allSpots = accepted.map(x => x.spot).filter(s =>
-        String(s.city_id) === String(routeData.origin.id) ||
-        String(s.city_id) === String(routeData.destination.id)
+    // Now use REAL ROAD distance for each candidate:
+    // origin → attraction → destination. This is the important fix.
+    // A place is included only if the extra driving distance is within
+    // the allowed detour.
+    const checked = await Promise.all(candidates.map(async s => {
+      const result = await getRoadDetour(
+        routeData.origin,
+        s,
+        routeData.destination,
+        directRoadKm
       );
 
-      if (allSpots.length === 0) {
-        console.warn(
-          `No attractions passed the road-detour check. ` +
-          `Direct trip: ${directTripKm.toFixed(1)}km; ` +
-          `maximum detour: ${detourCapKm.toFixed(1)}km.`
-        );
-      }
+      return {
+        spot: s,
+        detourKm: result.detourKm,
+        viaRoadKm: result.viaRoadKm,
+        roadBased: result.roadBased,
+      };
+    }));
+
+    const accepted = checked
+      .filter(x => Number.isFinite(x.detourKm) && x.detourKm <= detourCapKm)
+      .sort((a, b) => a.detourKm - b.detourKm);
+
+    // Keep the planner focused on the two cities the traveler selected.
+    // The road corridor can pass near neighboring municipalities (for example,
+    // Calauan), but a nearby point is not necessarily a useful stop for this
+    // origin-to-destination itinerary. Only include spots registered in the
+    // selected origin or destination city.
+    allSpots = accepted.map(x => x.spot).filter(s =>
+      String(s.city_id) === String(routeData.origin.id) ||
+      String(s.city_id) === String(routeData.destination.id)
+    );
+
+    if (allSpots.length === 0) {
+      console.warn(
+        `No attractions passed the road-detour check. ` +
+        `Direct trip: ${directTripKm.toFixed(1)}km; ` +
+        `maximum detour: ${detourCapKm.toFixed(1)}km.`
+      );
     }
 
     fareCache = new Map(); // fresh fare lookups for this itinerary
     drawSpotMarkers(allSpots);
-    if (sameCity && allSpots.length) {
-      // Frame the whole city's spots rather than the default city zoom.
-      map.fitBounds(L.latLngBounds(allSpots.map(s => [parseFloat(s.latitude), parseFloat(s.longitude)])).pad(0.15));
-    }
 
     renderTransportOptions(routeData.transport_options);
     renderRouteStats(routeData);
@@ -1152,7 +1082,7 @@ async function planRoute() {
     document.getElementById('budget-panel-wrap').classList.remove('d-none');
     document.getElementById('itinerary-panel').classList.remove('d-none');
     document.getElementById('right-panel-placeholder').classList.add('d-none');
-    document.getElementById('no-route-msg').classList.toggle('d-none', routeData.has_route || !!routeData.same_city);
+    document.getElementById('no-route-msg').classList.toggle('d-none', routeData.has_route);
 
     document.getElementById('budget-persons').textContent = persons;
     document.getElementById('budget-days').textContent    = days;
@@ -1184,17 +1114,6 @@ async function drawRoute(data) {
 
   const startLatLng = L.latLng(parseFloat(origin.latitude),      parseFloat(origin.longitude));
   const endLatLng   = L.latLng(parseFloat(destination.latitude), parseFloat(destination.longitude));
-
-  // Exploring a single city: no road to draw, just mark the city centre.
-  if (data.same_city) {
-    routeLayerGroup = L.layerGroup().addTo(map);
-    L.marker(startLatLng, { icon: iconStart })
-      .addTo(routeLayerGroup)
-      .bindPopup(`<div class="popup-title">${origin.name}</div>
-                  <div class="popup-meta"><i class="bi bi-geo-alt"></i> Exploring this city</div>`);
-    map.setView(startLatLng, 13);
-    return [[startLatLng.lat, startLatLng.lng]];
-  }
 
   function addEndpointMarkers(group) {
     L.marker(startLatLng, { icon: iconStart })
@@ -1315,18 +1234,6 @@ function drawSpotMarkers(spots) {
 // ── Render transport options ────────────────────────────────
 function renderTransportOptions(options) {
   const container = document.getElementById('transport-list');
-  if (routeData && routeData.same_city) {
-    container.innerHTML = `
-      <div class="text-center py-2">
-        <i class="bi bi-bicycle d-block mb-2" style="font-size:1.6rem;color:var(--maroon-pale)"></i>
-        <p class="text-muted small mb-1 fw-500">Exploring within ${routeData.origin.name}</p>
-        <p class="text-muted" style="font-size:.75rem;line-height:1.5">
-          No inter-city ride needed. Short hops between spots are usually
-          <strong>tricycle</strong> or <strong>multicab</strong> rides, estimated in your itinerary.
-        </p>
-      </div>`;
-    return;
-  }
   if (!options.length) {
     container.innerHTML = `
       <div class="text-center py-2">
@@ -1411,24 +1318,6 @@ function renderTransportOptions(options) {
 // Reflects whichever transport option is currently selected (defaults to
 // the cheapest, options[0], until the person clicks a different one).
 function renderRouteStats(data) {
-  if (data.same_city) {
-    document.getElementById('route-stats').innerHTML = `
-      <div class="route-bar flex-column gap-2 p-0 shadow-none border-0 bg-transparent">
-        <div class="route-stat">
-          <i class="bi bi-geo-alt-fill"></i>
-          <div><div class="val">${data.origin.name}</div><div class="lbl">Exploring this city</div></div>
-        </div>
-        <div class="route-stat">
-          <i class="bi bi-pin-map"></i>
-          <div><div class="val">${allSpots.length} spot${allSpots.length !== 1 ? 's' : ''}</div><div class="lbl">Available to visit</div></div>
-        </div>
-        <div class="route-stat">
-          <i class="bi bi-cash-coin"></i>
-          <div><div class="val"><span style="font-size:.82rem">Local rides only</span></div><div class="lbl">No inter-city fare</div></div>
-        </div>
-      </div>`;
-    return;
-  }
   const t = selectedTransport || data.transport_options[0] || {};
   const distVal  = t.distance_km  ? `${t.distance_km} km`        : '<span style="color:var(--text-muted);font-size:.85rem">Estimating…</span>';
   const timeVal  = t.duration_min ? formatDuration(t.duration_min): '<span style="color:var(--text-muted);font-size:.85rem">Varies</span>';
@@ -1892,11 +1781,8 @@ async function renderItinerary(routeData, spots, days, forceIncludeAll = false, 
     if (day === 1) {
       events.push({ t: 7*60, html: itineraryItem('7:00 AM', 'bi-sun', 'Start your day',
         'Pack your bags and get ready to explore.') });
-      events.push({ t: 7*60 + 15, html: routeData.same_city
-        ? itineraryItem('7:15 AM', 'bi-geo-alt', 'Start exploring ' + routeData.origin.name,
-            'No long ride today — your first stop is just around town.')
-        : itineraryItem('7:15 AM', 'bi-geo-alt', 'Depart from ' + routeData.origin.name,
-            'Your trip begins here — first stop coming up.') });
+      events.push({ t: 7*60 + 15, html: itineraryItem('7:15 AM', 'bi-geo-alt', 'Depart from ' + routeData.origin.name,
+        'Your trip begins here — first stop coming up.') });
     }
 
     let time = dayTouringStart(day); // minutes since midnight
