@@ -46,7 +46,9 @@ switch ($action) {
         if (!$title) {
             $origin_name = db_fetch_one("SELECT name FROM cities WHERE id=?",[$origin_id])['name'] ?? 'Unknown';
             $dest_name   = db_fetch_one("SELECT name FROM cities WHERE id=?",[$dest_id])['name']   ?? 'Unknown';
-            $title = $origin_name . ' → ' . $dest_name . ' (' . $days . 'd)';
+            $title = ($origin_id === $dest_id)
+                ? 'Explore ' . $origin_name . ' (' . $days . 'd)'
+                : $origin_name . ' → ' . $dest_name . ' (' . $days . 'd)';
         }
 
         db_execute(

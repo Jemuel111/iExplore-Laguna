@@ -179,8 +179,24 @@ switch ($action) {
         if (!$origin || !$dest) {
             json_error('Origin and destination are required.', 400);
         }
+
+        // Same city on both ends = "just explore this city". No inter-city
+        // transport applies, so return the city itself with no routes.
         if ($origin === $dest) {
-            json_error('Origin and destination must be different.', 400);
+            $city = db_fetch_one(
+                "SELECT id, name, slug, latitude, longitude FROM cities WHERE id = ?",
+                [$origin]
+            );
+            if (!$city) json_error('City not found.', 404);
+            json_ok([
+                'origin'            => $city,
+                'destination'       => $city,
+                'transport_options' => [],
+                'waypoints'         => [],
+                'has_route'         => false,
+                'same_city'         => true,
+            ]);
+            break;
         }
 
         // Get origin and destination city details
