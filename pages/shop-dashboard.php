@@ -690,7 +690,7 @@ require_once __DIR__ . '/../includes/header.php';
       <?php if (empty($shop['gcash_qr_url'])): ?>
         <div class="alert alert-warning small d-flex justify-content-between align-items-center flex-wrap gap-2">
           <span><i class="bi bi-shield-exclamation me-1"></i><strong>Protect yourself from no-shows.</strong> Upload your GCash QR so you can ask for a deposit before you start cooking.</span>
-          <button type="button" class="btn btn-sm btn-primary-app" data-bs-toggle="modal" data-bs-target="#depositModal">Set up deposits</button>
+          <a href="#settings" class="btn btn-sm btn-primary-app" data-bs-toggle="tab" data-bs-target="#settings">Set up deposits</a>
         </div>
       <?php endif; ?>
       <?php if ($orders_all === 0): ?>
@@ -1090,31 +1090,40 @@ require_once __DIR__ . '/../includes/header.php';
           </div>
 
           <div class="form-panel mt-4">
-            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
-              <div>
-                <h6 class="fw-bold mb-1" style="color:var(--maroon-dark);font-family:'Playfair Display',serif">
-                  <i class="bi bi-wallet2 me-2"></i>Deposits &amp; GCash
-                </h6>
-                <p class="small text-muted mb-2">Ask customers for a deposit before you start cooking, to protect you from no-shows.</p>
-                <div class="small">
-                  <?php if (!empty($shop['gcash_qr_url'])): ?>
-                    <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>GCash QR uploaded</span>
-                    · <?= e(['none' => 'No deposits', 'new_customers' => 'Deposit for new customers and large orders', 'always' => 'Deposit on every order'][$shop['deposit_policy'] ?? 'new_customers'] ?? '') ?>
-                    · <?= (int) ($shop['deposit_percent'] ?? 50) ?>%
-                  <?php else: ?>
-                    <span class="text-danger"><i class="bi bi-exclamation-circle-fill me-1"></i>Not set up yet. You can't ask for deposits until you upload your GCash QR.</span>
-                  <?php endif; ?>
-                </div>
-              </div>
-              <div class="d-flex align-items-center gap-3">
+            <h6 class="fw-bold mb-1" style="color:var(--maroon-dark);font-family:'Playfair Display',serif">
+              <i class="bi bi-wallet2 me-2"></i>Deposits &amp; GCash
+            </h6>
+            <p class="small text-muted mb-3">Ask customers for a deposit before you start cooking. They scan your GCash QR in the order chat and upload proof. You confirm it once you see the money.</p>
+            <form method="POST" enctype="multipart/form-data"><?= csrf_field() ?>
+              <input type="hidden" name="action" value="update_deposit_settings">
+              <div class="mb-3">
+                <label class="form-label">GCash QR code</label>
                 <?php if (!empty($shop['gcash_qr_url'])): ?>
-                  <img src="<?= e($shop['gcash_qr_url']) ?>" alt="Your GCash QR" style="width:64px;height:64px;object-fit:cover;border:1px solid var(--border);border-radius:10px">
+                  <img src="<?= e($shop['gcash_qr_url']) ?>" alt="Current GCash QR" class="d-block mb-2" style="max-width:180px;border:1px solid var(--border);border-radius:10px">
+                  <label class="small d-block mb-2"><input type="checkbox" name="remove_qr" value="1"> Remove this QR code</label>
                 <?php endif; ?>
-                <button type="button" class="btn btn-primary-app" data-bs-toggle="modal" data-bs-target="#depositModal">
-                  <i class="bi bi-pencil-square me-1"></i><?= !empty($shop['gcash_qr_url']) ? 'Edit' : 'Set up' ?>
-                </button>
+                <input type="file" class="form-control" name="gcash_qr" accept="image/jpeg,image/png,image/webp">
+                <div class="form-text">In GCash, open Receive Money, then QR, then Save to gallery, and upload that image here. JPG, PNG or WEBP, max 3MB.</div>
               </div>
-            </div>
+              <div class="row g-3 mb-3">
+                <div class="col-sm-6"><label class="form-label">Account name</label>
+                  <input type="text" class="form-control" name="gcash_name" maxlength="120" value="<?= e($shop['gcash_name'] ?? '') ?>"></div>
+                <div class="col-sm-6"><label class="form-label">GCash number</label>
+                  <input type="text" class="form-control" name="gcash_number" maxlength="20" value="<?= e($shop['gcash_number'] ?? '') ?>"></div>
+              </div>
+              <div class="row g-3 mb-4">
+                <div class="col-sm-8"><label class="form-label">When do you want a deposit?</label>
+                  <select class="form-select" name="deposit_policy">
+                    <?php foreach (['new_customers' => 'New customers and large orders (recommended)', 'always' => 'Every order', 'none' => 'Never (cash on pickup only)'] as $k => $lbl): ?>
+                      <option value="<?= $k ?>" <?= ($shop['deposit_policy'] ?? 'new_customers') === $k ? 'selected' : '' ?>><?= e($lbl) ?></option>
+                    <?php endforeach; ?>
+                  </select></div>
+                <div class="col-sm-4"><label class="form-label">Deposit %</label>
+                  <input type="number" class="form-control" name="deposit_percent" min="10" max="100" value="<?= (int) ($shop['deposit_percent'] ?? 50) ?>"></div>
+              </div>
+              <p class="small text-muted">Customers with missed pickups are always asked for a deposit, whatever you choose here, as long as you have a QR uploaded.</p>
+              <button type="submit" class="btn btn-primary-app w-100"><i class="bi bi-floppy me-2"></i>Save deposit settings</button>
+            </form>
           </div>
         </div>
       </div>
@@ -1133,58 +1142,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-document.addEventListener('DOMContentLoaded', () => { const m = document.getElementById('depositModal'); if (m) document.body.appendChild(m); });
-
 // Fix match() PHP 7 note — the match in this file is PHP only,
 // but update_order uses string concatenation fallback already.
 </script>
-
-<!-- Deposits & GCash settings pop-up -->
-<div class="modal fade" id="depositModal" tabindex="-1" aria-labelledby="depositModalTitle" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-    <div class="modal-content" style="border-radius:var(--radius);overflow:hidden;border:none">
-      <div class="modal-header border-0 pb-0">
-        <h5 class="modal-title fw-bold" id="depositModalTitle" style="color:var(--maroon-dark);font-family:'Playfair Display',serif">
-          <i class="bi bi-wallet2 me-2"></i>Deposits &amp; GCash
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p class="small text-muted">Customers scan your GCash QR in the order chat and upload proof. You confirm it once you see the money.</p>
-        <form method="POST" enctype="multipart/form-data"><?= csrf_field() ?>
-        <input type="hidden" name="action" value="update_deposit_settings">
-        <div class="mb-3">
-          <label class="form-label">GCash QR code</label>
-          <?php if (!empty($shop['gcash_qr_url'])): ?>
-            <img src="<?= e($shop['gcash_qr_url']) ?>" alt="Current GCash QR" class="d-block mb-2" style="max-width:180px;border:1px solid var(--border);border-radius:10px">
-            <label class="small d-block mb-2"><input type="checkbox" name="remove_qr" value="1"> Remove this QR code</label>
-          <?php endif; ?>
-          <input type="file" class="form-control" name="gcash_qr" accept="image/jpeg,image/png,image/webp">
-          <div class="form-text">In GCash, open Receive Money, then QR, then Save to gallery, and upload that image here. JPG, PNG or WEBP, max 3MB.</div>
-        </div>
-        <div class="row g-3 mb-3">
-          <div class="col-sm-6"><label class="form-label">Account name</label>
-            <input type="text" class="form-control" name="gcash_name" maxlength="120" value="<?= e($shop['gcash_name'] ?? '') ?>"></div>
-          <div class="col-sm-6"><label class="form-label">GCash number</label>
-            <input type="text" class="form-control" name="gcash_number" maxlength="20" value="<?= e($shop['gcash_number'] ?? '') ?>"></div>
-        </div>
-        <div class="row g-3 mb-4">
-          <div class="col-sm-8"><label class="form-label">When do you want a deposit?</label>
-            <select class="form-select" name="deposit_policy">
-              <?php foreach (['new_customers' => 'New customers and large orders (recommended)', 'always' => 'Every order', 'none' => 'Never (cash on pickup only)'] as $k => $lbl): ?>
-                <option value="<?= $k ?>" <?= ($shop['deposit_policy'] ?? 'new_customers') === $k ? 'selected' : '' ?>><?= e($lbl) ?></option>
-              <?php endforeach; ?>
-            </select></div>
-          <div class="col-sm-4"><label class="form-label">Deposit %</label>
-            <input type="number" class="form-control" name="deposit_percent" min="10" max="100" value="<?= (int) ($shop['deposit_percent'] ?? 50) ?>"></div>
-        </div>
-        <p class="small text-muted">Customers with missed pickups are always asked for a deposit, whatever you choose here, as long as you have a QR uploaded.</p>
-        <button type="submit" class="btn btn-primary-app w-100"><i class="bi bi-floppy me-2"></i>Save deposit settings</button>
-            </form>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- Generic confirmation modal, replacing this page's plain browser confirm() popups. -->
 <div class="modal fade" id="genericConfirmModal" tabindex="-1" aria-labelledby="genericConfirmTitle" aria-hidden="true">
