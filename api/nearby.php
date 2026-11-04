@@ -58,7 +58,7 @@ function nearby_spots(float $lat, float $lng, float $radiusKm, ?array $categorie
     $dist = nearby_distance_sql('s.latitude', 's.longitude');
     $sql  = "SELECT s.id, s.name, s.slug, s.category, s.latitude, s.longitude, s.entrance_fee,
                     s.operating_hours, s.rating, s.is_closed, s.closure_reason, s.closed_until,
-                    c.name AS city_name, c.id AS city_id,
+                    c.name AS city_name,
                     (SELECT url FROM spot_photos WHERE spot_id = s.id AND photo_type = 'main' LIMIT 1) AS main_photo_url,
                     $dist AS distance_km
              FROM tourist_spots s
@@ -86,7 +86,6 @@ function nearby_spots(float $lat, float $lng, float $radiusKm, ?array $categorie
             'category'       => $r['category'],
             'category_label' => spot_category_label($r['category']),
             'city_name'      => $r['city_name'],
-            'city_id'        => (int) $r['city_id'],
             'lat'            => (float) $r['latitude'],
             'lng'            => (float) $r['longitude'],
             'entrance_fee'   => (float) $r['entrance_fee'],
@@ -345,17 +344,18 @@ switch (input('action', 'get', 'search')) {
         $chosen = nearby_order_stops($lat, $lng, $chosen);
 
         // 3) Build the timeline, honouring opening hours and adding a lunch break.
-        //    The client re-times this plan when real road distances arrive, so each
-        //    stop also carries its raw numbers (visit length, opening window).
-        $foodShops = $wantLunch ? nearby_shops($lat, $lng, $radius, ['restaurant', 'cafe', 'street_food'], 40) : [];
+        $foodShops = $wantLunch ? array_values(array_filter(
+            nearby_shops($lat, $lng, $radius, ['restaurant', 'cafe', 'street_food'], 40),
+            fn($s) => true
+        )) : [];
 
         $timeline = []; $clock = $startMin; $prev = ['lat' => $lat, 'lng' => $lng];
-        $totalFee = 0.0; $totalKm = 0.0; $lunchDone = false; $skipped = []; $spotsAdded = 0;
+        $totalFee = 0.0; $totalKm = 0.0; $lunchDone = false; $skipped = [];
         $endLimit = $startMin + $budgetMin;
 
         foreach ($chosen as $s) {
-            // Lunch before this stop once it's past 11:30 and we haven't eaten.
-            if ($wantLunch && !$lunchDone && $clock >= 11 * 60 + 30 && $clock <= 15 * 60) {
+            // lunch before this stop if we'd otherwise pass noon without eating
+            if ($wantLunch && !$lunchDone && $clock >= 11 * 60 + 30 && $clock <= 14 * 60) {
                 $nearestFood = null; $nd = INF;
                 foreach ($foodShops as $f) {
                     $dd = haversine_meters($prev['lat'], $prev['lng'], $f['lat'], $f['lng']);
@@ -365,18 +365,10 @@ switch (input('action', 'get', 'search')) {
                     $leg = nearby_leg($prev['lat'], $prev['lng'], $nearestFood['lat'], $nearestFood['lng']);
                     $clock += $leg['minutes'];
                     $timeline[] = ['kind' => 'lunch', 'item' => $nearestFood, 'arrive' => nearby_fmt_time($clock),
-                                   'depart' => nearby_fmt_time($clock + 45), 'visit_minutes' => 45, 'leg' => $leg,
-                                   'why' => 'Nearest food stop to where you will be around midday'];
+                                   'depart' => nearby_fmt_time($clock + 45), 'leg' => $leg];
                     $clock += 45; $totalKm += $leg['km'];
-                    $prev = $nearestFood;
-                } else {
-                    // No food shop with a location nearby: keep a generic lunch break in the plan.
-                    $timeline[] = ['kind' => 'lunch_break', 'item' => null, 'arrive' => nearby_fmt_time($clock),
-                                   'depart' => nearby_fmt_time($clock + 45), 'visit_minutes' => 45, 'leg' => null,
-                                   'why' => 'Time to eat. Ask locals for a good place nearby.'];
-                    $clock += 45;
+                    $prev = $nearestFood; $lunchDone = true;
                 }
-                $lunchDone = true;
             }
 
             $leg = nearby_leg($prev['lat'], $prev['lng'], $s['lat'], $s['lng']);
@@ -389,30 +381,18 @@ switch (input('action', 'get', 'search')) {
             if ($hoursRange) {
                 [$open, $close] = $hoursRange;
                 if ($arrive >= $close - 20) { $skipped[] = $s['name'] . ' (closes ' . nearby_fmt_time($close) . ')'; continue; }
-                if ($arrive < $open) { $note = 'Opens at ' . nearby_fmt_time($open) . ', so wait or visit later.'; $arrive = $open; }
-                if ($arrive + $visit > $close) { $visit = max(20, $close - $arrive); $note = 'Closes at ' . nearby_fmt_time($close) . ', so visit time is shortened.'; }
+                if ($arrive < $open) { $note = 'Opens at ' . nearby_fmt_time($open) . ' — wait or visit later.'; $arrive = $open; }
+                if ($arrive + $visit > $close) { $visit = max(20, $close - $arrive); $note = 'Closes at ' . nearby_fmt_time($close) . ' — visit time shortened.'; }
             }
             if ($arrive + $visit > $endLimit + 30) { $skipped[] = $s['name'] . ' (not enough time)'; continue; }
 
-            // A short, human-readable reason this stop was picked.
-            $why = [];
-            // Wording only (no distances): the page shows the real road distance beside each stop.
-            if ($spotsAdded === 0)          $why[] = 'Closest good match to your starting point';
-            elseif ($leg['km'] < 0.3)       $why[] = 'Right beside your previous stop';
-            elseif ($leg['km'] <= 3)        $why[] = 'Close to your previous stop';
-            else                            $why[] = 'A longer ride, but worth the trip';
-            if ($s['rating'] >= 4.5)        $why[] = 'highly rated (★ ' . number_format($s['rating'], 1) . ')';
-            if ($s['entrance_fee'] <= 0)    $why[] = 'free entrance';
-
             $timeline[] = ['kind' => 'spot', 'item' => $s, 'arrive' => nearby_fmt_time($arrive),
                            'depart' => nearby_fmt_time($arrive + $visit), 'visit_minutes' => $visit,
-                           'open_min' => $hoursRange[0] ?? null, 'close_min' => $hoursRange[1] ?? null,
-                           'leg' => $leg, 'note' => $note, 'why' => implode(', ', $why)];
+                           'leg' => $leg, 'note' => $note];
             $clock = $arrive + $visit;
             $totalKm += $leg['km'];
             $totalFee += $s['entrance_fee'];
             $prev = $s;
-            $spotsAdded++;
         }
 
         $spotCount = count(array_filter($timeline, fn($t) => $t['kind'] === 'spot'));
@@ -425,7 +405,6 @@ switch (input('action', 'get', 'search')) {
                 'total_entrance'  => round($totalFee, 2),
                 'total_travel_km' => round($totalKm, 1),
                 'start'           => nearby_fmt_time($startMin),
-                'start_min'       => $startMin,
                 'end'             => nearby_fmt_time($clock),
                 'estimate_note'   => 'Travel times and distances are estimates (not live routing); entrance fees exclude transport and food.',
             ],

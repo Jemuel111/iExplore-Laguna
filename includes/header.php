@@ -26,7 +26,7 @@ $__theme_css = sprintf(
 // Admins are restricted to the admin area — bounce them off every
 // tourist-facing page (browsing, planner, ordering, booking, etc.)
 if ($user && ($user['role'] ?? '') === 'admin') {
-    $__admin_allowed = ['admin-dashboard.php', 'admin-packages.php', 'admin-spot-photos.php', 'admin-spots.php', 'admin-hotel-photos.php', 'admin-analytics.php', 'admin-city-admins.php', 'admin-order-safety.php', 'visitor-log.php', 'logout.php'];
+    $__admin_allowed = ['admin-dashboard.php', 'admin-packages.php', 'admin-spot-photos.php', 'admin-spots.php', 'admin-hotel-photos.php', 'admin-analytics.php', 'admin-city-admins.php', 'visitor-log.php', 'logout.php'];
     $__current_page  = basename($_SERVER['SCRIPT_NAME'] ?? '');
     if (!in_array($__current_page, $__admin_allowed, true)) {
         header('Location: ' . APP_URL . '/pages/admin-dashboard.php');
@@ -396,8 +396,6 @@ if ($user && ($user['role'] ?? '') === 'hotel_owner') {
                   <i class="bi bi-images me-2"></i>Manage Hotel Photos</a></li>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-analytics.php">
                   <i class="bi bi-bar-chart-line me-2"></i>Analytics</a></li>
-                <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/admin-order-safety.php">
-                  <i class="bi bi-shield-check me-2"></i>Order Safety</a></li>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/pages/visitor-log.php">
                   <i class="bi bi-people me-2"></i>Visitor Origins</a></li>
 

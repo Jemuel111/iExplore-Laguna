@@ -136,9 +136,6 @@ document.addEventListener('DOMContentLoaded', function () {
   const API = '<?= APP_URL ?>/api/';
   const PAGE = '<?= APP_URL ?>/pages/';
   const LAGUNA_CENTER = [14.2, 121.3];
-  const CITIES = <?= json_encode(array_map(fn($c) => ['id' => (int) $c['id'], 'name' => $c['name'], 'lat' => (float) $c['latitude'], 'lng' => (float) $c['longitude']], $cities), JSON_HEX_TAG | JSON_HEX_AMP) ?>;
-  const LOGGED_IN = <?= is_logged_in() ? 'true' : 'false' ?>;
-  let plan = null, savedId = null;   // current itinerary + whether it was saved
   const CAT_COLORS = {nature:'#2e7d32',heritage:'#b45309',waterfall:'#1d4ed8',hotspring:'#be123c',museum:'#7e22ce',religious:'#c2410c',beach_lake:'#0284c7',adventure:'#a16207',food:'#be185d'};
 
   const $ = id => document.getElementById(id);
@@ -178,7 +175,6 @@ document.addEventListener('DOMContentLoaded', function () {
     if (label) setStatus(label);
     itinLayer.clearLayers();
     $('nb-itin-result').innerHTML = '';
-    plan = null; savedId = null;
     updateRadiusCircle();
     if (fly) map.setView([lat, lng], 12);
     search();
@@ -308,9 +304,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // ── Itinerary ─────────────────────────────────────────────
   const MODE_ICON = {walk: 'bi-person-walking', tricycle: 'bi-bicycle', 'jeepney / van': 'bi-bus-front'};
-  const fmtTime = m => { m = ((Math.round(m) % 1440) + 1440) % 1440; const h = Math.floor(m / 60), mm = m % 60;
-    return (h % 12 || 12) + ':' + String(mm).padStart(2, '0') + ' ' + (h >= 12 ? 'PM' : 'AM'); };
-  const modeFor = km => km <= 1 ? 'walk' : km <= 5 ? 'tricycle' : 'jeepney / van';
 
   async function suggestItinerary() {
     if (!me) return;
@@ -336,174 +329,63 @@ document.addEventListener('DOMContentLoaded', function () {
       out.innerHTML = '<div class="form-panel small text-muted">' + esc(d.message || 'No itinerary could be built from here. Try a larger radius.') + '</div>';
       return;
     }
-    showPlan(d);
+    renderItinerary(d);
   }
 
-  // Re-times the plan from the numbers in each stop. `road[i]` (if present) holds the real
-  // road distance/time for the leg that leads to stop i, replacing the server's estimate.
-  function computeTimeline(d, road) {
-    let clock = d.summary.start_min, km = 0, allRoad = true;
-    const rows = d.stops.map((t, i) => {
-      let leg = t.leg ? Object.assign({}, t.leg) : null, isRoad = false;
-      if (leg && road[i]) {
-        leg.km = road[i].km;
-        leg.mode = modeFor(leg.km);
-        leg.minutes = leg.mode === 'walk' ? Math.max(1, Math.round(leg.km / 4.5 * 60)) : Math.max(1, road[i].minutes);
-        isRoad = true;
-      }
-      if (leg && !isRoad) allRoad = false;
-      let arrive = clock + (leg ? leg.minutes : 0), visit = t.visit_minutes, note = null;
-      if (t.kind === 'spot' && t.open_min != null && t.close_min != null) {
-        if (arrive < t.open_min) { note = 'Opens at ' + fmtTime(t.open_min) + ', so wait or visit later.'; arrive = t.open_min; }
-        if (arrive >= t.close_min - 20) note = 'May already be closed when you arrive (closes ' + fmtTime(t.close_min) + ').';
-        else if (arrive + visit > t.close_min) { visit = Math.max(20, t.close_min - arrive); note = 'Closes at ' + fmtTime(t.close_min) + ', so visit time is shortened.'; }
-      }
-      if (leg) km += leg.km;
-      const row = {t, leg, isRoad, arrive, depart: arrive + visit, note};
-      clock = arrive + visit;
-      return row;
-    });
-    return {rows, km, end: clock, allRoad};
-  }
-
-  function showPlan(d) {
-    plan = d;
-    savedId = null;
+  function renderItinerary(d) {
     itinLayer.clearLayers();
-    const road = {};        // stop index -> {km, minutes} once TomTom/ORS answers
-    paintPlan(computeTimeline(d, road));
+    const s = d.summary;
+    let html = '<div class="form-panel"><h6 class="fw-bold mb-1" style="font-family:\'Playfair Display\',serif;color:var(--maroon-dark)">Your suggested itinerary</h6>' +
+      '<div class="small text-muted mb-2">' + s.start + ' → ' + s.end + ' · ' + s.spots + ' spot' + (s.spots === 1 ? '' : 's') +
+      ' · ~' + s.total_travel_km + ' km travel · entrance fees ' + peso(s.total_entrance) + '</div>' +
+      '<div class="nb-step"><div class="nb-num" style="background:#1a73e8"><i class="bi bi-geo-fill"></i></div><div><div class="fw-semibold">Start: your location</div><div class="small text-muted">' + s.start + '</div></div></div>';
 
-    // Markers + lines. Each leg asks the routing service once: that answer both draws the
-    // road-following line AND gives the real distance/time, so there is no extra request.
     let prev = [me.lat, me.lng], n = 0;
-    const jobs = [];
-    d.stops.forEach((t, i) => {
-      if (!t.item) return;                       // generic lunch break: nothing to map
+    const legs = [];
+    d.stops.forEach(t => {
       const it = t.item, isLunch = t.kind === 'lunch';
       if (!isLunch) n++;
-      L.marker([it.lat, it.lng], {icon: pinIcon(isLunch ? '#c77c48' : '#B0281C', isLunch ? 'L' : n)}).bindPopup(popupHtml(it)).addTo(itinLayer);
-      jobs.push(drawLeg(prev, [it.lat, it.lng]).then(r => { if (r) road[i] = r; }));
-      prev = [it.lat, it.lng];
-    });
-    const pts = [[me.lat, me.lng]].concat(d.stops.filter(t => t.item).map(t => [t.item.lat, t.item.lng]));
-    map.fitBounds(L.latLngBounds(pts), {padding: [40, 40]});
-
-    // Once every leg has answered (or timed out), refresh the times once with road figures.
-    Promise.all(jobs).then(() => {
-      if (plan !== d || !Object.keys(road).length) return;
-      paintPlan(computeTimeline(d, road));
-    });
-    $('nb-itin-result').scrollIntoView({behavior: 'smooth', block: 'nearest'});
-  }
-
-  function paintPlan(tl) {
-    const s = plan.summary, spots = tl.rows.filter(r => r.t.kind === 'spot').length;
-    const km = Math.round(tl.km * 10) / 10;
-    let html = '<div class="form-panel" style="margin-bottom:4.5rem">' +
-      '<div class="d-flex justify-content-between align-items-start gap-2">' +
-        '<h6 class="fw-bold mb-1" style="font-family:\'Playfair Display\',serif;color:var(--maroon-dark)">Your suggested itinerary</h6>' +
-        '<button class="btn btn-sm btn-outline-secondary rounded-pill flex-shrink-0" id="nb-save-btn"' + (savedId ? ' disabled' : '') + '>' +
-          (savedId ? '<i class="bi bi-check2"></i> Saved' : '<i class="bi bi-bookmark-plus"></i> Save') + '</button></div>' +
-      '<div class="small text-muted mb-2">' + fmtTime(s.start_min) + ' → ' + fmtTime(tl.end) + ' · ' + spots + ' spot' + (spots === 1 ? '' : 's') +
-      ' · ~' + km + ' km ' + (tl.allRoad ? 'by road' : 'travel (estimated)') + ' · entrance fees ' + peso(s.total_entrance) + '</div>' +
-      (savedId ? '<div class="small mb-2"><a href="' + PAGE + 'itineraries.php">View it in My Itineraries →</a></div>' : '') +
-      '<div class="nb-step"><div class="nb-num" style="background:#1a73e8"><i class="bi bi-geo-fill"></i></div><div><div class="fw-semibold">Start: your location</div><div class="small text-muted">' + fmtTime(s.start_min) + '</div></div></div>';
-
-    let n = 0;
-    tl.rows.forEach(r => {
-      const t = r.t, it = t.item, isLunch = t.kind !== 'spot';
-      if (!isLunch) n++;
       const label = isLunch ? '<i class="bi bi-cup-hot"></i>' : n;
-      const legLine = r.leg
-        ? '<div class="small text-muted"><i class="bi ' + (MODE_ICON[r.leg.mode] || 'bi-arrow-right') + '"></i> ' + esc(r.leg.mode) + ' · ~' + r.leg.km + ' km · ~' + r.leg.minutes + ' min' + (r.isRoad ? '' : ' <span title="Estimated">(est.)</span>') + '</div>'
-        : '';
-      const name = isLunch
-        ? 'Lunch' + (it ? ': <a href="' + itemLink(it) + '" style="color:inherit">' + esc(it.name) + '</a>' : ' break')
-        : '<a href="' + itemLink(it) + '" style="color:inherit">' + esc(it.name) + '</a>';
-      html += '<div class="nb-step"><div class="nb-num ' + (isLunch ? 'lunch' : '') + '">' + label + '</div><div class="flex-grow-1">' + legLine +
-        '<div class="fw-semibold">' + name + '</div>' +
-        '<div class="small text-muted">' + fmtTime(r.arrive) + ' – ' + fmtTime(r.depart) + (isLunch ? '' : ' · ' + esc(it.category_label) + ' · ' + peso(it.entrance_fee)) + '</div>' +
-        (t.why ? '<div class="small" style="color:var(--terracotta)"><i class="bi bi-lightbulb"></i> ' + esc(t.why) + '</div>' : '') +
-        (r.note ? '<div class="small" style="color:var(--maroon-dark)"><i class="bi bi-info-circle"></i> ' + esc(r.note) + '</div>' : '') +
+      const m = L.marker([it.lat, it.lng], {icon: pinIcon(isLunch ? '#c77c48' : '#B0281C', isLunch ? 'L' : n)}).bindPopup(popupHtml(it));
+      m.addTo(itinLayer);
+      legs.push({from: prev, to: [it.lat, it.lng]});
+      prev = [it.lat, it.lng];
+
+      html += '<div class="nb-step"><div class="nb-num ' + (isLunch ? 'lunch' : '') + '">' + label + '</div><div class="flex-grow-1">' +
+        '<div class="small text-muted"><i class="bi ' + (MODE_ICON[t.leg.mode] || 'bi-arrow-right') + '"></i> ' + esc(t.leg.mode) + ' · ~' + t.leg.km + ' km · ~' + t.leg.minutes + ' min</div>' +
+        '<div class="fw-semibold">' + (isLunch ? 'Lunch: ' : '') + '<a href="' + itemLink(it) + '" style="color:inherit">' + esc(it.name) + '</a></div>' +
+        '<div class="small text-muted">' + esc(t.arrive) + ' – ' + esc(t.depart) + (isLunch ? '' : ' · ' + esc(it.category_label) + ' · ' + peso(it.entrance_fee)) + '</div>' +
+        (t.note ? '<div class="small" style="color:var(--maroon-dark)"><i class="bi bi-info-circle"></i> ' + esc(t.note) + '</div>' : '') +
         '</div></div>';
     });
 
-    if (plan.skipped && plan.skipped.length) html += '<div class="small text-muted mt-2">Left out: ' + plan.skipped.map(esc).join('; ') + '</div>';
-    html += '<div class="small text-muted mt-2"><i class="bi bi-info-circle"></i> ' +
-      (tl.allRoad ? 'Distances and drive times are road figures from our routing service; actual commute time depends on traffic and transport.' : esc(s.estimate_note)) +
-      ' Entrance fees exclude transport and food.</div></div>';
+    if (d.skipped && d.skipped.length) {
+      html += '<div class="small text-muted mt-2">Left out: ' + d.skipped.map(esc).join('; ') + '</div>';
+    }
+    html += '<div class="small text-muted mt-2"><i class="bi bi-info-circle"></i> ' + esc(s.estimate_note) + '</div></div>';
     $('nb-itin-result').innerHTML = html;
+
+    // Draw each leg: road-following line if the routing service answers, dashed straight line otherwise.
+    const all = [[me.lat, me.lng]].concat(legs.map(l => l.to));
+    map.fitBounds(L.latLngBounds(all), {padding: [40, 40]});
+    legs.forEach(drawLeg);
+    $('nb-itin-result').scrollIntoView({behavior: 'smooth', block: 'nearest'});
   }
 
-  // Asks the routing service for one leg. Resolves to {km, minutes} or null; never rejects,
-  // and gives up after 6 s so a slow provider can't hold the page up.
-  async function drawLeg(from, to) {
-    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 6000);
+  async function drawLeg(leg) {
+    const straight = () => L.polyline([leg.from, leg.to], {color: '#B0281C', weight: 3, dashArray: '6 8', opacity: .8}).addTo(itinLayer);
     try {
-      const p = new URLSearchParams({origin_lat: from[0], origin_lng: from[1], dest_lat: to[0], dest_lng: to[1]});
-      const r = await fetch(API + 'routes.php?action=directions&' + p, {signal: ctl.signal}).then(x => x.json());
+      const p = new URLSearchParams({origin_lat: leg.from[0], origin_lng: leg.from[1], dest_lat: leg.to[0], dest_lng: leg.to[1]});
+      const r = await fetch(API + 'routes.php?action=directions&' + p).then(x => x.json());
       const coords = r && r.success && r.data && r.data.coordinates;
-      if (coords && coords.length > 1) {
-        L.polyline(coords, {color: '#B0281C', weight: 4, opacity: .85}).addTo(itinLayer);
-        const km = parseFloat(r.data.distance_km), min = parseFloat(r.data.duration_min);
-        return (isFinite(km) && isFinite(min) && km >= 0 && min >= 0) ? {km: Math.round(km * 10) / 10, minutes: Math.round(min)} : null;
-      }
-    } catch (e) { /* fall through to straight line */ }
-    finally { clearTimeout(timer); }
-    L.polyline([from, to], {color: '#B0281C', weight: 3, dashArray: '6 8', opacity: .8}).addTo(itinLayer);
-    return null;
-  }
-
-  // ── Save to My Itineraries (uses the existing itineraries API) ──
-  function nearestCity(lat, lng) {
-    let best = CITIES[0], bd = Infinity;
-    CITIES.forEach(c => { const d = (c.lat - lat) ** 2 + ((c.lng - lng) * Math.cos(lat * Math.PI / 180)) ** 2; if (d < bd) { bd = d; best = c; } });
-    return best;
-  }
-
-  async function savePlan() {
-    if (!plan) return;
-    if (!LOGGED_IN) {
-      IExploreApp.toast('Please log in to save your itinerary.', 'warning');
-      setTimeout(() => { window.location.href = PAGE + 'login.php'; }, 1500);
-      return;
-    }
-    const spots = plan.stops.filter(t => t.kind === 'spot').map(t => t.item);
-    if (!spots.length) return;
-    const origin = nearestCity(me.lat, me.lng), last = spots[spots.length - 1];
-    const btn = $('nb-save-btn'); btn.disabled = true;
-    try {
-      const res = await fetch(API + 'itineraries.php?action=save', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
-        body: JSON.stringify({
-          origin_id: origin.id, dest_id: last.city_id, days: 1, persons: 1,
-          budget_level: 'midrange', transport_pref: 'any', travel_date: null,
-          title: 'Near Me plan from ' + origin.name,
-          spot_ids: spots.map(x => x.id),
-          total_budget: plan.summary.total_entrance,
-          itinerary_json: [{day: 1, city: origin.name, spots: spots.map(x => ({name: x.name, city: x.city_name, price: x.entrance_fee})), shops: []}]
-        })
-      }).then(r => r.json());
-      if (res.success) {
-        savedId = (res.data && res.data.id) || true;
-        IExploreApp.toast('Itinerary saved! View it in My Itineraries.', 'success');
-        const keep = $('nb-itin-result').firstElementChild;   // repaint with the "Saved" state
-        if (keep) { const b = $('nb-save-btn'); b.disabled = true; b.innerHTML = '<i class="bi bi-check2"></i> Saved'; }
-      } else {
-        btn.disabled = false;
-        IExploreApp.toast(res.message || res.error || 'Could not save itinerary.', 'error');
-      }
-    } catch (e) {
-      btn.disabled = false;
-      IExploreApp.toast('Could not save itinerary. Please try again.', 'error');
-    }
+      if (coords && coords.length > 1) { L.polyline(coords, {color: '#B0281C', weight: 4, opacity: .85}).addTo(itinLayer); return; }
+    } catch (e) { /* fall through */ }
+    straight();
   }
 
   // ── Wiring ────────────────────────────────────────────────
   $('nb-locate-btn').addEventListener('click', locate);
   $('nb-itin-btn').addEventListener('click', suggestItinerary);
-  $('nb-itin-result').addEventListener('click', e => { if (e.target.closest('#nb-save-btn')) savePlan(); });
   $('nb-radius').addEventListener('input', () => { $('nb-radius-val').textContent = $('nb-radius').value; updateRadiusCircle(); search(); });
   ['nb-hotels', 'nb-shops', 'nb-category'].forEach(id => $(id).addEventListener('change', search));
   $('nb-city').addEventListener('change', e => {
