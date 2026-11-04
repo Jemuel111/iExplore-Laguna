@@ -1,6 +1,6 @@
 <?php
 ob_start();
-require_once __DIR__ . '/../includes/helpers.php';
+require_once __DIR__ . '/../includes/order_safety.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') { csrf_verify(); }
 // ============================================================
 // iEXPLORE LAGUNA — Shop Owner Dashboard
@@ -15,6 +15,9 @@ $active_page = '';
 if (!is_logged_in()) { header('Location: ' . APP_URL . '/pages/login.php'); exit; }
 $u = current_user();
 if (($u['role'] ?? '') !== 'shop_owner') { header('Location: ' . APP_URL); exit; }
+
+ensure_order_safety_schema();   // adds the deposit/chat columns the first time
+order_safety_sweep();           // cancels orders whose deposit window ran out
 
 // Get this owner's shop
 $shop = db_fetch_one("SELECT * FROM shops WHERE owner_id = ?", [$u['id']]);
@@ -165,48 +168,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: ' . APP_URL . '/pages/shop-dashboard.php#products'); exit;
     }
 
-    // ── Update order status ───────────────────────────────────
+    // ── Order actions (accept, deposit received, start, ready, picked up, no-show, ...) ──
     if ($action === 'update_order') {
-        $oid    = (int) input('order_id', 'post', 0);
-        $status = input('status', 'post', '');
-        $allowed = ['confirmed','preparing','ready','picked_up','cancelled'];
-        if (in_array($status, $allowed)) {
-            if ($status === 'confirmed') {
-                $ts_col = ', confirmed_at = NOW()';
-            } elseif ($status === 'ready') {
-                $ts_col = ', ready_at = NOW()';
-            } elseif ($status === 'picked_up') {
-                $ts_col = ', picked_up_at = NOW()';
-            } elseif ($status === 'cancelled') {
-                $ts_col = ', cancelled_at = NOW()';
-            } else {
-                $ts_col = '';
-            }
-            db_execute(
-                "UPDATE orders SET status = ? {$ts_col}
-                 WHERE id = ? AND shop_id = ?",
-                [$status, $oid, $sid]
-            );
-            // Notify tourist
-            $order = db_fetch_one("SELECT * FROM orders WHERE id = ?", [$oid]);
-            if ($order) {
-                $msgs = [
-                    'confirmed' => ['Order Confirmed!', "Your order #{$order['order_number']} has been confirmed by the shop."],
-                    'preparing' => ['Order Being Prepared', "Your order #{$order['order_number']} is now being prepared!"],
-                    'ready'     => ['Ready for Pickup!', "Your order #{$order['order_number']} is ready. Show your pickup code: {$order['pickup_code']}"],
-                    'picked_up' => ['Order Completed', "Your order #{$order['order_number']} has been picked up. Thanks for ordering!"],
-                    'cancelled' => ['Order Cancelled', "Your order #{$order['order_number']} was cancelled by the shop."],
-                ];
-                if (isset($msgs[$status])) {
-                    db_execute(
-                        "INSERT INTO notifications (user_id, type, title, message, link)
-                         VALUES (?, ?, ?, ?, ?)",
-                        [$order['tourist_id'], 'order_'.$status,
-                         $msgs[$status][0], $msgs[$status][1],
-                         APP_URL . '/pages/my-orders.php']
-                    );
-                }
-            }
+        $oid = (int) input('order_id', 'post', 0);
+        $do  = (string) input('do', 'post', '');
+        $own = db_fetch_one("SELECT id FROM orders WHERE id = ? AND shop_id = ?", [$oid, $sid]);
+        if ($own) {
+            [$ok, $msg] = order_do('owner', $oid, $do, ['reason' => (string) input('reason', 'post', '')]);
+            $_SESSION['flash'][$ok ? 'success' : 'danger'] = $msg;
         }
         // Return to the same filter/page the owner was on
         parse_str((string) input('ret', 'post', ''), $ret_raw);
@@ -215,6 +184,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (isset($ret_raw[$k]) && is_string($ret_raw[$k]) && $ret_raw[$k] !== '') { $ret[$k] = $ret_raw[$k]; }
         }
         header('Location: ' . APP_URL . '/pages/shop-dashboard.php' . ($ret ? '?' . http_build_query($ret) : '') . '#orders'); exit;
+    }
+
+    // ── Deposit settings: GCash QR + when to ask for a deposit ──
+    if ($action === 'update_deposit_settings') {
+        try {
+            $qrUrl = handle_image_upload('gcash_qr', 'qr');
+        } catch (RuntimeException $e) {
+            $_SESSION['flash']['danger'] = $e->getMessage();
+            header('Location: ' . APP_URL . '/pages/shop-dashboard.php#settings'); exit;
+        }
+        $policy  = (string) input('deposit_policy', 'post', 'new_customers');
+        if (!in_array($policy, ['none', 'new_customers', 'always'], true)) $policy = 'new_customers';
+        $percent = max(10, min(100, (int) input('deposit_percent', 'post', 50)));
+        $gname   = mb_substr(trim((string) input('gcash_name', 'post', '')), 0, 120);
+        $gnum    = preg_replace('/[^0-9+ ]/', '', (string) input('gcash_number', 'post', ''));
+
+        $sql = "UPDATE shops SET deposit_policy = ?, deposit_percent = ?, gcash_name = ?, gcash_number = ?";
+        $params = [$policy, $percent, $gname ?: null, mb_substr($gnum, 0, 20) ?: null];
+        if ($qrUrl) { $sql .= ", gcash_qr_url = ?"; $params[] = $qrUrl; }
+        if (input('remove_qr', 'post', '') === '1' && !$qrUrl) { $sql .= ", gcash_qr_url = NULL"; }
+        $sql .= " WHERE id = ?"; $params[] = $sid;
+        db_execute($sql, $params);
+        $_SESSION['flash']['success'] = 'Deposit settings saved.';
+        header('Location: ' . APP_URL . '/pages/shop-dashboard.php#settings'); exit;
     }
 
     // ── Update shop info ──────────────────────────────────────
@@ -265,7 +258,7 @@ $product_photos = [];
 foreach ($product_photos_raw as $pp) { $product_photos[$pp['product_id']][] = $pp; }
 
 // Orders list: filtered, searched and paged on the server so it stays fast as orders pile up.
-$ORDER_STATUSES = ['pending', 'confirmed', 'preparing', 'ready', 'picked_up', 'cancelled'];
+$ORDER_STATUSES = ['pending', 'awaiting_deposit', 'confirmed', 'preparing', 'ready', 'picked_up', 'cancelled', 'no_show'];
 $ord_status = (string) input('ostatus', 'get', '');
 if (!in_array($ord_status, $ORDER_STATUSES, true)) { $ord_status = ''; }
 $ord_q      = trim((string) input('oq', 'get', ''));
@@ -291,12 +284,14 @@ $ord_page  = min($ord_page, $ord_pages);
 $ord_off   = ($ord_page - 1) * $ord_per;
 
 $orders = db_fetch_all(
-    "SELECT o.*, u.name AS tourist_name, u.phone AS tourist_phone
+    "SELECT o.*, u.name AS tourist_name, u.phone AS tourist_phone, u.no_show_count AS tourist_strikes,
+            (SELECT COUNT(*) FROM order_messages m WHERE m.order_id = o.id AND m.kind = 'text'
+                AND m.sender_id <> ? AND m.read_at IS NULL) AS unread
      FROM orders o JOIN users u ON o.tourist_id = u.id
      WHERE {$ord_where_sql}
      ORDER BY o.created_at DESC
      LIMIT {$ord_per} OFFSET {$ord_off}",
-    $ord_params
+    array_merge([$u['id']], $ord_params)
 );
 // Items for just this page's orders, in one query
 $items_by_order = [];
@@ -369,11 +364,11 @@ foreach ($queue as &$q_) {
 unset($q_);
 $inprog = array_column(db_fetch_all(
     "SELECT status, COUNT(*) AS n FROM orders
-      WHERE shop_id = ? AND status IN ('confirmed','preparing','ready') GROUP BY status", [$sid]
+      WHERE shop_id = ? AND status IN ('awaiting_deposit','confirmed','preparing','ready') GROUP BY status", [$sid]
 ), 'n', 'status');
 
-$chip_labels = ['pending' => 'Pending', 'confirmed' => 'Confirmed', 'preparing' => 'Preparing',
-                'ready' => 'Ready', 'picked_up' => 'Picked up', 'cancelled' => 'Cancelled'];
+$chip_labels = ['pending' => 'Pending', 'awaiting_deposit' => 'Awaiting deposit', 'confirmed' => 'Confirmed', 'preparing' => 'Preparing',
+                'ready' => 'Ready', 'picked_up' => 'Picked up', 'cancelled' => 'Cancelled', 'no_show' => 'Missed pickup'];
 // Chip counts cover all of the shop's orders, whatever filter is active.
 $status_counts = array_column(db_fetch_all(
     "SELECT status, COUNT(*) AS n FROM orders WHERE shop_id = ? GROUP BY status", [$sid]
@@ -388,14 +383,18 @@ function sd_orders_url(array $over = []): string {
     return APP_URL . '/pages/shop-dashboard.php' . ($q ? '?' . http_build_query($q) : '') . '#orders';
 }
 
-/** One-button form that moves an order to a new status. */
-function sd_order_btn(int $oid, string $status, string $label, string $cls = 'sd-btn'): string {
-    return '<form method="POST" class="m-0">' . csrf_field()
+/** One-button form for an order action. $confirm shows a browser confirm; $why disables it with a reason. */
+function sd_order_btn(int $oid, string $do, string $label, string $cls = 'sd-btn', ?string $confirm = null, ?string $why = null): string {
+    $ask = ($confirm === 'ask-reason');
+    $js  = ($confirm && !$ask) ? ' onsubmit="return confirm(' . e(json_encode($confirm)) . ')"' : '';
+    if ($ask) { $js = ' onsubmit="var r=prompt(\'Why is the payment not valid?\'); if(r===null) return false; this.reason.value=r; return true;"'; }
+    return '<form method="POST" class="m-0"' . $js . '>' . csrf_field()
          . '<input type="hidden" name="action" value="update_order">'
          . '<input type="hidden" name="order_id" value="' . $oid . '">'
-         . '<input type="hidden" name="status" value="' . e($status) . '">'
+         . '<input type="hidden" name="do" value="' . e($do) . '">'
+         . '<input type="hidden" name="reason" value="">'
          . '<input type="hidden" name="ret" value="' . e((string) ($_SERVER['QUERY_STRING'] ?? '')) . '">'
-         . '<button class="' . e($cls) . '">' . e($label) . '</button></form>';
+         . '<button class="' . e($cls) . '"' . ($why ? ' disabled title="' . e($why) . '"' : '') . '>' . e($label) . ($why ? ' <small>(' . e(strtolower($why)) . ')</small>' : '') . '</button></form>';
 }
 
 // Group products by category: preset categories first (in order), then any
@@ -635,8 +634,8 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
             <div class="sd-q-items"><?= e($q['summary']) ?></div>
             <div class="sd-q-actions">
-              <?= sd_order_btn((int) $q['id'], 'confirmed', 'Accept') ?>
-              <?= sd_order_btn((int) $q['id'], 'cancelled', 'Decline', 'sd-btn-quiet') ?>
+              <?= sd_order_btn((int) $q['id'], 'accept', 'Accept') ?>
+              <?= sd_order_btn((int) $q['id'], 'decline', 'Decline', 'sd-btn-quiet', 'Decline this order?') ?>
             </div>
           </div>
         <?php endforeach; ?>
@@ -688,6 +687,12 @@ require_once __DIR__ . '/../includes/header.php';
 
     <!-- ── ORDERS TAB ──────────────────────────────────────── -->
     <div class="tab-pane fade show active" id="orders">
+      <?php if (empty($shop['gcash_qr_url'])): ?>
+        <div class="alert alert-warning small d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <span><i class="bi bi-shield-exclamation me-1"></i><strong>Protect yourself from no-shows.</strong> Upload your GCash QR so you can ask for a deposit before you start cooking.</span>
+          <a href="#settings" class="btn btn-sm btn-primary-app" data-bs-toggle="tab" data-bs-target="#settings">Set up deposits</a>
+        </div>
+      <?php endif; ?>
       <?php if ($orders_all === 0): ?>
         <div class="py-5 text-center">
           <h5 class="mb-1">No orders yet</h5>
@@ -751,22 +756,31 @@ require_once __DIR__ . '/../includes/header.php';
               <?php if ($ord['special_notes']): ?>
                 <p class="slip-note">Note from customer: <?= e($ord['special_notes']) ?></p>
               <?php endif; ?>
+              <?php if ((int) $ord['tourist_strikes'] > 0 && in_array($ord['status'], ['pending','awaiting_deposit'], true)): ?>
+                <p class="slip-note" style="color:#8a4b08"><i class="bi bi-exclamation-triangle me-1"></i>This customer has <?= (int) $ord['tourist_strikes'] ?> missed pickup<?= (int) $ord['tourist_strikes'] === 1 ? '' : 's' ?>.</p>
+              <?php endif; ?>
+              <?php if ($ord['deposit_required'] || $ord['deposit_status'] !== 'none'):
+                $dl = ['none'=>'Deposit needed','requested'=>'Waiting for deposit','proof_submitted'=>'Proof received: check your GCash','paid'=>'Deposit paid','refund_due'=>'Refund due to customer','refunded'=>'Deposit refunded','forfeited'=>'Deposit kept (no-show)'][$ord['deposit_status']] ?? $ord['deposit_status'];
+              ?>
+                <p class="slip-note" style="color:#8a4b08"><i class="bi bi-wallet2 me-1"></i><?= e($dl) ?>: ₱<?= number_format($ord['deposit_amount'], 2) ?>
+                  <?php if ($ord['deposit_status'] === 'paid'): ?> · balance at pickup ₱<?= number_format(max(0, $ord['total_amount'] - $ord['deposit_amount']), 2) ?><?php endif; ?></p>
+              <?php endif; ?>
 
               <div class="slip-foot">
                 <div class="slip-total">₱<?= number_format($ord['total_amount'], 2) ?>
                   <span class="slip-when">Order <?= e($ord['order_number']) ?>, placed <?= date('M j, g:i A', strtotime($ord['created_at'])) ?></span>
                 </div>
                 <div class="slip-actions">
-                  <?php if ($ord['status'] === 'pending'): ?>
-                    <?= sd_order_btn($oid, 'confirmed', 'Accept') ?>
-                    <?= sd_order_btn($oid, 'cancelled', 'Decline', 'sd-btn-quiet') ?>
-                  <?php elseif ($ord['status'] === 'confirmed'): ?>
-                    <?= sd_order_btn($oid, 'preparing', 'Start preparing', 'sd-btn-sand') ?>
-                  <?php elseif ($ord['status'] === 'preparing'): ?>
-                    <?= sd_order_btn($oid, 'ready', 'Mark ready') ?>
-                  <?php elseif ($ord['status'] === 'ready'): ?>
-                    <?= sd_order_btn($oid, 'picked_up', 'Mark picked up') ?>
-                  <?php endif; ?>
+                  <?php
+                    $btnCls = ['primary' => 'sd-btn', 'sand' => 'sd-btn-sand', 'quiet' => 'sd-btn-quiet', 'danger' => 'sd-btn-quiet'];
+                    foreach (order_available_actions('owner', $ord) as $act) {
+                        echo sd_order_btn($oid, $act[0], $act[1], $btnCls[$act[2]] ?? 'sd-btn', $act[3] ?? null, $act[4] ?? null);
+                    }
+                  ?>
+                  <button type="button" class="sd-btn-quiet position-relative" onclick="openOrderChat(<?= $oid ?>)">
+                    <i class="bi bi-chat-dots me-1"></i>Chat
+                    <?php if ((int) $ord['unread'] > 0): ?><span class="badge rounded-pill bg-danger ms-1" data-chat-badge="<?= $oid ?>"><?= (int) $ord['unread'] ?></span><?php endif; ?>
+                  </button>
                 </div>
               </div>
             </div>
@@ -1074,6 +1088,43 @@ require_once __DIR__ . '/../includes/header.php';
               </button>
             </form>
           </div>
+
+          <div class="form-panel mt-4">
+            <h6 class="fw-bold mb-1" style="color:var(--maroon-dark);font-family:'Playfair Display',serif">
+              <i class="bi bi-wallet2 me-2"></i>Deposits &amp; GCash
+            </h6>
+            <p class="small text-muted mb-3">Ask customers for a deposit before you start cooking. They scan your GCash QR in the order chat and upload proof. You confirm it once you see the money.</p>
+            <form method="POST" enctype="multipart/form-data"><?= csrf_field() ?>
+              <input type="hidden" name="action" value="update_deposit_settings">
+              <div class="mb-3">
+                <label class="form-label">GCash QR code</label>
+                <?php if (!empty($shop['gcash_qr_url'])): ?>
+                  <img src="<?= e($shop['gcash_qr_url']) ?>" alt="Current GCash QR" class="d-block mb-2" style="max-width:180px;border:1px solid var(--border);border-radius:10px">
+                  <label class="small d-block mb-2"><input type="checkbox" name="remove_qr" value="1"> Remove this QR code</label>
+                <?php endif; ?>
+                <input type="file" class="form-control" name="gcash_qr" accept="image/jpeg,image/png,image/webp">
+                <div class="form-text">In GCash, open Receive Money, then QR, then Save to gallery, and upload that image here. JPG, PNG or WEBP, max 3MB.</div>
+              </div>
+              <div class="row g-3 mb-3">
+                <div class="col-sm-6"><label class="form-label">Account name</label>
+                  <input type="text" class="form-control" name="gcash_name" maxlength="120" value="<?= e($shop['gcash_name'] ?? '') ?>"></div>
+                <div class="col-sm-6"><label class="form-label">GCash number</label>
+                  <input type="text" class="form-control" name="gcash_number" maxlength="20" value="<?= e($shop['gcash_number'] ?? '') ?>"></div>
+              </div>
+              <div class="row g-3 mb-4">
+                <div class="col-sm-8"><label class="form-label">When do you want a deposit?</label>
+                  <select class="form-select" name="deposit_policy">
+                    <?php foreach (['new_customers' => 'New customers and large orders (recommended)', 'always' => 'Every order', 'none' => 'Never (cash on pickup only)'] as $k => $lbl): ?>
+                      <option value="<?= $k ?>" <?= ($shop['deposit_policy'] ?? 'new_customers') === $k ? 'selected' : '' ?>><?= e($lbl) ?></option>
+                    <?php endforeach; ?>
+                  </select></div>
+                <div class="col-sm-4"><label class="form-label">Deposit %</label>
+                  <input type="number" class="form-control" name="deposit_percent" min="10" max="100" value="<?= (int) ($shop['deposit_percent'] ?? 50) ?>"></div>
+              </div>
+              <p class="small text-muted">Customers with missed pickups are always asked for a deposit, whatever you choose here, as long as you have a QR uploaded.</p>
+              <button type="submit" class="btn btn-primary-app w-100"><i class="bi bi-floppy me-2"></i>Save deposit settings</button>
+            </form>
+          </div>
         </div>
       </div>
     </div>
@@ -1177,4 +1228,5 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
+<?php require_once __DIR__ . '/../includes/order_chat_panel.php'; ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

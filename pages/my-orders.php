@@ -1,6 +1,6 @@
 <?php
 ob_start();
-require_once __DIR__ . '/../includes/helpers.php';
+require_once __DIR__ . '/../includes/order_safety.php';
 // ============================================================
 // iEXPLORE LAGUNA — Tourist: My Orders Page
 // pages/my-orders.php
@@ -12,18 +12,25 @@ $active_page = '';
 if (!is_logged_in()) { header('Location: ' . APP_URL . '/pages/login.php'); exit; }
 $u = current_user();
 
+ensure_order_safety_schema();
+order_safety_sweep();
+$safety_state = order_safety_user_state((int) $u['id']);
+$standing_msg = order_safety_standing_text($safety_state);
+$new_deposit  = (float) input('dep', 'get', 0);
 $new_order = input('new', 'get', '');
 $new_spot  = input('spot', 'get', '');
 
 $orders = db_fetch_all(
     "SELECT o.*, s.name AS shop_name, s.id AS shop_id,
-            c.name AS city_name
+            c.name AS city_name,
+            (SELECT COUNT(*) FROM order_messages m WHERE m.order_id = o.id AND m.kind = 'text'
+                AND m.sender_id <> ? AND m.read_at IS NULL) AS unread
      FROM orders o
      JOIN shops  s ON o.shop_id  = s.id
      JOIN cities c ON s.city_id  = c.id
      WHERE o.tourist_id = ?
      ORDER BY o.created_at DESC",
-    [$u['id']]
+    [$u['id'], $u['id']]
 );
 
 // Order status colors/icons/labels now come from the shared
@@ -46,13 +53,23 @@ require_once __DIR__ . '/../includes/header.php';
 
 <div class="container py-4">
 
+  <?php if ($standing_msg): ?>
+  <div class="alert alert-warning d-flex align-items-start gap-3 mb-4" style="border-radius:var(--radius)">
+    <i class="bi bi-exclamation-triangle-fill fs-4 flex-shrink-0"></i>
+    <div><?= e($standing_msg) ?></div>
+  </div>
+  <?php endif; ?>
+
   <?php if ($new_order): ?>
   <div class="alert alert-success d-flex align-items-start gap-3 mb-4" style="border-radius:var(--radius)">
     <i class="bi bi-check-circle-fill fs-4 flex-shrink-0"></i>
     <div>
       <div class="fw-bold mb-1">Order Placed Successfully!</div>
       <div>Your order <strong><?= e($new_order) ?></strong> has been sent to the shop.
-        You'll be notified when it's confirmed and ready for pickup.</div>
+        You'll be notified when it's confirmed and ready for pickup.
+        <?php if ($new_deposit > 0): ?>
+          <div class="mt-2 fw-semibold">This order needs a ₱<?= number_format($new_deposit, 2) ?> deposit. Once the shop accepts it, you will get a message with the shop's GCash QR code and 30 minutes to pay.</div>
+        <?php endif; ?></div>
     </div>
   </div>
   <div id="itinerary-nudge" class="alert <?= $new_spot ? 'd-flex' : 'd-none' ?> align-items-start gap-3 mb-4"
@@ -94,6 +111,17 @@ require_once __DIR__ . '/../includes/header.php';
           </div>
           <span class="text-muted small"><?= date('M d, Y g:i A', strtotime($ord['created_at'])) ?></span>
         </div>
+
+        <?php if ($ord['status'] === 'awaiting_deposit' && $ord['deposit_status'] === 'requested'): ?>
+        <div class="px-3 pt-3">
+          <div class="alert alert-warning mb-0 py-2 small d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span><i class="bi bi-wallet2 me-1"></i>Pay the <strong>₱<?= number_format($ord['deposit_amount'], 2) ?></strong> deposit before <strong><?= date('g:i A', strtotime($ord['deposit_due_at'])) ?></strong> or the order is cancelled.</span>
+            <button type="button" class="btn btn-sm btn-primary-app" onclick="openOrderChat(<?= (int) $ord['id'] ?>)">Pay deposit</button>
+          </div>
+        </div>
+        <?php elseif ($ord['status'] === 'no_show'): ?>
+        <div class="px-3 pt-3"><div class="alert alert-danger mb-0 py-2 small">This order was not picked up and counted as a missed pickup.</div></div>
+        <?php endif; ?>
 
         <div class="p-3">
           <div class="row g-3 align-items-start">
@@ -162,22 +190,29 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
 
         <!-- Action footer -->
-        <?php if ($ord['status'] === 'pending'): ?>
-        <div class="px-3 pb-3">
-          <form method="POST" action="<?= APP_URL ?>/api/cancel-order.php">
+        <div class="px-3 pb-3 d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary position-relative" style="border-radius:var(--radius-pill)"
+                  onclick="openOrderChat(<?= (int) $ord['id'] ?>)">
+            <i class="bi bi-chat-dots me-1"></i>Chat with shop
+            <?php if ((int) $ord['unread'] > 0): ?>
+              <span class="badge rounded-pill bg-danger ms-1" data-chat-badge="<?= (int) $ord['id'] ?>"><?= (int) $ord['unread'] ?></span>
+            <?php endif; ?>
+          </button>
+          <?php if (in_array($ord['status'], ['pending', 'awaiting_deposit', 'confirmed'], true)): ?>
+          <form method="POST" action="<?= APP_URL ?>/api/cancel-order.php" class="m-0">
             <?= csrf_field() ?>
             <input type="hidden" name="order_id" value="<?= $ord['id'] ?>">
             <button type="button" class="btn btn-sm btn-outline-danger js-confirm-action" style="border-radius:var(--radius-pill)"
               data-icon="bi-x-circle" data-icon-bg="#fee2e2" data-icon-color="#a61c1c"
               data-title="Cancel this order?" data-name="<?= e($ord['shop_name']) ?>"
               data-meta="₱<?= number_format($ord['total_amount'],2) ?>"
-              data-body="This can't be undone. You'll need to place a new order if you change your mind."
+              data-body="<?= in_array($ord['deposit_status'], ['paid', 'proof_submitted'], true) ? 'You already paid a deposit. The shop will be asked to refund it. You can message them in the chat.' : 'This can\'t be undone. You\'ll need to place a new order if you change your mind.' ?>"
               data-confirm-label="Yes, cancel" data-confirm-class="btn-danger">
               <i class="bi bi-x-circle me-1"></i>Cancel Order
             </button>
           </form>
+          <?php endif; ?>
         </div>
-        <?php endif; ?>
 
       </div>
       <?php endforeach; ?>
@@ -268,4 +303,5 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
+<?php require_once __DIR__ . '/../includes/order_chat_panel.php'; ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

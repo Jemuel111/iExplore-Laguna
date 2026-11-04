@@ -1,6 +1,6 @@
 <?php
 ob_start();
-require_once __DIR__ . '/../includes/helpers.php';
+require_once __DIR__ . '/../includes/order_safety.php';
 // ============================================================
 // iEXPLORE LAGUNA — Public Shop Page (Tourist View)
 // pages/shop.php?id=SHOP_ID
@@ -22,6 +22,22 @@ $shop = db_fetch_one(
     [$shop_id]
 );
 if (!$shop) { header('Location: ' . APP_URL . '/pages/explore.php'); exit; }
+
+// Deposit rules for this shop + this tourist, so the order box can warn before they press "Place Order"
+ensure_order_safety_schema();
+$__cfg = order_safety_config();
+$__os  = is_logged_in() ? order_safety_user_state((int) current_user()['id'])
+                        : ['strikes' => 0, 'blocked' => false, 'blocked_until' => null, 'completed_pickups' => 0, 'active_orders' => 0, 'always_deposit' => false];
+$__os_banner = is_logged_in() ? order_safety_standing_text($__os) : null;
+$__os_js = [
+    'hasQr'     => !empty($shop['gcash_qr_url']),
+    'policy'    => $shop['deposit_policy'] ?? 'new_customers',
+    'percent'   => max(10, min(100, (int) ($shop['deposit_percent'] ?? 50) ?: 50)),
+    'completed' => $__os['completed_pickups'],
+    'always'    => $__os['always_deposit'],
+    'cap'       => $__cfg['new_cash_cap'],
+    'large'     => $__cfg['large_order'],
+];
 
 // SEO — real per-shop title/description instead of the generic "Shop"
 // every shop page used to show.
@@ -325,6 +341,11 @@ require_once __DIR__ . '/../includes/header.php';
             <span>Total</span>
             <span style="color:var(--maroon-dark)" id="order-total">₱0.00</span>
           </div>
+          <?php if ($__os_banner): ?>
+            <div class="alert alert-warning py-2 small mb-3"><?= e($__os_banner) ?></div>
+          <?php endif; ?>
+          <div id="deposit-hint" class="small mb-3" style="display:none;background:#fff7ed;border:1px solid #f6d3ad;border-radius:10px;padding:.55rem .7rem"></div>
+          <div class="small text-muted mb-3">Missed pickups are recorded. Repeated no-shows lead to deposits and then a temporary ordering pause.</div>
 
           <button class="btn btn-primary-app w-100" id="place-order-btn"
                   onclick="placeOrder(<?= $shop_id ?>)" disabled>
@@ -412,6 +433,23 @@ function changeQty(pid, delta, name, price) {
   renderOrderSidebar();
 }
 
+const DEPOSIT_RULES = <?= json_encode($__os_js) ?>;
+function updateDepositHint(total) {
+  const box = document.getElementById('deposit-hint'), r = DEPOSIT_RULES;
+  let need = false, why = '';
+  if (r.always) { need = true; why = 'Your account needs a deposit for every order.'; }
+  else if (r.hasQr && r.policy !== 'none') {
+    if (r.policy === 'always') { need = true; why = 'This shop asks for a deposit on every order.'; }
+    else if (total > r.large) { need = true; why = 'Orders above ₱' + r.large.toLocaleString() + ' need a deposit.'; }
+    else if (r.completed === 0 && total > r.cap) { need = true; why = 'First orders above ₱' + r.cap + ' need a deposit.'; }
+  }
+  if (!need || total <= 0) { box.style.display = 'none'; return; }
+  const amt = (total * r.percent / 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  box.style.display = '';
+  box.innerHTML = '<i class="bi bi-wallet2 me-1"></i><strong>Deposit needed: ₱' + amt + '</strong> (' + r.percent + '%). ' + why +
+                  ' After the shop accepts, you pay it by GCash QR in the order chat. Unpaid deposits are cancelled automatically after 30 minutes.';
+}
+
 function renderOrderSidebar() {
   const list  = document.getElementById('order-items-list');
   const emsg  = document.getElementById('empty-cart-msg');
@@ -419,6 +457,7 @@ function renderOrderSidebar() {
   const btn   = document.getElementById('place-order-btn');
 
   document.getElementById('order-total').textContent = '₱' + total.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  updateDepositHint(total);
 
   if (Object.keys(orderCart).length === 0) {
     list.innerHTML = '<p class="text-muted small text-center mb-0 py-2"><i class="bi bi-bag d-block fs-3 mb-1 opacity-25"></i>No items yet — add from the menu!</p>';
@@ -466,7 +505,7 @@ function placeOrder(shopId) {
       addToItineraryCart(SHOP_CART_ITEM);
       let spotQS = '';
       if (NEARBY_SPOT_ITEM) { addToItineraryCart(NEARBY_SPOT_ITEM); spotQS = '&spot=' + encodeURIComponent(NEARBY_SPOT_ITEM.name); }
-      window.location.href = '<?= APP_URL ?>/pages/my-orders.php?new=' + data.order_number + spotQS;
+      window.location.href = '<?= APP_URL ?>/pages/my-orders.php?new=' + data.order_number + spotQS + (data.deposit_required ? '&dep=' + data.deposit_amount : '');
     } else {
       alert(data.message || 'Failed to place order. Please try again.');
       btn.disabled = false;

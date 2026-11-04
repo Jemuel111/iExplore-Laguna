@@ -4,6 +4,7 @@
 // api/orders.php  POST → place order
 // ============================================================
 require_once __DIR__ . '/../includes/helpers.php';
+require_once __DIR__ . '/../includes/order_safety.php';
 
 header('Content-Type: application/json');
 
@@ -27,6 +28,20 @@ if (in_array(($u['role'] ?? ''), ['admin', 'city_admin'], true)) {
 }
 csrf_verify_header();
 $data = json_decode(file_get_contents('php://input'), true);
+
+// ── Order safety: expire stale deposits, then check this tourist's standing ──
+ensure_order_safety_schema();
+order_safety_sweep();
+$safety = order_safety_user_state((int) $u['id']);
+$cfg    = order_safety_config();
+if ($safety['blocked']) {
+    echo json_encode(['success'=>false,'message'=>'Ordering is paused on your account until ' . date('M j, Y', strtotime($safety['blocked_until'])) . ' because of repeated missed pickups. Please contact the site admin if you think this is a mistake.']);
+    exit;
+}
+if ($safety['active_orders'] >= $cfg['max_active_orders']) {
+    echo json_encode(['success'=>false,'message'=>'You already have ' . $safety['active_orders'] . ' open orders. Please pick up or cancel one before placing another.']);
+    exit;
+}
 
 $shop_id        = (int)   ($data['shop_id']        ?? 0);
 $items          = (array) ($data['items']          ?? []);
@@ -79,6 +94,16 @@ if (empty($line_items)) {
 }
 
 // Generate order number and pickup code
+$deposit = order_safety_deposit_requirement($shop, $safety, (float) $subtotal);
+if ($deposit['error']) {
+    echo json_encode(['success'=>false,'message'=>$deposit['error']]);
+    exit;
+}
+if ($pickup_date && $pickup_date < date('Y-m-d')) {
+    echo json_encode(['success'=>false,'message'=>'The pickup date cannot be in the past.']);
+    exit;
+}
+
 $order_number = 'ORD-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -5));
 $pickup_code  = strtoupper(substr(md5(uniqid()), 0, 6));
 
@@ -86,14 +111,16 @@ $pickup_code  = strtoupper(substr(md5(uniqid()), 0, 6));
 db_execute(
     "INSERT INTO orders
        (order_number, tourist_id, shop_id, status, subtotal, total_amount,
-        special_notes, pickup_date, pickup_time, pickup_code)
-     VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)",
+        special_notes, pickup_date, pickup_time, pickup_code, deposit_required, deposit_amount)
+     VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)",
     [
         $order_number, $u['id'], $shop_id, $subtotal, $subtotal,
-        $notes ?: null,
+        mb_substr((string) $notes, 0, 500) ?: null,
         $pickup_date ?: null,
         $pickup_time ?: null,
         $pickup_code,
+        $deposit['required'] ? 1 : 0,
+        $deposit['required'] ? $deposit['amount'] : 0,
     ]
 );
 
@@ -125,7 +152,7 @@ db_execute(
     [
         $shop['owner_id'],
         'New Order: ' . $order_number,
-        "You have a new order from {$u['name']} — ₱" . number_format($subtotal, 2),
+        "You have a new order from {$u['name']} — ₱" . number_format($subtotal, 2) . ($deposit['required'] ? ' (deposit required: ₱' . number_format($deposit['amount'], 2) . ')' : ''),
         APP_URL . '/pages/shop-dashboard.php#orders'
     ]
 );
@@ -147,4 +174,6 @@ echo json_encode([
     'order_number' => $order_number,
     'pickup_code'  => $pickup_code,
     'total'        => $subtotal,
+    'deposit_required' => $deposit['required'],
+    'deposit_amount'   => $deposit['required'] ? $deposit['amount'] : 0,
 ]);

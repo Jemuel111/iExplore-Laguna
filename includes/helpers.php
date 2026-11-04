@@ -334,6 +334,8 @@ function haversine_meters(float $lat1, float $lon1, float $lat2, float $lon2): f
 function order_status_meta(string $status): array {
     $map = [
         'pending'   => ['bg'=>'#fff3cd','fg'=>'#856404','icon'=>'bi-hourglass-split',  'label'=>'Pending'],
+        'awaiting_deposit' => ['bg'=>'#fde8d0','fg'=>'#8a4b08','icon'=>'bi-wallet2',     'label'=>'Awaiting Deposit'],
+        'no_show'   => ['bg'=>'#f8d7da','fg'=>'#721c24','icon'=>'bi-person-x-fill',     'label'=>'Missed Pickup'],
         'confirmed' => ['bg'=>'#d1ecf1','fg'=>'#0c5460','icon'=>'bi-check-circle-fill','label'=>'Confirmed'],
         'preparing' => ['bg'=>'#d4edda','fg'=>'#155724','icon'=>'bi-egg-fried',         'label'=>'Preparing'],
         'ready'     => ['bg'=>'#d4edda','fg'=>'#155724','icon'=>'bi-bag-check-fill',    'label'=>'Ready for Pickup!'],
