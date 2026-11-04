@@ -658,6 +658,25 @@ function detourKm(oLat, oLng, spotLat, spotLng, dLat, dLng) {
 // one planning operation.
 const roadDetourCache = new Map();
 
+// Limit routing lookups so a route with many nearby attractions does not
+// flood the PHP endpoint or the external routing provider with requests.
+async function mapWithConcurrency(items, limit, mapper) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (true) {
+      const index = nextIndex++;
+      if (index >= items.length) return;
+      results[index] = await mapper(items[index], index);
+    }
+  }
+
+  const workerCount = Math.min(Math.max(1, limit), items.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}
+
 async function getRoadDetour(origin, spot, destination, directRoadKm = null) {
   const oLat = parseFloat(origin.latitude);
   const oLng = parseFloat(origin.longitude);
@@ -688,7 +707,24 @@ async function getRoadDetour(origin, spot, destination, directRoadKm = null) {
       params.set('direct_km', directRoadKm);
     }
 
-    const res = await fetch(API_BASE + 'routes.php?' + params.toString()).then(r => r.json());
+    // Do not leave a browser request hanging indefinitely if the server or
+    // routing provider becomes slow. The PHP endpoint has its own timeout.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    let response;
+    try {
+      response = await fetch(API_BASE + 'routes.php?' + params.toString(), {
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' },
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    if (!response.ok) {
+      throw new Error(`Route API returned HTTP ${response.status}`);
+    }
+    const res = await response.json();
 
     if (res.success && res.data) {
       const result = {
@@ -1027,7 +1063,11 @@ async function planRoute() {
       // origin → attraction → destination. This is the important fix.
       // A place is included only if the extra driving distance is within
       // the allowed detour.
-      const checked = await Promise.all(candidates.map(async s => {
+      // Check at most 3 attractions at a time. Promise.all(candidates.map(...))
+      // can launch dozens of PHP/TomTom requests simultaneously and overload
+      // shared hosting. The worker pool preserves candidate order while
+      // keeping the number of in-flight requests predictable.
+      const checked = await mapWithConcurrency(candidates, 3, async s => {
         const result = await getRoadDetour(
           routeData.origin,
           s,
@@ -1041,7 +1081,7 @@ async function planRoute() {
           viaRoadKm: result.viaRoadKm,
           roadBased: result.roadBased,
         };
-      }));
+      });
 
       const accepted = checked
         .filter(x => Number.isFinite(x.detourKm) && x.detourKm <= detourCapKm)
